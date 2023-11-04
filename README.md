@@ -1,12 +1,12 @@
-#CryptoTweetSense
+# CryptoTweetSense
 
 Discover the pulse of the cryptocurrency market with CryptoTweetSense – your intelligent tool for surfacing the most popular crypto conversations on Twitter and engaging with them directly from Telegram.
 
-Project Overview
+## Project Overview
 
 CryptoTweetSense is a cutting-edge application designed to bridge the gap between social media buzz and crypto enthusiasts. This tool empowers users to sift through the noise of Twitter to find and share the most relevant and trending crypto-related tweets. By integrating with Telegram, it not only simplifies the process of content dissemination but also involves the community in content curation through a democratic voting feature.
 
-Features
+## Features
 
 Real-Time Twitter Scraper: Leverages Twitter's API to continuously monitor and retrieve tweets that are gaining traction within the crypto community.
 Intelligent Filtering Algorithm: Applies a set of heuristics and user preferences to score and select the most impactful tweets, ensuring quality content.
@@ -31,10 +31,10 @@ Getting Started
 
 Please refer to our INSTALL.md for detailed installation instructions, and USAGE.md for guidance on how to use CryptoTweetSense.
 
-Contribution
+## Contribution
 
 We welcome contributions from the community! Please read our CONTRIBUTING.md for how you can contribute to making CryptoTweetSense better.
 
-License
+## License
 
 This project is licensed under the MIT License - see the LICENSE.md file for details.
