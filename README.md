@@ -1,4 +1,4 @@
-CryptoTweetSense
+#CryptoTweetSense
 
 Discover the pulse of the cryptocurrency market with CryptoTweetSense – your intelligent tool for surfacing the most popular crypto conversations on Twitter and engaging with them directly from Telegram.
 
