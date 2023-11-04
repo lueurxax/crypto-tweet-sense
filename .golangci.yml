@@ -1,0 +1,48 @@
+run:
+  deadline: 3m
+
+linters:
+  enable:
+    - asciicheck
+    - bodyclose
+    - deadcode
+    - errcheck
+    - gas
+    - gocritic
+    - gofmt
+    - goimports
+    - gosec
+    - govet
+    - gosimple
+    - ineffassign
+    - megacheck
+    - misspell
+    - nestif
+    - revive
+    - staticcheck
+    - structcheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - prealloc
+    - thelper
+    - promlinter
+    - wastedassign
+  fast: false
+
+linters-settings:
+  revive:
+    rules:
+      - name: blank-imports
+        disabled: true
+
+  gocritic:
+    disabled-checks:
+      - ifElseChain
+
+  gosec:
+    excludes:
+      - G402  # TLS InsecureSkipVerify
+      - G404  # random
+      - G108  # pprof
