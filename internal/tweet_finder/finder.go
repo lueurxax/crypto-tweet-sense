@@ -69,7 +69,7 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 			f.log.
 				WithField("created", tweet.TimeParsed).
 				WithField("count", debugInterval).
-				Debug("processed %d tweets")
+				Debug("processed tweets")
 		}
 		if tweet.TimeParsed.Sub(until).Seconds() < 0 {
 			cancel()
