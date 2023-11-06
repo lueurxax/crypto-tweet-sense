@@ -68,8 +68,9 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 		if counter%debugInterval == 0 {
 			f.log.
 				WithField("created", tweet.TimeParsed).
-				WithField("count", debugInterval).
+				WithField("count", counter).
 				Debug("processed tweets")
+			f.decDelay()
 		}
 		if tweet.TimeParsed.Sub(until).Seconds() < 0 {
 			cancel()
@@ -97,7 +98,6 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 	f.log.WithField("map", likesMap).Debug("likes count")
 	f.log.WithField("map", retweetsMap).Debug("retweet count")
 	f.log.WithField("map", replyMap).Debug("reply count")
-	f.decDelay()
 
 	return response, nil
 }
