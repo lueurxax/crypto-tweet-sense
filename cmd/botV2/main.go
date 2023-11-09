@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	foundeationDB "github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/kelseyhightower/envconfig"
 	twitterscraper "github.com/n0madic/twitter-scraper"
 	"github.com/sirupsen/logrus"
@@ -26,19 +27,25 @@ import (
 
 var version = "dev"
 
+const (
+	foundationDBVersion = 710
+	pkgKey              = "pkg"
+)
+
 type config struct {
-	TopCount    int          `envconfig:"TOP_COUNT" default:"1000"`
-	LoggerLevel logrus.Level `envconfig:"LOG_LEVEL" default:"info"`
-	LogToEcs    bool         `envconfig:"LOG_TO_ECS" default:"false"`
-	SessionFile string       `envconfig:"SESSION_FILE" required:"true"`
-	BotToken    string       `envconfig:"BOT_TOKEN" required:"true"`
-	XLogin      string       `envconfig:"X_LOGIN" required:"true"`
-	XPassword   string       `envconfig:"X_PASSWORD" required:"true"`
-	ChannelID   int64        `envconfig:"CHANNEL_ID" required:"true"`
-	ChatID      int64        `envconfig:"CHAT_ID" required:"true"`
-	AppID       int          `envconfig:"APP_ID" required:"true"`
-	AppHash     string       `envconfig:"APP_HASH" required:"true"`
-	Phone       string       `envconfig:"PHONE" required:"true"`
+	TopCount     int          `envconfig:"TOP_COUNT" default:"1000"`
+	LoggerLevel  logrus.Level `envconfig:"LOG_LEVEL" default:"info"`
+	LogToEcs     bool         `envconfig:"LOG_TO_ECS" default:"false"`
+	SessionFile  string       `envconfig:"SESSION_FILE" required:"true"`
+	BotToken     string       `envconfig:"BOT_TOKEN" required:"true"`
+	XLogin       string       `envconfig:"X_LOGIN" required:"true"`
+	XPassword    string       `envconfig:"X_PASSWORD" required:"true"`
+	ChannelID    int64        `envconfig:"CHANNEL_ID" required:"true"`
+	ChatID       int64        `envconfig:"CHAT_ID" required:"true"`
+	AppID        int          `envconfig:"APP_ID" required:"true"`
+	AppHash      string       `envconfig:"APP_HASH" required:"true"`
+	Phone        string       `envconfig:"PHONE" required:"true"`
+	DatabasePath string       `default:"/usr/local/etc/foundationdb/fdb.cluster"`
 }
 
 func main() {
@@ -48,9 +55,6 @@ func main() {
 		fmt.Println(version)
 		return
 	}
-	go func() {
-		println(http.ListenAndServe("localhost:6060", nil))
-	}()
 
 	// init main config
 	cfg := new(config)
@@ -67,6 +71,15 @@ func main() {
 	logger := log.NewLogger(logrusLogger)
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	foundeationDB.MustAPIVersion(foundationDBVersion)
+
+	db, err := foundeationDB.OpenDatabase(cfg.DatabasePath)
+	if err != nil {
+		panic(err)
+	}
+
+	st := fdb.NewDB(db, logrusLogger.WithField(pkgKey, "fdb"))
 
 	ratingFetcher := ratingCollector.NewFetcher(cfg.AppID, cfg.AppHash, cfg.Phone, cfg.SessionFile, logger)
 	if err := ratingFetcher.Auth(ctx); err != nil {

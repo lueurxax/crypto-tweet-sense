@@ -10,7 +10,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	go.elastic.co/ecslogrus v1.0.0
 	go.uber.org/zap v1.26.0
-	golang.org/x/crypto v0.14.0
+	github.com/apple/foundationdb/bindings/go v0.0.0-20230508183941-1098aa0251f4
 	gopkg.in/telebot.v3 v3.1.4
 )
 
