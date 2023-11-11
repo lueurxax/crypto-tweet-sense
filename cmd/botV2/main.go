@@ -29,20 +29,20 @@ import (
 var version = "dev"
 
 type config struct {
-	TopCount           int           `envconfig:"TOP_COUNT" default:"1000"`
-	LoggerLevel        logrus.Level  `envconfig:"LOG_LEVEL" default:"info"`
-	LogToEcs           bool          `envconfig:"LOG_TO_ECS" default:"false"`
-	SessionFile        string        `envconfig:"SESSION_FILE" required:"true"`
-	BotToken           string        `envconfig:"BOT_TOKEN" required:"true"`
-	XLogin             string        `envconfig:"X_LOGIN" required:"true"`
-	XPassword          string        `envconfig:"X_PASSWORD" required:"true"`
-	ChannelID          int64         `envconfig:"CHANNEL_ID" required:"true"`
-	ChatID             int64         `envconfig:"CHAT_ID" required:"true"`
-	AppID              int           `envconfig:"APP_ID" required:"true"`
-	AppHash            string        `envconfig:"APP_HASH" required:"true"`
-	Phone              string        `envconfig:"PHONE" required:"true"`
-	ChatGPTToken       string        `envconfig:"CHAT_GPT_TOKEN" required:"true"`
-	EditorSendInterval time.Duration `envconfig:"EDITOR_SEND_INTERVAL" default:"2h"`
+	LoggerLevel        logrus.Level  `envconfig:"LOG_LEVEL" default:"info"`          // Log level for logrus logger
+	LogToEcs           bool          `envconfig:"LOG_TO_ECS" default:"false"`        // Log to ECS format
+	TopCount           int           `envconfig:"TOP_COUNT" default:"1000"`          // Count of top tweets to check
+	SessionFile        string        `envconfig:"SESSION_FILE" required:"true"`      // Path to telegram session file
+	BotToken           string        `envconfig:"BOT_TOKEN" required:"true"`         // Telegram bot token
+	XLogin             string        `envconfig:"X_LOGIN" required:"true"`           // Twitter login
+	XPassword          string        `envconfig:"X_PASSWORD" required:"true"`        // Twitter password
+	ChannelID          int64         `envconfig:"CHANNEL_ID" required:"true"`        // Telegram channel id
+	ChatID             int64         `envconfig:"CHAT_ID" required:"true"`           // Telegram chat id
+	AppID              int           `envconfig:"APP_ID" required:"true"`            // Telegram app id
+	AppHash            string        `envconfig:"APP_HASH" required:"true"`          // Telegram app hash
+	Phone              string        `envconfig:"PHONE" required:"true"`             // Telegram phone number
+	ChatGPTToken       string        `envconfig:"CHAT_GPT_TOKEN" required:"true"`    // OpenAI token
+	EditorSendInterval time.Duration `envconfig:"EDITOR_SEND_INTERVAL" default:"2h"` // Interval to send edited tweets to telegram
 }
 
 func main() {

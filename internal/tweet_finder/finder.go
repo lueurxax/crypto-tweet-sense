@@ -108,14 +108,16 @@ func (f *finder) incRandomDelay() {
 	}
 	f.delay += rand.Int63n(f.delay) + 1
 	f.scraper.WithDelay(f.delay)
+	f.log.WithField("delay", f.delay).Debug("delay increased")
 }
 
 func (f *finder) decDelay() {
-	if f.delay <= 0 {
+	if f.delay <= 5 {
 		return
 	}
 	f.delay--
 	f.scraper.WithDelay(f.delay)
+	f.log.WithField("delay", f.delay).Debug("delay decreased")
 }
 
 func (f *finder) Find(ctx context.Context, start, end time.Time, search string) (string, error) {
