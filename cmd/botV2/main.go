@@ -121,7 +121,8 @@ func main() {
 		panic(err)
 	}
 	checker := ratingCollector.NewChecker(res, cfg.TopCount)
-	finder := tweetFinder.NewFinder(scraper, checker, 10, logger)
+	delayManager := tweetFinder.NewDelayManager(func(seconds int64) { scraper.WithDelay(seconds) }, 10)
+	finder := tweetFinder.NewFinder(scraper, checker, delayManager, logger)
 	watch := watcher.NewWatcher(finder, links, logger)
 	checker.CollectRatings(ratingFetcher.Subscribe(ctx, cfg.ChannelID))
 

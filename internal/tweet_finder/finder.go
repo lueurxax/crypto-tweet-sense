@@ -3,7 +3,6 @@ package tweet_finder
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -13,15 +12,20 @@ import (
 )
 
 const (
-	limit        = 10000
-	format       = "2006-01-02"
-	minimalDelay = 5
+	limit  = 10000
+	format = "2006-01-02"
 )
 
 type Finder interface {
 	Find(ctx context.Context, start, end time.Time, search string) (string, error)
 	FindAll(ctx context.Context, start, end *time.Time, search string) ([]twitterscraper.Tweet, error)
 	FindAllByUser(ctx context.Context, username string) ([]twitterscraper.Tweet, error)
+}
+
+type delayManager interface {
+	TooManyRequests()
+	ProcessedBatchOfTweets()
+	ProcessedQuery()
 }
 
 type ratingChecker interface {
@@ -31,7 +35,7 @@ type ratingChecker interface {
 type finder struct {
 	scraper *twitterscraper.Scraper
 	ratingChecker
-	delay int64
+	delayManager
 
 	log log.Logger
 }
@@ -59,8 +63,7 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 	for tweet := range tweetsCh {
 		if tweet.Error != nil {
 			if strings.Contains(tweet.Error.Error(), "429 Too Many Requests") {
-				f.log.WithError(tweet.Error).WithField("delay", f.delay).Error("too many requests")
-				f.incRandomDelay()
+				f.delayManager.TooManyRequests()
 				return response, nil
 			}
 			return nil, tweet.Error
@@ -71,7 +74,7 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 				WithField("created", tweet.TimeParsed).
 				WithField("count", counter).
 				Debug("processed tweets")
-			f.decDelay()
+			f.delayManager.ProcessedBatchOfTweets()
 		}
 		if tweet.TimeParsed.Sub(until).Seconds() < 0 {
 			cancel()
@@ -94,6 +97,9 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 		}
 		lastTweetTime = tweet.TimeParsed
 	}
+
+	f.delayManager.ProcessedQuery()
+
 	f.log.WithField("created", lastTweetTime).Debug("last tweet")
 	f.log.WithField("count", counter).Debug("tweets found")
 	f.log.WithField("map", likesMap).Debug("likes count")
@@ -101,25 +107,6 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 	f.log.WithField("map", replyMap).Debug("reply count")
 
 	return response, nil
-}
-
-func (f *finder) incRandomDelay() {
-	if f.delay == 0 {
-		f.delay = 1
-	}
-	f.delay += rand.Int63n(f.delay-minimalDelay+1) + 1
-	f.scraper.WithDelay(f.delay)
-	f.log.WithField("delay", f.delay).Debug("delay increased")
-}
-
-func (f *finder) decDelay() {
-	if f.delay <= minimalDelay {
-		f.log.WithField("delay", f.delay).Debug("delay is minimal")
-		return
-	}
-	f.delay--
-	f.scraper.WithDelay(f.delay)
-	f.log.WithField("delay", f.delay).Debug("delay decreased")
 }
 
 func (f *finder) Find(ctx context.Context, start, end time.Time, search string) (string, error) {
@@ -185,10 +172,10 @@ func (f *finder) FindAllByUser(ctx context.Context, username string) ([]twitters
 	return response, nil
 }
 
-func NewFinder(scraper *twitterscraper.Scraper, ratingChecker ratingChecker, delay int64, logger log.Logger) Finder {
+func NewFinder(scraper *twitterscraper.Scraper, ratingChecker ratingChecker, delayManager delayManager, logger log.Logger) Finder {
 	return &finder{
 		scraper:       scraper,
-		delay:         delay,
+		delayManager:  delayManager,
 		ratingChecker: ratingChecker,
 		log:           logger,
 	}
