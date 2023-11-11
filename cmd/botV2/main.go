@@ -132,7 +132,7 @@ func main() {
 	s := sender.NewSender(api, &telebot.Chat{ID: cfg.ChatID})
 	ctx = s.Send(ctx, watch.Subscribe())
 	editor := tweets_editor.NewEditor(openai.NewClient(cfg.ChatGPTToken), cfg.EditorSendInterval, logger)
-	editor.Edit(ctx, watch.Subscribe())
+	editor.Edit(ctx, watch.RawSubscribe())
 	ctx = s.Send(ctx, editor.SubscribeEdited())
 	watch.Watch()
 	logger.Info("service started")
