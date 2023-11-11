@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	twitterscraper "github.com/n0madic/twitter-scraper"
@@ -16,6 +17,7 @@ import (
 type Watcher interface {
 	Watch()
 	Subscribe() <-chan string
+	RawSubscribe() <-chan string
 }
 
 type finder interface {
@@ -25,13 +27,27 @@ type finder interface {
 
 type watcher struct {
 	finder
-	subscriber chan string
-	published  map[string]struct{}
-	logger     log.Logger
+	subMu          sync.RWMutex
+	subscribers    []chan string
+	rawSubscribers []chan string
+	published      map[string]struct{}
+	logger         log.Logger
+}
+
+func (w *watcher) RawSubscribe() <-chan string {
+	w.subMu.Lock()
+	defer w.subMu.Unlock()
+	subscriber := make(chan string)
+	w.rawSubscribers = append(w.rawSubscribers, subscriber)
+	return subscriber
 }
 
 func (w *watcher) Subscribe() <-chan string {
-	return w.subscriber
+	w.subMu.Lock()
+	defer w.subMu.Unlock()
+	subscriber := make(chan string)
+	w.subscribers = append(w.subscribers, subscriber)
+	return subscriber
 }
 
 func (w *watcher) Watch() {
@@ -75,7 +91,14 @@ func (w *watcher) runWithQuery(ctx context.Context, query string, start time.Tim
 		}
 		w.published[tweet.PermanentURL] = struct{}{}
 
-		w.subscriber <- w.formatTweet(tweet)
+		w.subMu.RLock()
+		for _, subscriber := range w.subscribers {
+			subscriber <- w.formatTweet(tweet)
+		}
+		for _, subscriber := range w.rawSubscribers {
+			subscriber <- tweet.Text
+		}
+		w.subMu.RUnlock()
 	}
 }
 
@@ -102,9 +125,10 @@ func escape(data string) string {
 
 func NewWatcher(finder finder, initPublished map[string]struct{}, logger log.Logger) Watcher {
 	return &watcher{
-		finder:     finder,
-		subscriber: make(chan string),
-		published:  initPublished,
-		logger:     logger,
+		finder:         finder,
+		subscribers:    make([]chan string, 0),
+		rawSubscribers: make([]chan string, 0),
+		published:      initPublished,
+		logger:         logger,
 	}
 }
