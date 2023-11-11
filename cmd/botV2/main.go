@@ -18,6 +18,8 @@ import (
 	"go.elastic.co/ecslogrus"
 	"gopkg.in/telebot.v3"
 
+	"github.com/lueurxax/crypto-tweet-sense/internal/tweets_editor"
+
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 	ratingCollector "github.com/lueurxax/crypto-tweet-sense/internal/rating_collector"
 	"github.com/lueurxax/crypto-tweet-sense/internal/sender"
@@ -33,18 +35,20 @@ const (
 )
 
 type config struct {
-	TopCount     int          `envconfig:"TOP_COUNT" default:"1000"`
-	LoggerLevel  logrus.Level `envconfig:"LOG_LEVEL" default:"info"`
-	LogToEcs     bool         `envconfig:"LOG_TO_ECS" default:"false"`
-	SessionFile  string       `envconfig:"SESSION_FILE" required:"true"`
-	BotToken     string       `envconfig:"BOT_TOKEN" required:"true"`
-	XLogin       string       `envconfig:"X_LOGIN" required:"true"`
-	XPassword    string       `envconfig:"X_PASSWORD" required:"true"`
-	ChannelID    int64        `envconfig:"CHANNEL_ID" required:"true"`
-	ChatID       int64        `envconfig:"CHAT_ID" required:"true"`
-	AppID        int          `envconfig:"APP_ID" required:"true"`
-	AppHash      string       `envconfig:"APP_HASH" required:"true"`
-	Phone        string       `envconfig:"PHONE" required:"true"`
+	LoggerLevel        logrus.Level  `envconfig:"LOG_LEVEL" default:"info"`
+	LogToEcs           bool          `envconfig:"LOG_TO_ECS" default:"false"`
+	TopCount           int           `envconfig:"TOP_COUNT" default:"1000"`
+	SessionFile        string        `envconfig:"SESSION_FILE" required:"true"`
+	BotToken           string        `envconfig:"BOT_TOKEN" required:"true"`
+	XLogin             string        `envconfig:"X_LOGIN" required:"true"`
+	XPassword          string        `envconfig:"X_PASSWORD" required:"true"`
+	ChannelID          int64         `envconfig:"CHANNEL_ID" required:"true"`
+	ChatID             int64         `envconfig:"CHAT_ID" required:"true"`
+	AppID              int           `envconfig:"APP_ID" required:"true"`
+	AppHash            string        `envconfig:"APP_HASH" required:"true"`
+	Phone              string        `envconfig:"PHONE" required:"true"`
+	ChatGPTToken       string        `envconfig:"CHAT_GPT_TOKEN" required:"true"`    // OpenAI token
+	EditorSendInterval time.Duration `envconfig:"EDITOR_SEND_INTERVAL" default:"2h"` // Interval to send edited tweets to telegram
 	DatabasePath string       `default:"/usr/local/etc/foundationdb/fdb.cluster"`
 }
 
@@ -130,7 +134,8 @@ func main() {
 		panic(err)
 	}
 	checker := ratingCollector.NewChecker(res, cfg.TopCount)
-	finder := tweetFinder.NewFinder(scraper, checker, 10, logger)
+	delayManager := tweetFinder.NewDelayManager(func(seconds int64) { scraper.WithDelay(seconds) }, 10, logger)
+	finder := tweetFinder.NewFinder(scraper, checker, delayManager, logger)
 	watch := watcher.NewWatcher(finder, links, logger)
 	checker.CollectRatings(ratingFetcher.Subscribe(ctx, cfg.ChannelID))
 
@@ -139,8 +144,11 @@ func main() {
 		panic(err)
 	}
 	s := sender.NewSender(api, &telebot.Chat{ID: cfg.ChatID})
-	watch.Watch()
 	ctx = s.Send(ctx, watch.Subscribe())
+	editor := tweets_editor.NewEditor(openai.NewClient(cfg.ChatGPTToken), cfg.EditorSendInterval, logger)
+	editor.Edit(ctx, watch.RawSubscribe())
+	ctx = s.Send(ctx, editor.SubscribeEdited())
+	watch.Watch()
 	logger.Info("service started")
 	<-ctx.Done()
 }
