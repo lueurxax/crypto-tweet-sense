@@ -52,7 +52,8 @@ func (e *editor) editLoop(ctx context.Context, cancel context.CancelFunc, ch <-c
 				e.log.Info("skip edit, because no tweets")
 				continue
 			}
-			if err := e.edit(ctx, collectedTweets); err != nil {
+			requestContext := context.Background()
+			if err := e.edit(requestContext, collectedTweets); err != nil {
 				e.log.WithError(err).Error("edit error")
 				cancel()
 			}
