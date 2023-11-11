@@ -60,6 +60,6 @@ func (m *manager) incRandomDelay() {
 	m.log.WithField("delay", m.delay).Debug("delay increased")
 }
 
-func NewDelayManager(setter func(seconds int64), minimalDelay int64) Manager {
-	return &manager{setter: setter, minimalDelay: minimalDelay, delay: minimalDelay}
+func NewDelayManager(setter func(seconds int64), minimalDelay int64, logger log.Logger) Manager {
+	return &manager{setter: setter, minimalDelay: minimalDelay, delay: minimalDelay, log: logger}
 }
