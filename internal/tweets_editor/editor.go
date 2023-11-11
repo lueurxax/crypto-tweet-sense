@@ -82,12 +82,17 @@ func (e *editor) edit(ctx context.Context, tweets []string) error {
 		return err
 	}
 
+	e.log.WithField("response", resp).Debug("summary generation result")
+
 	res := struct {
 		Message string `json:"message"`
 	}{}
 
 	if err = jsoniter.UnmarshalFromString(resp.Choices[0].Message.Content, &res); err != nil {
-		return err
+		// TODO: try to search correct json in string
+		e.log.WithError(err).Error("summary unmarshal error")
+		e.editedCh <- resp.Choices[0].Message.Content
+		return nil
 	}
 
 	e.editedCh <- res.Message
