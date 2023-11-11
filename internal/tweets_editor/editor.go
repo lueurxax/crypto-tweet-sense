@@ -43,14 +43,17 @@ func (e *editor) editLoop(ctx context.Context, cancel context.CancelFunc, ch <-c
 	for {
 		select {
 		case <-ctx.Done():
+			e.log.Info("edit loop done")
 			return
 		case link := <-ch:
 			collectedTweets = append(collectedTweets, link)
 		case <-ticker.C:
 			if len(collectedTweets) == 0 {
+				e.log.Info("skip edit, because no tweets")
 				continue
 			}
 			if err := e.edit(ctx, collectedTweets); err != nil {
+				e.log.WithError(err).Error("edit error")
 				cancel()
 			}
 			collectedTweets = make([]string, 0)

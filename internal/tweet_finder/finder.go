@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	limit  = 10000
-	format = "2006-01-02"
+	limit        = 10000
+	format       = "2006-01-02"
+	minimalDelay = 5
 )
 
 type Finder interface {
@@ -106,16 +107,19 @@ func (f *finder) incRandomDelay() {
 	if f.delay == 0 {
 		f.delay = 1
 	}
-	f.delay += rand.Int63n(f.delay) + 1
+	f.delay += rand.Int63n(f.delay-minimalDelay+1) + 1
 	f.scraper.WithDelay(f.delay)
+	f.log.WithField("delay", f.delay).Debug("delay increased")
 }
 
 func (f *finder) decDelay() {
-	if f.delay <= 0 {
+	if f.delay <= minimalDelay {
+		f.log.WithField("delay", f.delay).Debug("delay is minimal")
 		return
 	}
 	f.delay--
 	f.scraper.WithDelay(f.delay)
+	f.log.WithField("delay", f.delay).Debug("delay decreased")
 }
 
 func (f *finder) Find(ctx context.Context, start, end time.Time, search string) (string, error) {
