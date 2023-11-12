@@ -103,11 +103,13 @@ func (w *watcher) runWithQuery(ctx context.Context, query string, start time.Tim
 
 		w.subMu.RLock()
 		w.logger.WithField("subscribers", len(w.rawSubscribers)).Debug("send raw tweet")
+
 		for i := range w.rawSubscribers {
 			w.rawSubscribers[i] <- tweet.Text
 		}
 
 		w.logger.WithField("subscribers", len(w.subscribers)).Debug("send formatted tweet")
+
 		for i := range w.subscribers {
 			w.subscribers[i] <- w.formatTweet(tweet)
 		}
@@ -145,8 +147,8 @@ func NewWatcher(finder finder, initPublished map[string]struct{}, logger log.Log
 	return &watcher{
 		finder:         finder,
 		subMu:          sync.RWMutex{},
-		subscribers:    make([]chan string, 10),
-		rawSubscribers: make([]chan string, 10),
+		subscribers:    make([]chan string, 0),
+		rawSubscribers: make([]chan string, 0),
 		published:      initPublished,
 		logger:         logger,
 	}
