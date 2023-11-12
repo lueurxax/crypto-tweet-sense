@@ -24,7 +24,7 @@ func TestTweetSnapshot_String(t1 *testing.T) {
 				ID:         "123",
 				TimeParsed: time.Now(),
 			},
-			RatingGrowSpeed: 1.345345,
+			RatingGrowSpeed: 1.3453453463432523524234234,
 			CheckedAt:       time.Now(),
 		}
 		logger.WithField("tweet", t).Info("test")

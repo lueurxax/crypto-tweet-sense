@@ -43,7 +43,7 @@ type TweetSnapshot struct {
 
 func (t TweetSnapshot) String() string {
 	return fmt.Sprintf(
-		"TweetSnapshot{ID: %s, CreatedAt: %s, RatingGrowSpeed: %f, CheckedAt: %s}",
+		"TweetSnapshot{ID: %s, CreatedAt: %s, RatingGrowSpeed: %0.3f, CheckedAt: %s}",
 		t.ID, t.TimeParsed.Format(time.RFC3339), t.RatingGrowSpeed, t.CheckedAt.Format(time.RFC3339),
 	)
 }
