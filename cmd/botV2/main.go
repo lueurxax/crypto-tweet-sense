@@ -12,6 +12,7 @@ import (
 	"time"
 
 	nested "github.com/antonfisher/nested-logrus-formatter"
+	foundeationDB "github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/kelseyhightower/envconfig"
 	twitterscraper "github.com/n0madic/twitter-scraper"
 	"github.com/sashabaranov/go-openai"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 	ratingCollector "github.com/lueurxax/crypto-tweet-sense/internal/rating_collector"
+	fdb "github.com/lueurxax/crypto-tweet-sense/internal/repo"
 	"github.com/lueurxax/crypto-tweet-sense/internal/sender"
 	tweetFinder "github.com/lueurxax/crypto-tweet-sense/internal/tweet_finder"
 	"github.com/lueurxax/crypto-tweet-sense/internal/tweets_editor"
@@ -30,24 +32,26 @@ import (
 var version = "dev"
 
 const (
-	pkgKey = "pkg"
+	foundationDBVersion = 710
+	pkgKey              = "pkg"
 )
 
 type config struct {
-	LoggerLevel        logrus.Level  `envconfig:"LOG_LEVEL" default:"info"`          // Log level for logrus logger
-	LogToEcs           bool          `envconfig:"LOG_TO_ECS" default:"false"`        // Log to ECS format
-	TopCount           int           `envconfig:"TOP_COUNT" default:"1000"`          // Count of top tweets to check
-	SessionFile        string        `envconfig:"SESSION_FILE" required:"true"`      // Path to telegram session file
-	BotToken           string        `envconfig:"BOT_TOKEN" required:"true"`         // Telegram bot token
-	XLogin             string        `envconfig:"X_LOGIN" required:"true"`           // Twitter login
-	XPassword          string        `envconfig:"X_PASSWORD" required:"true"`        // Twitter password
-	ChannelID          int64         `envconfig:"CHANNEL_ID" required:"true"`        // Telegram channel id
-	ChatID             int64         `envconfig:"CHAT_ID" required:"true"`           // Telegram chat id
-	AppID              int           `envconfig:"APP_ID" required:"true"`            // Telegram app id
-	AppHash            string        `envconfig:"APP_HASH" required:"true"`          // Telegram app hash
-	Phone              string        `envconfig:"PHONE" required:"true"`             // Telegram phone number
+	LoggerLevel        logrus.Level  `envconfig:"LOG_LEVEL" default:"info"`
+	LogToEcs           bool          `envconfig:"LOG_TO_ECS" default:"false"`
+	TopCount           int           `envconfig:"TOP_COUNT" default:"1000"`
+	SessionFile        string        `envconfig:"SESSION_FILE" required:"true"`
+	BotToken           string        `envconfig:"BOT_TOKEN" required:"true"`
+	XLogin             string        `envconfig:"X_LOGIN" required:"true"`
+	XPassword          string        `envconfig:"X_PASSWORD" required:"true"`
+	ChannelID          int64         `envconfig:"CHANNEL_ID" required:"true"`
+	ChatID             int64         `envconfig:"CHAT_ID" required:"true"`
+	AppID              int           `envconfig:"APP_ID" required:"true"`
+	AppHash            string        `envconfig:"APP_HASH" required:"true"`
+	Phone              string        `envconfig:"PHONE" required:"true"`
 	ChatGPTToken       string        `envconfig:"CHAT_GPT_TOKEN" required:"true"`    // OpenAI token
 	EditorSendInterval time.Duration `envconfig:"EDITOR_SEND_INTERVAL" default:"2h"` // Interval to send edited tweets to telegram
+	DatabasePath       string        `default:"/usr/local/etc/foundationdb/fdb.cluster"`
 }
 
 func main() {
@@ -81,6 +85,15 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	foundeationDB.MustAPIVersion(foundationDBVersion)
+
+	db, err := foundeationDB.OpenDatabase(cfg.DatabasePath)
+	if err != nil {
+		panic(err)
+	}
+
+	st := fdb.NewDB(db, logrusLogger.WithField(pkgKey, "fdb"))
 
 	ratingFetcher := ratingCollector.NewFetcher(
 		cfg.AppID,
@@ -151,8 +164,8 @@ func main() {
 		10,
 		logger.WithField(pkgKey, "delay_manager"),
 	)
-	finder := tweetFinder.NewFinder(scraper, checker, delayManager, logger.WithField(pkgKey, "finder"))
-	watch := watcher.NewWatcher(finder, links, logger.WithField(pkgKey, "watcher"))
+	finder := tweetFinder.NewFinder(scraper, delayManager, logger.WithField(pkgKey, "finder"))
+	watch := watcher.NewWatcher(finder, st, checker, links, logger.WithField(pkgKey, "watcher"))
 
 	checker.CollectRatings(ratingFetcher.Subscribe(ctx, cfg.ChannelID))
 

@@ -8,6 +8,7 @@ import (
 
 	twitterscraper "github.com/n0madic/twitter-scraper"
 
+	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 )
 
@@ -17,9 +18,8 @@ const (
 )
 
 type Finder interface {
-	Find(ctx context.Context, start, end time.Time, search string) (string, error)
-	FindAll(ctx context.Context, start, end *time.Time, search string) ([]twitterscraper.Tweet, error)
-	FindAllByUser(ctx context.Context, username string) ([]twitterscraper.Tweet, error)
+	FindAll(ctx context.Context, start, end *time.Time, search string) ([]common.TweetSnapshot, error)
+	Find(ctx context.Context, id string) (*common.TweetSnapshot, error)
 }
 
 type delayManager interface {
@@ -28,19 +28,43 @@ type delayManager interface {
 	ProcessedQuery()
 }
 
-type ratingChecker interface {
-	Check(ctx context.Context, tweet *twitterscraper.Tweet) (bool, error)
-}
-
 type finder struct {
 	scraper *twitterscraper.Scraper
-	ratingChecker
 	delayManager
 
 	log log.Logger
 }
 
-func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search string) ([]twitterscraper.Tweet, error) {
+func (f *finder) Find(_ context.Context, id string) (*common.TweetSnapshot, error) {
+	tweet, err := f.scraper.GetTweet(id)
+	if err != nil {
+		if strings.Contains(err.Error(), "429 Too Many Requests") {
+			f.delayManager.TooManyRequests()
+		}
+		return nil, err
+	}
+	return &common.TweetSnapshot{
+		Tweet: &common.Tweet{
+			ID:           tweet.ID,
+			Likes:        tweet.Likes,
+			Name:         tweet.Name,
+			PermanentURL: tweet.PermanentURL,
+			Replies:      tweet.Replies,
+			Retweets:     tweet.Retweets,
+			Text:         tweet.Text,
+			TimeParsed:   tweet.TimeParsed,
+			Timestamp:    tweet.Timestamp,
+			UserID:       tweet.UserID,
+			Username:     tweet.Username,
+			Views:        tweet.Views,
+			Photos:       scrapperPhotosToCommon(tweet.Photos),
+			Videos:       scrapperVideosToCommon(tweet.Videos),
+		},
+		CheckedAt: time.Now(),
+	}, nil
+}
+
+func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search string) ([]common.TweetSnapshot, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -56,7 +80,7 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 	f.log.WithField("query", query).Debug("searching")
 	tweetsCh := f.scraper.SearchTweets(ctx, query, limit)
 
-	response := make([]twitterscraper.Tweet, 0)
+	response := make([]common.TweetSnapshot, 0)
 	counter := 0
 	likesMap := map[int]int{}
 	retweetsMap := map[int]int{}
@@ -73,6 +97,7 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 
 			return nil, tweet.Error
 		}
+		syncTime := time.Now()
 
 		const debugInterval = 100
 		if counter%debugInterval == 0 {
@@ -92,18 +117,25 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 		retweetsMap[tweet.Retweets]++
 		replyMap[tweet.Retweets]++
 
-		ok, err := f.ratingChecker.Check(ctx, &tweet.Tweet)
-		if err != nil {
-			return nil, err
-		}
-
-		if ok {
-			response = append(response, tweet.Tweet)
-			f.log.
-				WithField("ts", tweet.TimeParsed).
-				WithField("text", tweet.Text).
-				Debug("found tweet")
-		}
+		response = append(response, common.TweetSnapshot{
+			Tweet: &common.Tweet{
+				ID:           tweet.ID,
+				Likes:        tweet.Likes,
+				Name:         tweet.Name,
+				PermanentURL: tweet.PermanentURL,
+				Replies:      tweet.Replies,
+				Retweets:     tweet.Retweets,
+				Text:         tweet.Text,
+				TimeParsed:   tweet.TimeParsed,
+				Timestamp:    tweet.Timestamp,
+				UserID:       tweet.UserID,
+				Username:     tweet.Username,
+				Views:        tweet.Views,
+				Photos:       scrapperPhotosToCommon(tweet.Photos),
+				Videos:       scrapperVideosToCommon(tweet.Videos),
+			},
+			CheckedAt: syncTime,
+		})
 
 		lastTweetTime = tweet.TimeParsed
 	}
@@ -119,85 +151,33 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 	return response, nil
 }
 
-func (f *finder) Find(ctx context.Context, start, end time.Time, search string) (string, error) {
-	query := fmt.Sprintf("%s -filter:retweets since:%s until:%s", search, start.Format(format), end.Format(format))
-	tweetsCh := f.scraper.SearchTweets(ctx, query, limit)
-	maxTweets := 4000
-
-	var (
-		maxTweet *twitterscraper.Tweet
-	)
-
-	for tweet := range tweetsCh {
-		if tweet.Error != nil {
-			return "", tweet.Error
-		}
-
-		if maxTweets < tweet.Likes {
-			maxTweets = tweet.Likes
-			maxTweet = &tweet.Tweet
+func scrapperPhotosToCommon(photos []twitterscraper.Photo) []common.Photo {
+	res := make([]common.Photo, len(photos))
+	for i, photo := range photos {
+		res[i] = common.Photo{
+			ID:  photo.ID,
+			URL: photo.URL,
 		}
 	}
-
-	if maxTweet == nil {
-		return "", NoTops
-	}
-
-	return maxTweet.PermanentURL, nil
+	return res
 }
 
-func (f *finder) FindAllByUser(ctx context.Context, username string) ([]twitterscraper.Tweet, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	tweetsCh := f.scraper.GetTweets(ctx, username, limit)
-
-	response := make([]twitterscraper.Tweet, 0)
-	counter := 0
-	likesMap := map[int]int{}
-	retweetsMap := map[int]int{}
-	replyMap := map[int]int{}
-	lastTweetTime := time.Now()
-
-	for tweet := range tweetsCh {
-		if tweet.Error != nil {
-			return nil, tweet.Error
+func scrapperVideosToCommon(videos []twitterscraper.Video) []common.Video {
+	res := make([]common.Video, len(videos))
+	for i, video := range videos {
+		res[i] = common.Video{
+			ID:      video.ID,
+			Preview: video.Preview,
+			URL:     video.URL,
 		}
-
-		if counter == 0 {
-			f.log.WithField("created", tweet.TimeParsed).Debug("first tweet")
-		}
-
-		counter++
-		likesMap[tweet.Likes]++
-		retweetsMap[tweet.Retweets]++
-		replyMap[tweet.Retweets]++
-
-		ok, err := f.ratingChecker.Check(ctx, &tweet.Tweet)
-		if err != nil {
-			return nil, err
-		}
-
-		if ok {
-			response = append(response, tweet.Tweet)
-		}
-
-		lastTweetTime = tweet.TimeParsed
 	}
-	f.log.WithField("created", lastTweetTime).Debug("last tweet")
-	f.log.WithField("count", counter).Debug("tweets found")
-	f.log.WithField("map", likesMap).Debug("likes count")
-	f.log.WithField("map", retweetsMap).Debug("retweet count")
-	f.log.WithField("map", replyMap).Debug("reply count")
-
-	return response, nil
+	return res
 }
 
-func NewFinder(scraper *twitterscraper.Scraper, ratingChecker ratingChecker, delayManager delayManager, logger log.Logger) Finder {
+func NewFinder(scraper *twitterscraper.Scraper, delayManager delayManager, logger log.Logger) Finder {
 	return &finder{
-		scraper:       scraper,
-		delayManager:  delayManager,
-		ratingChecker: ratingChecker,
-		log:           logger,
+		scraper:      scraper,
+		delayManager: delayManager,
+		log:          logger,
 	}
 }

@@ -4,13 +4,12 @@ import (
 	"context"
 	"sync"
 
-	twitterscraper "github.com/n0madic/twitter-scraper"
-
+	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/rating_collector/models"
 )
 
 type RatingChecker interface {
-	Check(ctx context.Context, tweet *twitterscraper.Tweet) (bool, error)
+	Check(ctx context.Context, tweet *common.TweetSnapshot) (bool, float64, error)
 	CollectRatings(<-chan *models.UsernameRating)
 }
 
@@ -32,16 +31,22 @@ func (c *checker) loop(ratings <-chan *models.UsernameRating) {
 	}
 }
 
-func (c *checker) Check(_ context.Context, tweet *twitterscraper.Tweet) (bool, error) {
+func (c *checker) Check(_ context.Context, tweet *common.TweetSnapshot) (bool, float64, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
+	liveDuration := tweet.CheckedAt.Sub(tweet.TimeParsed).Seconds()
+
+	likes := float64(tweet.Likes)
+
 	rating, ok := c.rating[tweet.Username]
 	if !ok {
-		return tweet.Likes > c.topCount, nil
+		return tweet.Likes > c.topCount, likes / liveDuration, nil
 	}
 
-	return float32(tweet.Likes)*(1.0+float32(rating.Likes-rating.Dislikes)/10.0) > float32(c.topCount), nil
+	raiting := likes * (1.0 + float64(rating.Likes-rating.Dislikes)/10.0)
+
+	return raiting > float64(c.topCount), raiting / liveDuration, nil
 }
 
 func NewChecker(rating map[string]*models.Rating, topCount int) RatingChecker {
