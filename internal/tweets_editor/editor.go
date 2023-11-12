@@ -58,8 +58,7 @@ func (e *editor) editLoop(ctx context.Context, cancel context.CancelFunc, ch <-c
 				continue
 			}
 
-			requestContext := context.Background()
-			if err := e.edit(requestContext, collectedTweets); err != nil {
+			if err := e.edit(context.Background(), collectedTweets); err != nil {
 				e.log.WithError(err).Error("edit error")
 				cancel()
 			}

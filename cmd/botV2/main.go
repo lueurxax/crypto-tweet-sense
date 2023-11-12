@@ -28,6 +28,10 @@ import (
 
 var version = "dev"
 
+const (
+	pkgKey = "pkg"
+)
+
 type config struct {
 	LoggerLevel        logrus.Level  `envconfig:"LOG_LEVEL" default:"info"`          // Log level for logrus logger
 	LogToEcs           bool          `envconfig:"LOG_TO_ECS" default:"false"`        // Log to ECS format
@@ -70,13 +74,21 @@ func main() {
 
 	if cfg.LogToEcs {
 		logrusLogger.SetFormatter(&ecslogrus.Formatter{})
+	} else {
 	}
+
 	logger := log.NewLogger(logrusLogger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	ratingFetcher := ratingCollector.NewFetcher(cfg.AppID, cfg.AppHash, cfg.Phone, cfg.SessionFile, logger)
+	ratingFetcher := ratingCollector.NewFetcher(
+		cfg.AppID,
+		cfg.AppHash,
+		cfg.Phone,
+		cfg.SessionFile,
+		logger.WithField(pkgKey, "rating_fetcher"),
+	)
 	if err := ratingFetcher.Auth(ctx); err != nil {
 		panic(err)
 	}
@@ -134,21 +146,31 @@ func main() {
 	}
 	checker := ratingCollector.NewChecker(res, cfg.TopCount)
 
-	delayManager := tweetFinder.NewDelayManager(func(seconds int64) { scraper.WithDelay(seconds) }, 10, logger)
-	finder := tweetFinder.NewFinder(scraper, checker, delayManager, logger)
-	watch := watcher.NewWatcher(finder, links, logger)
+	delayManager := tweetFinder.NewDelayManager(
+		func(seconds int64) { scraper.WithDelay(seconds) },
+		10,
+		logger.WithField(pkgKey, "delay_manager"),
+	)
+	finder := tweetFinder.NewFinder(scraper, checker, delayManager, logger.WithField(pkgKey, "finder"))
+	watch := watcher.NewWatcher(finder, links, logger.WithField(pkgKey, "watcher"))
 
 	checker.CollectRatings(ratingFetcher.Subscribe(ctx, cfg.ChannelID))
 
-	api, err := telebot.NewBot(telebot.Settings{Token: cfg.BotToken, Poller: &telebot.LongPoller{Timeout: 10 * time.Second}})
+	api, err := telebot.NewBot(
+		telebot.Settings{Token: cfg.BotToken, Poller: &telebot.LongPoller{Timeout: 10 * time.Second}},
+	)
 	if err != nil {
 		panic(err)
 	}
 
-	s := sender.NewSender(api, &telebot.Chat{ID: cfg.ChatID})
+	s := sender.NewSender(api, &telebot.Chat{ID: cfg.ChatID}, logger.WithField(pkgKey, "sender"))
 	ctx = s.Send(ctx, watch.Subscribe())
 
-	editor := tweets_editor.NewEditor(openai.NewClient(cfg.ChatGPTToken), cfg.EditorSendInterval, logger)
+	editor := tweets_editor.NewEditor(
+		openai.NewClient(cfg.ChatGPTToken),
+		cfg.EditorSendInterval,
+		logger.WithField(pkgKey, "editor"),
+	)
 	editor.Edit(ctx, watch.RawSubscribe())
 	ctx = s.Send(ctx, editor.SubscribeEdited())
 

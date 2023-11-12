@@ -252,10 +252,12 @@ func NewFetcher(appID int, appHash, phone, sessionFile string, logger log.Logger
 	gaps := updates.New(updates.Config{
 		Handler: d,
 	})
-	zapLogger, err := zap.NewProduction()
+
+	zapLogger, err := zap.NewDevelopment()
 	if err != nil {
 		logger.Error(err)
 	}
+
 	client := telegram.NewClient(appID, appHash, telegram.Options{
 		UpdateHandler: gaps,
 		Middlewares: []telegram.Middleware{
@@ -266,6 +268,7 @@ func NewFetcher(appID int, appHash, phone, sessionFile string, logger log.Logger
 		},
 		Logger: zapLogger,
 	})
+
 	return &fetcher{
 		client:           client,
 		gaps:             gaps,
@@ -279,11 +282,11 @@ func NewFetcher(appID int, appHash, phone, sessionFile string, logger log.Logger
 // noSignUp can be embedded to prevent signing up.
 type noSignUp struct{}
 
-func (c noSignUp) SignUp(ctx context.Context) (auth.UserInfo, error) {
+func (c noSignUp) SignUp(context.Context) (auth.UserInfo, error) {
 	return auth.UserInfo{}, errors.New("not implemented")
 }
 
-func (c noSignUp) AcceptTermsOfService(ctx context.Context, tos tg.HelpTermsOfService) error {
+func (c noSignUp) AcceptTermsOfService(_ context.Context, tos tg.HelpTermsOfService) error {
 	return &auth.SignUpRequired{TermsOfService: tos}
 }
 
