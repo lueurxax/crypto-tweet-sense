@@ -36,20 +36,22 @@ type watcher struct {
 
 func (w *watcher) RawSubscribe() <-chan string {
 	w.subMu.Lock()
-	defer w.subMu.Unlock()
 
-	subscriber := make(chan string)
+	subscriber := make(chan string, 10)
 	w.rawSubscribers = append(w.rawSubscribers, subscriber)
+
+	w.subMu.Unlock()
 
 	return subscriber
 }
 
 func (w *watcher) Subscribe() <-chan string {
 	w.subMu.Lock()
-	defer w.subMu.Unlock()
 
-	subscriber := make(chan string)
+	subscriber := make(chan string, 10)
 	w.subscribers = append(w.subscribers, subscriber)
+
+	w.subMu.Unlock()
 
 	return subscriber
 }

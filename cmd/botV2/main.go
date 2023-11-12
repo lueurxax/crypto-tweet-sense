@@ -48,10 +48,12 @@ type config struct {
 func main() {
 	printVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
 	if *printVersion {
 		fmt.Println(version)
 		return
 	}
+
 	go func() {
 		println(http.ListenAndServe("localhost:6060", nil))
 	}()
@@ -65,10 +67,12 @@ func main() {
 	// init logger
 	logrusLogger := logrus.New()
 	logrusLogger.SetLevel(cfg.LoggerLevel)
+
 	if cfg.LogToEcs {
 		logrusLogger.SetFormatter(&ecslogrus.Formatter{})
 	}
 	logger := log.NewLogger(logrusLogger)
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -76,18 +80,22 @@ func main() {
 	if err := ratingFetcher.Auth(ctx); err != nil {
 		panic(err)
 	}
+
 	defer func() {
 		if err := ratingFetcher.Stop(); err != nil {
 			logger.Error(err)
 		}
 	}()
+
 	res, links, err := ratingFetcher.FetchRatingsAndUniqueMessages(ctx, cfg.ChannelID)
 	if err != nil {
 		panic(err)
 	}
 
 	scraper := twitterscraper.New().WithDelay(10).SetSearchMode(twitterscraper.SearchLatest)
+
 	var cookies []*http.Cookie
+
 	data, err := os.ReadFile("cookies.json")
 	if err != nil {
 		logger.Error(err)
@@ -95,6 +103,7 @@ func main() {
 			panic(err)
 		}
 	}
+
 	if data != nil {
 		if err = json.Unmarshal(data, &cookies); err != nil {
 			logger.Error(err)
@@ -103,6 +112,7 @@ func main() {
 			}
 		}
 	}
+
 	if cookies != nil {
 		scraper.SetCookies(cookies)
 		if !scraper.IsLoggedIn() {
@@ -113,29 +123,37 @@ func main() {
 	}
 
 	cookies = scraper.GetCookies()
+
 	data, err = json.Marshal(cookies)
 	if err != nil {
 		panic(err)
 	}
+
 	if err = os.WriteFile("cookies.json", data, 0644); err != nil {
 		panic(err)
 	}
 	checker := ratingCollector.NewChecker(res, cfg.TopCount)
+
 	delayManager := tweetFinder.NewDelayManager(func(seconds int64) { scraper.WithDelay(seconds) }, 10, logger)
 	finder := tweetFinder.NewFinder(scraper, checker, delayManager, logger)
 	watch := watcher.NewWatcher(finder, links, logger)
+
 	checker.CollectRatings(ratingFetcher.Subscribe(ctx, cfg.ChannelID))
 
 	api, err := telebot.NewBot(telebot.Settings{Token: cfg.BotToken, Poller: &telebot.LongPoller{Timeout: 10 * time.Second}})
 	if err != nil {
 		panic(err)
 	}
+
 	s := sender.NewSender(api, &telebot.Chat{ID: cfg.ChatID})
 	ctx = s.Send(ctx, watch.Subscribe())
+
 	editor := tweets_editor.NewEditor(openai.NewClient(cfg.ChatGPTToken), cfg.EditorSendInterval, logger)
 	editor.Edit(ctx, watch.RawSubscribe())
 	ctx = s.Send(ctx, editor.SubscribeEdited())
+
 	watch.Watch()
+
 	logger.Info("service started")
 	<-ctx.Done()
 }
