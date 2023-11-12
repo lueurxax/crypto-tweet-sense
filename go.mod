@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/antonfisher/nested-logrus-formatter v1.3.1
-	github.com/apple/foundationdb/bindings/go v0.0.0-20231109205445-2f2ef0f44e7b
+	github.com/apple/foundationdb/bindings/go v0.0.0-20230508183941-1098aa0251f4
 	github.com/gotd/contrib v0.19.0
 	github.com/gotd/td v0.89.0
 	github.com/json-iterator/go v1.1.12
@@ -38,6 +38,7 @@ require (
 	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/sync v0.4.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/xerrors v0.0.0-20220517211312-f3a8303e98df // indirect
 	nhooyr.io/websocket v1.8.10 // indirect
 	rsc.io/qr v0.2.0 // indirect
 )
