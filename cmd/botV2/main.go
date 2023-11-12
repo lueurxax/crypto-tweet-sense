@@ -11,14 +11,13 @@ import (
 	"syscall"
 	"time"
 
+	nested "github.com/antonfisher/nested-logrus-formatter"
 	"github.com/kelseyhightower/envconfig"
 	twitterscraper "github.com/n0madic/twitter-scraper"
 	"github.com/sashabaranov/go-openai"
 	"github.com/sirupsen/logrus"
 	"go.elastic.co/ecslogrus"
 	"gopkg.in/telebot.v3"
-
-	nested "github.com/antonfisher/nested-logrus-formatter"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 	ratingCollector "github.com/lueurxax/crypto-tweet-sense/internal/rating_collector"
@@ -69,14 +68,13 @@ func main() {
 	// init logger
 	logrusLogger := logrus.New()
 	logrusLogger.SetLevel(cfg.LoggerLevel)
+	logrusLogger.SetFormatter(&nested.Formatter{
+		FieldsOrder:     []string{pkgKey},
+		TimestampFormat: "01-02|15:04:05",
+	})
 
 	if cfg.LogToEcs {
 		logrusLogger.SetFormatter(&ecslogrus.Formatter{})
-	} else {
-		logrus.SetFormatter(&nested.Formatter{
-			FieldsOrder:     []string{pkgKey, "msg"},
-			TimestampFormat: "01-02|15:04:05",
-		})
 	}
 
 	logger := log.NewLogger(logrusLogger)
