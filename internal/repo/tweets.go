@@ -26,15 +26,33 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 	}
 
 	for _, tweet := range tweets {
-		data, err := jsoniter.Marshal(tweet)
+		key := d.keyBuilder.Tweet(tweet.ID)
+
+		data, err := tr.Get(key)
 		if err != nil {
 			return err
 		}
 
-		if err = tr.Set(d.keyBuilder.Tweet(tweet.ID), data); err != nil {
+		if data != nil {
+			oldTweet := new(common.TweetSnapshot)
+			if err = jsoniter.Unmarshal(data, oldTweet); err != nil {
+				return err
+			}
+			if oldTweet.CheckedAt.After(tweet.CheckedAt) {
+				continue
+			}
+		}
+
+		data, err = jsoniter.Marshal(tweet)
+		if err != nil {
+			return err
+		}
+
+		if err = tr.Set(key, data); err != nil {
 			return err
 		}
 	}
+
 	return tr.Commit()
 }
 
@@ -69,10 +87,12 @@ func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot,
 		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
 			return nil, err
 		}
+
 		if result == nil {
 			result = tweet
 			continue
 		}
+
 		if result.RatingGrowSpeed < tweet.RatingGrowSpeed {
 			result = tweet
 		}
@@ -102,7 +122,9 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 	}
 
 	var result *common.TweetSnapshot
+
 	var fallbackResult *common.TweetSnapshot
+
 	best := 0.0
 
 	for _, kv := range kvs {
