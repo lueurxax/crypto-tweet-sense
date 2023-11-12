@@ -15,4 +15,25 @@ type Tweet struct {
 	UserID       string
 	Username     string
 	Views        int
+	Photos       []Photo
+	Videos       []Video
+}
+
+// Photo type.
+type Photo struct {
+	ID  string
+	URL string
+}
+
+// Video type.
+type Video struct {
+	ID      string
+	Preview string
+	URL     string
+}
+
+type TweetSnapshot struct {
+	*Tweet
+	RatingGrowSpeed float64
+	CheckedAt       time.Time
 }

@@ -8,10 +8,20 @@ import (
 
 type Database interface {
 	NewTransaction(ctx context.Context) (Transaction, error)
+	Clear(ctx context.Context, key []byte) error
 }
 
 type database struct {
 	db fdb.Database
+}
+
+func (d *database) Clear(ctx context.Context, key []byte) error {
+	tr, err := d.NewTransaction(ctx)
+	if err != nil {
+		return err
+	}
+	tr.Clear(key)
+	return tr.Commit()
 }
 
 func (d *database) NewTransaction(ctx context.Context) (Transaction, error) {

@@ -11,20 +11,21 @@ import (
 	"syscall"
 	"time"
 
-	foundeationDB "github.com/apple/foundationdb/bindings/go/src/fdb"
 	nested "github.com/antonfisher/nested-logrus-formatter"
+	foundeationDB "github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/kelseyhightower/envconfig"
 	twitterscraper "github.com/n0madic/twitter-scraper"
+	"github.com/sashabaranov/go-openai"
 	"github.com/sirupsen/logrus"
 	"go.elastic.co/ecslogrus"
 	"gopkg.in/telebot.v3"
 
-	"github.com/lueurxax/crypto-tweet-sense/internal/tweets_editor"
-
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 	ratingCollector "github.com/lueurxax/crypto-tweet-sense/internal/rating_collector"
+	fdb "github.com/lueurxax/crypto-tweet-sense/internal/repo"
 	"github.com/lueurxax/crypto-tweet-sense/internal/sender"
 	tweetFinder "github.com/lueurxax/crypto-tweet-sense/internal/tweet_finder"
+	"github.com/lueurxax/crypto-tweet-sense/internal/tweets_editor"
 	"github.com/lueurxax/crypto-tweet-sense/internal/watcher"
 )
 
@@ -50,7 +51,7 @@ type config struct {
 	Phone              string        `envconfig:"PHONE" required:"true"`
 	ChatGPTToken       string        `envconfig:"CHAT_GPT_TOKEN" required:"true"`    // OpenAI token
 	EditorSendInterval time.Duration `envconfig:"EDITOR_SEND_INTERVAL" default:"2h"` // Interval to send edited tweets to telegram
-	DatabasePath string       `default:"/usr/local/etc/foundationdb/fdb.cluster"`
+	DatabasePath       string        `default:"/usr/local/etc/foundationdb/fdb.cluster"`
 }
 
 func main() {
@@ -163,8 +164,8 @@ func main() {
 		10,
 		logger.WithField(pkgKey, "delay_manager"),
 	)
-	finder := tweetFinder.NewFinder(scraper, checker, delayManager, logger.WithField(pkgKey, "finder"))
-	watch := watcher.NewWatcher(finder, links, logger.WithField(pkgKey, "watcher"))
+	finder := tweetFinder.NewFinder(scraper, delayManager, logger.WithField(pkgKey, "finder"))
+	watch := watcher.NewWatcher(finder, st, checker, links, logger.WithField(pkgKey, "watcher"))
 
 	checker.CollectRatings(ratingFetcher.Subscribe(ctx, cfg.ChannelID))
 

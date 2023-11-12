@@ -4,6 +4,7 @@ go 1.21
 
 require (
 	github.com/antonfisher/nested-logrus-formatter v1.3.1
+	github.com/apple/foundationdb/bindings/go v0.0.0-20231109205445-2f2ef0f44e7b
 	github.com/gotd/contrib v0.19.0
 	github.com/gotd/td v0.89.0
 	github.com/json-iterator/go v1.1.12

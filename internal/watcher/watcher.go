@@ -7,8 +7,7 @@ import (
 	"sync"
 	"time"
 
-	twitterscraper "github.com/n0madic/twitter-scraper"
-
+	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 	"github.com/lueurxax/crypto-tweet-sense/internal/tweet_finder"
 	"github.com/lueurxax/crypto-tweet-sense/pkg/utils"
@@ -21,17 +20,37 @@ type Watcher interface {
 }
 
 type finder interface {
-	Find(ctx context.Context, start, end time.Time, search string) (string, error)
-	FindAll(ctx context.Context, start, end *time.Time, search string) ([]twitterscraper.Tweet, error)
+	FindAll(ctx context.Context, start, end *time.Time, search string) ([]common.TweetSnapshot, error)
+	Find(ctx context.Context, id string) (*common.TweetSnapshot, error)
+}
+
+type repo interface {
+	Save(ctx context.Context, tweets []common.TweetSnapshot) error
+	DeleteTweet(ctx context.Context, id string) error
+	GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot, error)
+	GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, error)
+	GetOldestTweet(ctx context.Context) (*common.TweetSnapshot, error)
+	GetTweetsOlderThen(ctx context.Context, after time.Time) ([]*common.TweetSnapshot, error)
+}
+
+type ratingChecker interface {
+	Check(ctx context.Context, tweet *common.TweetSnapshot) (bool, float64, error)
 }
 
 type watcher struct {
+	queries map[string]time.Time
+
 	finder
+	repo
+	ratingChecker
+
 	subMu          sync.RWMutex
 	subscribers    []chan string
 	rawSubscribers []chan string
-	published      map[string]struct{}
-	logger         log.Logger
+
+	published map[string]struct{}
+
+	logger log.Logger
 }
 
 func (w *watcher) RawSubscribe() <-chan string {
@@ -57,29 +76,31 @@ func (w *watcher) Subscribe() <-chan string {
 }
 
 func (w *watcher) Watch() {
-	go w.watch()
+	go w.searchAll()
+	go w.updateTop()
+	go w.updateOldestFast()
+	go w.updateOldest()
+	go w.cleanTooOld()
 }
 
-func (w *watcher) watch() {
+func (w *watcher) searchAll() {
 	ctx := context.Background()
-	w.run(ctx)
+	w.search(ctx)
 
 	tick := time.NewTicker(time.Minute * 10)
 	for range tick.C {
-		w.run(ctx)
+		w.search(ctx)
 	}
 }
 
-func (w *watcher) run(ctx context.Context) {
-	start := time.Now().AddDate(0, 0, -1)
-	w.runWithQuery(ctx, "bitcoin", start)
-	w.runWithQuery(ctx, "crypto", start)
-	w.runWithQuery(ctx, "cryptocurrency", start)
-	w.runWithQuery(ctx, "BTC", start)
+func (w *watcher) search(ctx context.Context) {
+	for query, start := range w.queries {
+		w.searchWithQuery(ctx, query, start)
+	}
 	w.logger.Debug("watcher checked news")
 }
 
-func (w *watcher) runWithQuery(ctx context.Context, query string, start time.Time) {
+func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.Time) {
 	tweets, err := w.finder.FindAll(
 		ctx,
 		&start,
@@ -94,30 +115,20 @@ func (w *watcher) runWithQuery(ctx context.Context, query string, start time.Tim
 		panic(err)
 	}
 
-	for _, tweet := range tweets {
-		if _, ok := w.published[tweet.PermanentURL]; ok {
-			continue
-		}
+	lastTweet := start
 
-		w.published[tweet.PermanentURL] = struct{}{}
-
-		w.subMu.RLock()
-		w.logger.WithField("subscribers", len(w.rawSubscribers)).Debug("send raw tweet")
-
-		for i := range w.rawSubscribers {
-			w.rawSubscribers[i] <- tweet.Text
-		}
-
-		w.logger.WithField("subscribers", len(w.subscribers)).Debug("send formatted tweet")
-
-		for i := range w.subscribers {
-			w.subscribers[i] <- w.formatTweet(tweet)
-		}
-		w.subMu.RUnlock()
+	for i := range tweets {
+		lastTweet, tweets[i].RatingGrowSpeed = w.processTweet(ctx, &tweets[i], lastTweet)
 	}
+
+	if err = w.repo.Save(ctx, tweets); err != nil {
+		w.logger.WithError(err).Error("save tweets")
+	}
+
+	w.queries[query] = lastTweet
 }
 
-func (w *watcher) formatTweet(tweet twitterscraper.Tweet) (str string) {
+func (w *watcher) formatTweet(tweet common.TweetSnapshot) (str string) {
 	str = fmt.Sprintf("*%s*\n", utils.Escape(tweet.TimeParsed.Format(time.RFC3339)))
 	str += fmt.Sprintf("%s\n", utils.Escape(tweet.Text))
 
@@ -134,9 +145,162 @@ func (w *watcher) formatTweet(tweet twitterscraper.Tweet) (str string) {
 	return
 }
 
-func NewWatcher(finder finder, initPublished map[string]struct{}, logger log.Logger) Watcher {
+func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot, lastTweet time.Time) (time.Time, float64) {
+	if _, ok := w.published[tweet.PermanentURL]; ok {
+		return lastTweet, 0
+	}
+
+	ok, ratingSpeed, err := w.ratingChecker.Check(ctx, tweet)
+	if err != nil {
+		w.logger.WithError(err).Error("check tweet")
+		return lastTweet, 0
+	}
+
+	if ok {
+		w.subMu.RLock()
+		w.logger.WithField("subscribers", len(w.rawSubscribers)).Debug("send raw tweet")
+
+		for j := range w.rawSubscribers {
+			w.rawSubscribers[j] <- tweet.Text
+		}
+
+		w.logger.WithField("subscribers", len(w.subscribers)).Debug("send formatted tweet")
+
+		for j := range w.subscribers {
+			w.subscribers[j] <- w.formatTweet(*tweet)
+		}
+		w.subMu.RUnlock()
+
+		w.logger.
+			WithField("ts", tweet.TimeParsed).
+			WithField("text", tweet.Text).
+			Debug("found tweet")
+
+		w.published[tweet.PermanentURL] = struct{}{}
+	}
+
+	if lastTweet.Before(tweet.TimeParsed) {
+		lastTweet = tweet.TimeParsed
+	}
+
+	return lastTweet, ratingSpeed
+}
+
+func (w *watcher) updateTop() {
+	tick := time.NewTicker(time.Second * 30)
+	for range tick.C {
+		ctx := context.Background()
+		if err := w.updateTopTweet(ctx); err != nil {
+			w.logger.WithError(err).Error("update top tweet")
+		}
+	}
+}
+
+func (w *watcher) updateTopTweet(ctx context.Context) error {
+	tweet, err := w.repo.GetFastestGrowingTweet(ctx)
+	if err != nil {
+		return err
+	}
+
+	w.logger.WithField("tweet", tweet).Debug("top tweet")
+
+	return w.updateTweet(ctx, tweet.ID)
+}
+
+func (w *watcher) updateOldestFast() {
+	tick := time.NewTicker(time.Minute * 1)
+	for range tick.C {
+		ctx := context.Background()
+		if err := w.updateOldestFastTweet(ctx); err != nil {
+			w.logger.WithError(err).Error()
+		}
+	}
+}
+
+func (w *watcher) updateOldestFastTweet(ctx context.Context) error {
+	tweet, err := w.repo.GetOldestTopReachableTweet(ctx, 0)
+	if err != nil {
+		return err
+	}
+
+	w.logger.WithField("tweet", tweet).Debug("oldest fast tweet")
+
+	return w.updateTweet(ctx, tweet.ID)
+}
+
+func (w *watcher) updateTweet(ctx context.Context, id string) error {
+	tweet, err := w.finder.Find(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	_, tweet.RatingGrowSpeed = w.processTweet(ctx, tweet, time.Now())
+	if tweet.RatingGrowSpeed != 0 {
+		if err = w.repo.Save(ctx, []common.TweetSnapshot{*tweet}); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	return w.repo.DeleteTweet(ctx, tweet.ID)
+}
+
+func (w *watcher) updateOldest() {
+	tick := time.NewTicker(time.Minute * 10)
+	for range tick.C {
+		ctx := context.Background()
+		if err := w.updateOldestTweet(ctx); err != nil {
+			w.logger.WithError(err).Error()
+		}
+	}
+}
+
+func (w *watcher) updateOldestTweet(ctx context.Context) error {
+	tweet, err := w.repo.GetOldestTweet(ctx)
+	if err != nil {
+		return err
+	}
+
+	w.logger.WithField("tweet", tweet).Debug("oldest tweet")
+
+	return w.updateTweet(ctx, tweet.ID)
+}
+
+func (w *watcher) cleanTooOld() {
+	tick := time.NewTicker(time.Hour)
+	for range tick.C {
+		ctx := context.Background()
+		if err := w.cleanTooOldTweets(ctx); err != nil {
+			w.logger.WithError(err).Error()
+		}
+	}
+}
+
+func (w *watcher) cleanTooOldTweets(ctx context.Context) error {
+	tweets, err := w.repo.GetTweetsOlderThen(ctx, time.Now().AddDate(0, 0, -1))
+	if err != nil {
+		return err
+	}
+	for _, tweet := range tweets {
+		if err = w.repo.DeleteTweet(ctx, tweet.ID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func NewWatcher(finder finder, repo repo, checker ratingChecker, initPublished map[string]struct{}, logger log.Logger) Watcher {
+	start := time.Now().AddDate(0, 0, -1)
 	return &watcher{
+		queries: map[string]time.Time{
+			"bitcoin":        start,
+			"crypto":         start,
+			"cryptocurrency": start,
+			"BTC":            start,
+		},
 		finder:         finder,
+		repo:           repo,
+		ratingChecker:  checker,
 		subMu:          sync.RWMutex{},
 		subscribers:    make([]chan string, 0),
 		rawSubscribers: make([]chan string, 0),
