@@ -103,10 +103,12 @@ func (w *watcher) runWithQuery(ctx context.Context, query string, start time.Tim
 
 		w.subMu.RLock()
 		for i := range w.rawSubscribers {
+			w.logger.Debug("send raw tweet")
 			w.rawSubscribers[i] <- tweet.Text
 		}
 
 		for i := range w.subscribers {
+			w.logger.Debug("send formatted tweet")
 			w.subscribers[i] <- w.formatTweet(tweet)
 		}
 		w.subMu.RUnlock()
