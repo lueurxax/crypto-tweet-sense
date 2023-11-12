@@ -38,6 +38,7 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 			if err = jsoniter.Unmarshal(data, oldTweet); err != nil {
 				return err
 			}
+
 			if oldTweet.CheckedAt.After(tweet.CheckedAt) {
 				continue
 			}
