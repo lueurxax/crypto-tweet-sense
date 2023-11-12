@@ -102,6 +102,8 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 	}
 
 	var result *common.TweetSnapshot
+	var fallbackResult *common.TweetSnapshot
+	best := 0.0
 
 	for _, kv := range kvs {
 		tweet := new(common.TweetSnapshot)
@@ -109,8 +111,14 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 			return nil, err
 		}
 
+		predictedRating := tweet.RatingGrowSpeed * time.Since(tweet.TimeParsed).Seconds()
+
 		// skip unreachable top tweets
-		if tweet.RatingGrowSpeed*time.Since(tweet.TimeParsed).Seconds() < top {
+		if predictedRating < top {
+			if predictedRating > best {
+				best = predictedRating
+				fallbackResult = tweet
+			}
 			continue
 		}
 
@@ -125,6 +133,9 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 	}
 
 	if result == nil {
+		if fallbackResult != nil {
+			return fallbackResult, nil
+		}
 		return nil, ErrTweetsNotFound
 	}
 
