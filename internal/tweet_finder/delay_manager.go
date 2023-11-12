@@ -44,7 +44,6 @@ func (m *manager) SetSetterFn(fn func(seconds int64)) {
 
 func (m *manager) decDelay() {
 	if m.delay <= m.minimalDelay {
-		m.log.WithField("delay", m.delay).Debug("delay is minimal")
 		return
 	}
 	m.delay--
