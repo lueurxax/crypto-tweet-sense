@@ -51,7 +51,7 @@ func (w *spamWatcher) runWithQuery(ctx context.Context, query string, start time
 		query,
 	)
 	if err != nil {
-		if errors.Is(err, tweetfinder.NoTops) {
+		if errors.Is(err, tweetfinder.ErrNoTops) {
 			return
 		}
 		panic(err)

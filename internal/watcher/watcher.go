@@ -110,7 +110,7 @@ func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.
 		query,
 	)
 	if err != nil {
-		if errors.Is(err, tweetfinder.NoTops) {
+		if errors.Is(err, tweetfinder.ErrNoTops) {
 			return
 		}
 
@@ -233,6 +233,9 @@ func (w *watcher) updateOldestFastTweet(ctx context.Context) error {
 func (w *watcher) updateTweet(ctx context.Context, id string) error {
 	tweet, err := w.finder.Find(ctx, id)
 	if err != nil {
+		if errors.Is(err, tweetfinder.ErrNotFound) {
+			return w.repo.DeleteTweet(ctx, id)
+		}
 		return err
 	}
 

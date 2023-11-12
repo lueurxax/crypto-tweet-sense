@@ -16,6 +16,7 @@ const (
 	limit           = 10000
 	format          = "2006-01-02"
 	tooManyRequests = "429 Too Many Requests"
+	notFound        = "not found"
 )
 
 type Finder interface {
@@ -41,6 +42,10 @@ func (f *finder) Find(_ context.Context, id string) (*common.TweetSnapshot, erro
 	if err != nil {
 		if strings.Contains(err.Error(), tooManyRequests) {
 			f.delayManager.TooManyRequests()
+		}
+
+		if strings.Contains(err.Error(), notFound) {
+			return nil, ErrNotFound
 		}
 
 		return nil, err
