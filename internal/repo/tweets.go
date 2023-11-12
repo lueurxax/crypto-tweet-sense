@@ -15,7 +15,7 @@ type tweetRepo interface {
 	DeleteTweet(ctx context.Context, id string) error
 	GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot, error)
 	GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, error)
-	GetOldestTweet(ctx context.Context) (*common.TweetSnapshot, error)
+	GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error)
 	GetTweetsOlderThen(ctx context.Context, after time.Time) ([]*common.TweetSnapshot, error)
 }
 
@@ -144,7 +144,7 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 	return result, nil
 }
 
-func (d *db) GetOldestTweet(ctx context.Context) (*common.TweetSnapshot, error) {
+func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error) {
 	tr, err := d.db.NewTransaction(ctx)
 	if err != nil {
 		return nil, err
@@ -177,7 +177,7 @@ func (d *db) GetOldestTweet(ctx context.Context) (*common.TweetSnapshot, error) 
 			continue
 		}
 
-		if result.TimeParsed.After(tweet.TimeParsed) {
+		if result.CheckedAt.After(tweet.CheckedAt) {
 			result = tweet
 		}
 	}
