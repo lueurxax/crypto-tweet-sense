@@ -119,6 +119,7 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 				best = predictedRating
 				fallbackResult = tweet
 			}
+
 			continue
 		}
 
@@ -136,6 +137,7 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 		if fallbackResult != nil {
 			return fallbackResult, nil
 		}
+
 		return nil, ErrTweetsNotFound
 	}
 
