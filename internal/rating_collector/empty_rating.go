@@ -11,6 +11,11 @@ type emptyRating struct {
 	topCount int
 }
 
+func (e *emptyRating) CurrentTop() float64 {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (e *emptyRating) Check(_ context.Context, tweet *common.TweetSnapshot) (bool, float64, error) {
 	return tweet.Likes > e.topCount, 0, nil
 }
