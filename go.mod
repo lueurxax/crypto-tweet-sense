@@ -3,6 +3,7 @@ module github.com/lueurxax/crypto-tweet-sense
 go 1.21
 
 require (
+	github.com/antonfisher/nested-logrus-formatter v1.3.1
 	github.com/gotd/contrib v0.19.0
 	github.com/gotd/td v0.89.0
 	github.com/json-iterator/go v1.1.12

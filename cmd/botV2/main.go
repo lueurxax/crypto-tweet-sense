@@ -18,6 +18,8 @@ import (
 	"go.elastic.co/ecslogrus"
 	"gopkg.in/telebot.v3"
 
+	nested "github.com/antonfisher/nested-logrus-formatter"
+
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 	ratingCollector "github.com/lueurxax/crypto-tweet-sense/internal/rating_collector"
 	"github.com/lueurxax/crypto-tweet-sense/internal/sender"
@@ -58,10 +60,6 @@ func main() {
 		return
 	}
 
-	go func() {
-		println(http.ListenAndServe("localhost:6060", nil))
-	}()
-
 	// init main config
 	cfg := new(config)
 	if err := envconfig.Process("", cfg); err != nil {
@@ -75,6 +73,10 @@ func main() {
 	if cfg.LogToEcs {
 		logrusLogger.SetFormatter(&ecslogrus.Formatter{})
 	} else {
+		logrus.SetFormatter(&nested.Formatter{
+			FieldsOrder:     []string{pkgKey, "msg"},
+			TimestampFormat: "01-02|15:04:05",
+		})
 	}
 
 	logger := log.NewLogger(logrusLogger)
