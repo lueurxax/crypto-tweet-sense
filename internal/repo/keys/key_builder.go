@@ -9,13 +9,11 @@ type builder struct {
 }
 
 func (b builder) Version() []byte {
-	//TODO implement me
-	panic("implement me")
+	return []byte{version}
 }
 
 func (b builder) Tweets() []byte {
-	//TODO implement me
-	panic("implement me")
+	return []byte{tweet}
 }
 
 func NewBuilder() Builder {
