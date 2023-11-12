@@ -37,16 +37,20 @@ type watcher struct {
 func (w *watcher) RawSubscribe() <-chan string {
 	w.subMu.Lock()
 	defer w.subMu.Unlock()
+
 	subscriber := make(chan string)
 	w.rawSubscribers = append(w.rawSubscribers, subscriber)
+
 	return subscriber
 }
 
 func (w *watcher) Subscribe() <-chan string {
 	w.subMu.Lock()
 	defer w.subMu.Unlock()
+
 	subscriber := make(chan string)
 	w.subscribers = append(w.subscribers, subscriber)
+
 	return subscriber
 }
 
@@ -57,6 +61,7 @@ func (w *watcher) Watch() {
 func (w *watcher) watch() {
 	ctx := context.Background()
 	w.run(ctx)
+
 	tick := time.NewTicker(time.Minute * 10)
 	for range tick.C {
 		w.run(ctx)
@@ -83,20 +88,24 @@ func (w *watcher) runWithQuery(ctx context.Context, query string, start time.Tim
 		if errors.Is(err, tweet_finder.NoTops) {
 			return
 		}
+
 		panic(err)
 	}
+
 	for _, tweet := range tweets {
 		if _, ok := w.published[tweet.PermanentURL]; ok {
 			continue
 		}
+
 		w.published[tweet.PermanentURL] = struct{}{}
 
 		w.subMu.RLock()
-		for _, subscriber := range w.subscribers {
-			subscriber <- w.formatTweet(tweet)
-		}
 		for _, subscriber := range w.rawSubscribers {
 			subscriber <- tweet.Text
+		}
+
+		for _, subscriber := range w.subscribers {
+			subscriber <- w.formatTweet(tweet)
 		}
 		w.subMu.RUnlock()
 	}
@@ -105,13 +114,17 @@ func (w *watcher) runWithQuery(ctx context.Context, query string, start time.Tim
 func (w *watcher) formatTweet(tweet twitterscraper.Tweet) (str string) {
 	str = fmt.Sprintf("*%s*\n", escape(tweet.TimeParsed.Format(time.RFC3339)))
 	str += fmt.Sprintf("%s\n", escape(tweet.Text))
+
 	for _, photo := range tweet.Photos {
 		str += fmt.Sprintf("[photo](%s)\n", escape(photo.URL))
 	}
+
 	for _, video := range tweet.Videos {
 		str += fmt.Sprintf("[video](%s)\n", escape(video.URL))
 	}
+
 	str += fmt.Sprintf("[link](%s)\n", escape(tweet.PermanentURL))
+
 	return
 }
 
@@ -120,14 +133,16 @@ func escape(data string) string {
 	for _, symbol := range []string{"-", "]", "[", "{", "}", "(", ")", ">", "<", ".", "!", "*", "+", "=", "#", "~", "|", "`", "_"} {
 		res = strings.ReplaceAll(res, symbol, "\\"+symbol)
 	}
+
 	return res
 }
 
 func NewWatcher(finder finder, initPublished map[string]struct{}, logger log.Logger) Watcher {
 	return &watcher{
 		finder:         finder,
-		subscribers:    make([]chan string, 0),
-		rawSubscribers: make([]chan string, 0),
+		subMu:          sync.RWMutex{},
+		subscribers:    make([]chan string, 10),
+		rawSubscribers: make([]chan string, 10),
 		published:      initPublished,
 		logger:         logger,
 	}
