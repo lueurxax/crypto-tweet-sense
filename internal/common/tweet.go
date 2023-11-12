@@ -1,6 +1,9 @@
 package common
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type Tweet struct {
 	ID           string
@@ -36,4 +39,11 @@ type TweetSnapshot struct {
 	*Tweet
 	RatingGrowSpeed float64
 	CheckedAt       time.Time
+}
+
+func (t TweetSnapshot) String() string {
+	return fmt.Sprintf(
+		"TweetSnapshot{ID: %s, CreatedAt: %s, RatingGrowSpeed: %f, CheckedAt: %s}",
+		t.ID, t.TimeParsed.Format(time.RFC3339), t.RatingGrowSpeed, t.CheckedAt.Format(time.RFC3339),
+	)
 }

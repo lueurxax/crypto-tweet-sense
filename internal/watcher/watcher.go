@@ -13,6 +13,8 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/pkg/utils"
 )
 
+const subscribersKey = "subscribers"
+
 type Watcher interface {
 	Watch()
 	Subscribe() <-chan string
@@ -160,13 +162,13 @@ func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot,
 
 	if ok {
 		w.subMu.RLock()
-		w.logger.WithField("subscribers", len(w.rawSubscribers)).Debug("send raw tweet")
+		w.logger.WithField(subscribersKey, len(w.rawSubscribers)).Debug("send raw tweet")
 
 		for j := range w.rawSubscribers {
 			w.rawSubscribers[j] <- tweet.Text
 		}
 
-		w.logger.WithField("subscribers", len(w.subscribers)).Debug("send formatted tweet")
+		w.logger.WithField(subscribersKey, len(w.subscribers)).Debug("send formatted tweet")
 
 		for j := range w.subscribers {
 			w.subscribers[j] <- w.formatTweet(*tweet)
@@ -236,6 +238,7 @@ func (w *watcher) updateTweet(ctx context.Context, id string) error {
 		if errors.Is(err, tweetfinder.ErrNotFound) {
 			return w.repo.DeleteTweet(ctx, id)
 		}
+
 		return err
 	}
 

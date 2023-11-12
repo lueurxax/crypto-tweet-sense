@@ -6,6 +6,8 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 )
 
+const delayKey = "delay"
+
 type Manager interface {
 	TooManyRequests()
 	ProcessedBatchOfTweets()
@@ -21,7 +23,7 @@ type manager struct {
 }
 
 func (m *manager) TooManyRequests() {
-	m.log.WithField("delay", m.delay).Error("too many requests")
+	m.log.WithField(delayKey, m.delay).Error("too many requests")
 	m.minimalDelay = m.delay - 1
 	m.incRandomDelay()
 }
@@ -48,7 +50,7 @@ func (m *manager) decDelay() {
 	}
 	m.delay--
 	m.setter(m.delay)
-	m.log.WithField("delay", m.delay).Debug("delay decreased")
+	m.log.WithField(delayKey, m.delay).Debug("delay decreased")
 }
 
 func (m *manager) incRandomDelay() {
@@ -56,9 +58,9 @@ func (m *manager) incRandomDelay() {
 		m.delay = 1
 	}
 
-	m.delay += rand.Int63n(m.delay+1-m.minimalDelay/2) + 1
+	m.delay += rand.Int63n(m.delay+1-m.minimalDelay/2) + 1 //nolint:gosec
 	m.setter(m.delay)
-	m.log.WithField("delay", m.delay).Debug("delay increased")
+	m.log.WithField(delayKey, m.delay).Debug("delay increased")
 }
 
 func NewDelayManager(setter func(seconds int64), minimalDelay int64, logger log.Logger) Manager {
