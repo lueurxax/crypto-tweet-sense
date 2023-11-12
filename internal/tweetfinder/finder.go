@@ -1,4 +1,4 @@
-package tweet_finder
+package tweetfinder
 
 import (
 	"context"
@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	limit  = 10000
-	format = "2006-01-02"
+	limit           = 10000
+	format          = "2006-01-02"
+	tooManyRequests = "429 Too Many Requests"
 )
 
 type Finder interface {
@@ -38,11 +39,13 @@ type finder struct {
 func (f *finder) Find(_ context.Context, id string) (*common.TweetSnapshot, error) {
 	tweet, err := f.scraper.GetTweet(id)
 	if err != nil {
-		if strings.Contains(err.Error(), "429 Too Many Requests") {
+		if strings.Contains(err.Error(), tooManyRequests) {
 			f.delayManager.TooManyRequests()
 		}
+
 		return nil, err
 	}
+
 	return &common.TweetSnapshot{
 		Tweet: &common.Tweet{
 			ID:           tweet.ID,
@@ -86,11 +89,10 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 	retweetsMap := map[int]int{}
 	replyMap := map[int]int{}
 	lastTweetTime := time.Now()
-	until := time.Now().UTC().Add(-time.Hour * 24)
 
 	for tweet := range tweetsCh {
 		if tweet.Error != nil {
-			if strings.Contains(tweet.Error.Error(), "429 Too Many Requests") {
+			if strings.Contains(tweet.Error.Error(), tooManyRequests) {
 				f.delayManager.TooManyRequests()
 				return response, nil
 			}
@@ -108,10 +110,11 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 			f.delayManager.ProcessedBatchOfTweets()
 		}
 
-		if tweet.TimeParsed.Sub(until).Seconds() < 0 {
+		if start != nil && tweet.TimeParsed.Sub(*start).Seconds() < 0 {
 			cancel()
 			break
 		}
+
 		counter++
 		likesMap[tweet.Likes]++
 		retweetsMap[tweet.Retweets]++
@@ -159,6 +162,7 @@ func scrapperPhotosToCommon(photos []twitterscraper.Photo) []common.Photo {
 			URL: photo.URL,
 		}
 	}
+
 	return res
 }
 
@@ -171,6 +175,7 @@ func scrapperVideosToCommon(videos []twitterscraper.Video) []common.Video {
 			URL:     video.URL,
 		}
 	}
+
 	return res
 }
 

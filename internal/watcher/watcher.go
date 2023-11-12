@@ -9,7 +9,7 @@ import (
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
-	"github.com/lueurxax/crypto-tweet-sense/internal/tweet_finder"
+	"github.com/lueurxax/crypto-tweet-sense/internal/tweetfinder"
 	"github.com/lueurxax/crypto-tweet-sense/pkg/utils"
 )
 
@@ -110,7 +110,7 @@ func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.
 		query,
 	)
 	if err != nil {
-		if errors.Is(err, tweet_finder.NoTops) {
+		if errors.Is(err, tweetfinder.NoTops) {
 			return
 		}
 

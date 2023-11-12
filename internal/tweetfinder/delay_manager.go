@@ -1,4 +1,4 @@
-package tweet_finder
+package tweetfinder
 
 import (
 	"math/rand"

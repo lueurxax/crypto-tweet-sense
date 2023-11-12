@@ -24,7 +24,7 @@ import (
 	ratingCollector "github.com/lueurxax/crypto-tweet-sense/internal/rating_collector"
 	fdb "github.com/lueurxax/crypto-tweet-sense/internal/repo"
 	"github.com/lueurxax/crypto-tweet-sense/internal/sender"
-	tweetFinder "github.com/lueurxax/crypto-tweet-sense/internal/tweet_finder"
+	tweetFinder "github.com/lueurxax/crypto-tweet-sense/internal/tweetfinder"
 	"github.com/lueurxax/crypto-tweet-sense/internal/tweets_editor"
 	"github.com/lueurxax/crypto-tweet-sense/internal/watcher"
 )
