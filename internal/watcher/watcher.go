@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 	"github.com/lueurxax/crypto-tweet-sense/internal/tweet_finder"
+	"github.com/lueurxax/crypto-tweet-sense/pkg/utils"
 )
 
 type Watcher interface {
@@ -36,20 +36,22 @@ type watcher struct {
 
 func (w *watcher) RawSubscribe() <-chan string {
 	w.subMu.Lock()
-	defer w.subMu.Unlock()
 
-	subscriber := make(chan string)
+	subscriber := make(chan string, 10)
 	w.rawSubscribers = append(w.rawSubscribers, subscriber)
+
+	w.subMu.Unlock()
 
 	return subscriber
 }
 
 func (w *watcher) Subscribe() <-chan string {
 	w.subMu.Lock()
-	defer w.subMu.Unlock()
 
-	subscriber := make(chan string)
+	subscriber := make(chan string, 10)
 	w.subscribers = append(w.subscribers, subscriber)
+
+	w.subMu.Unlock()
 
 	return subscriber
 }
@@ -100,49 +102,44 @@ func (w *watcher) runWithQuery(ctx context.Context, query string, start time.Tim
 		w.published[tweet.PermanentURL] = struct{}{}
 
 		w.subMu.RLock()
-		for _, subscriber := range w.rawSubscribers {
-			subscriber <- tweet.Text
+		w.logger.WithField("subscribers", len(w.rawSubscribers)).Debug("send raw tweet")
+
+		for i := range w.rawSubscribers {
+			w.rawSubscribers[i] <- tweet.Text
 		}
 
-		for _, subscriber := range w.subscribers {
-			subscriber <- w.formatTweet(tweet)
+		w.logger.WithField("subscribers", len(w.subscribers)).Debug("send formatted tweet")
+
+		for i := range w.subscribers {
+			w.subscribers[i] <- w.formatTweet(tweet)
 		}
 		w.subMu.RUnlock()
 	}
 }
 
 func (w *watcher) formatTweet(tweet twitterscraper.Tweet) (str string) {
-	str = fmt.Sprintf("*%s*\n", escape(tweet.TimeParsed.Format(time.RFC3339)))
-	str += fmt.Sprintf("%s\n", escape(tweet.Text))
+	str = fmt.Sprintf("*%s*\n", utils.Escape(tweet.TimeParsed.Format(time.RFC3339)))
+	str += fmt.Sprintf("%s\n", utils.Escape(tweet.Text))
 
 	for _, photo := range tweet.Photos {
-		str += fmt.Sprintf("[photo](%s)\n", escape(photo.URL))
+		str += fmt.Sprintf("[photo](%s)\n", utils.Escape(photo.URL))
 	}
 
 	for _, video := range tweet.Videos {
-		str += fmt.Sprintf("[video](%s)\n", escape(video.URL))
+		str += fmt.Sprintf("[video](%s)\n", utils.Escape(video.URL))
 	}
 
-	str += fmt.Sprintf("[link](%s)\n", escape(tweet.PermanentURL))
+	str += fmt.Sprintf("[link](%s)\n", utils.Escape(tweet.PermanentURL))
 
 	return
-}
-
-func escape(data string) string {
-	res := data
-	for _, symbol := range []string{"-", "]", "[", "{", "}", "(", ")", ">", "<", ".", "!", "*", "+", "=", "#", "~", "|", "`", "_"} {
-		res = strings.ReplaceAll(res, symbol, "\\"+symbol)
-	}
-
-	return res
 }
 
 func NewWatcher(finder finder, initPublished map[string]struct{}, logger log.Logger) Watcher {
 	return &watcher{
 		finder:         finder,
 		subMu:          sync.RWMutex{},
-		subscribers:    make([]chan string, 10),
-		rawSubscribers: make([]chan string, 10),
+		subscribers:    make([]chan string, 0),
+		rawSubscribers: make([]chan string, 0),
 		published:      initPublished,
 		logger:         logger,
 	}

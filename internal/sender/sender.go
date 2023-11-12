@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"gopkg.in/telebot.v3"
+
+	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 )
 
 type Sender interface {
@@ -14,6 +16,8 @@ type sender struct {
 	client *telebot.Bot
 
 	recipient telebot.Recipient
+
+	log log.Logger
 }
 
 func (s *sender) Send(ctx context.Context, linkCh <-chan string) context.Context {
@@ -24,13 +28,14 @@ func (s *sender) Send(ctx context.Context, linkCh <-chan string) context.Context
 }
 
 func (s *sender) send(cancel context.CancelFunc, ch <-chan string) {
-	for link := range ch {
-		if _, err := s.client.Send(s.recipient, link, telebot.ModeMarkdownV2); err != nil {
+	for msg := range ch {
+		if _, err := s.client.Send(s.recipient, msg, telebot.ModeMarkdownV2); err != nil {
+			s.log.WithField("what", msg).WithError(err).Error("send error")
 			cancel()
 		}
 	}
 }
 
-func NewSender(client *telebot.Bot, recipient telebot.Recipient) Sender {
-	return &sender{client: client, recipient: recipient}
+func NewSender(client *telebot.Bot, recipient telebot.Recipient, logger log.Logger) Sender {
+	return &sender{client: client, recipient: recipient, log: logger}
 }
