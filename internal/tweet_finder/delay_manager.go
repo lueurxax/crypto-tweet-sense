@@ -32,6 +32,7 @@ func (m *manager) ProcessedBatchOfTweets() {
 
 func (m *manager) ProcessedQuery() {
 	m.decDelay()
+
 	if m.minimalDelay > 4 {
 		m.minimalDelay--
 	}
@@ -55,6 +56,7 @@ func (m *manager) incRandomDelay() {
 	if m.delay == 0 {
 		m.delay = 1
 	}
+
 	m.delay += rand.Int63n(m.delay+1-m.minimalDelay/2) + 1
 	m.setter(m.delay)
 	m.log.WithField("delay", m.delay).Debug("delay increased")

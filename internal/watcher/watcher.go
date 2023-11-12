@@ -96,6 +96,7 @@ func (w *watcher) runWithQuery(ctx context.Context, query string, start time.Tim
 		if _, ok := w.published[tweet.PermanentURL]; ok {
 			continue
 		}
+
 		w.published[tweet.PermanentURL] = struct{}{}
 
 		w.subMu.RLock()
@@ -113,13 +114,17 @@ func (w *watcher) runWithQuery(ctx context.Context, query string, start time.Tim
 func (w *watcher) formatTweet(tweet twitterscraper.Tweet) (str string) {
 	str = fmt.Sprintf("*%s*\n", escape(tweet.TimeParsed.Format(time.RFC3339)))
 	str += fmt.Sprintf("%s\n", escape(tweet.Text))
+
 	for _, photo := range tweet.Photos {
 		str += fmt.Sprintf("[photo](%s)\n", escape(photo.URL))
 	}
+
 	for _, video := range tweet.Videos {
 		str += fmt.Sprintf("[video](%s)\n", escape(video.URL))
 	}
+
 	str += fmt.Sprintf("[link](%s)\n", escape(tweet.PermanentURL))
+
 	return
 }
 
@@ -128,12 +133,14 @@ func escape(data string) string {
 	for _, symbol := range []string{"-", "]", "[", "{", "}", "(", ")", ">", "<", ".", "!", "*", "+", "=", "#", "~", "|", "`", "_"} {
 		res = strings.ReplaceAll(res, symbol, "\\"+symbol)
 	}
+
 	return res
 }
 
 func NewWatcher(finder finder, initPublished map[string]struct{}, logger log.Logger) Watcher {
 	return &watcher{
 		finder:         finder,
+		subMu:          sync.RWMutex{},
 		subscribers:    make([]chan string, 10),
 		rawSubscribers: make([]chan string, 10),
 		published:      initPublished,
