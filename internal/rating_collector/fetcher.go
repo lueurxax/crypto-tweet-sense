@@ -132,9 +132,13 @@ func (f *fetcher) FetchRatingsAndUniqueMessages(ctx context.Context, id int64) (
 	}
 
 	offset := 0
+
 	const limit = 100
+
 	ratings := map[string]*models.Rating{}
+
 	uniqueLinks := map[string]struct{}{}
+
 	for {
 		raw, err := f.client.API().MessagesGetHistory(ctx, &tg.MessagesGetHistoryRequest{
 			Peer: &tg.InputPeerChannel{
@@ -253,7 +257,14 @@ func NewFetcher(appID int, appHash, phone, sessionFile string, logger log.Logger
 		Handler: d,
 	})
 
-	zapLogger, err := zap.NewDevelopment()
+	zapLogger, err := zap.Config{
+		Level:            zap.NewAtomicLevelAt(zap.InfoLevel),
+		Development:      true,
+		Encoding:         "console",
+		EncoderConfig:    zap.NewDevelopmentEncoderConfig(),
+		OutputPaths:      []string{"stderr"},
+		ErrorOutputPaths: []string{"stderr"},
+	}.Build()
 	if err != nil {
 		logger.Error(err)
 	}
