@@ -102,13 +102,13 @@ func (w *watcher) runWithQuery(ctx context.Context, query string, start time.Tim
 		w.published[tweet.PermanentURL] = struct{}{}
 
 		w.subMu.RLock()
+		w.logger.WithField("subscribers", len(w.rawSubscribers)).Debug("send raw tweet")
 		for i := range w.rawSubscribers {
-			w.logger.Debug("send raw tweet")
 			w.rawSubscribers[i] <- tweet.Text
 		}
 
+		w.logger.WithField("subscribers", len(w.subscribers)).Debug("send formatted tweet")
 		for i := range w.subscribers {
-			w.logger.Debug("send formatted tweet")
 			w.subscribers[i] <- w.formatTweet(tweet)
 		}
 		w.subMu.RUnlock()
