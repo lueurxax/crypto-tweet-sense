@@ -110,7 +110,7 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 		}
 
 		// skip unreachable top tweets
-		if tweet.RatingGrowSpeed*time.Since(tweet.TimeParsed).Seconds() >= top {
+		if tweet.RatingGrowSpeed*time.Since(tweet.TimeParsed).Seconds() < top {
 			continue
 		}
 
