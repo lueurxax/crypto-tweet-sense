@@ -75,6 +75,9 @@ func (e *editor) edit(ctx context.Context, tweets []string) error {
 	resp, err := e.client.CreateChatCompletion(
 		ctx,
 		openai.ChatCompletionRequest{
+			ResponseFormat: &openai.ChatCompletionResponseFormat{
+				Type: openai.ChatCompletionResponseFormatTypeJSONObject,
+			},
 			Model: openai.GPT4TurboPreview,
 			Messages: []openai.ChatCompletionMessage{
 				{

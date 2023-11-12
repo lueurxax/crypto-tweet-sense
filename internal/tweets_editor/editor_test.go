@@ -2,14 +2,18 @@ package tweets_editor
 
 import (
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/sashabaranov/go-openai"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
+	"gopkg.in/telebot.v3"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
+	"github.com/lueurxax/crypto-tweet-sense/internal/sender"
 )
 
 var testTweets = []string{
@@ -43,17 +47,28 @@ var testTweets = []string{
 func TestNewEditor(t *testing.T) {
 	t.Run("some tweets request", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		client := openai.NewClient(os.Getenv("token"))
-		ed := NewEditor(client, time.Second, log.NewLogger(logrus.New()))
+		client := openai.NewClient(os.Getenv("openai_token"))
+		logger := log.NewLogger(logrus.New())
+		ed := NewEditor(client, time.Second, logger)
 		input := make(chan string)
 		ctx = ed.Edit(ctx, input)
 		output := ed.SubscribeEdited()
+
+		chatID, err := strconv.ParseInt(os.Getenv("chat_id"), 10, 64)
+		require.NoError(t, err)
+
+		api, err := telebot.NewBot(
+			telebot.Settings{Token: os.Getenv("bot_token"), Poller: &telebot.LongPoller{Timeout: 10 * time.Second}},
+		)
+		require.NoError(t, err)
+		s := sender.NewSender(api, &telebot.Chat{ID: chatID}, logger)
+		s.Send(ctx, output)
 		go func(input chan string) {
 			for _, tweet := range testTweets {
 				input <- tweet
 			}
 		}(input)
-		t.Log(<-output)
+		time.Sleep(10 * time.Second)
 		cancel()
 	})
 }
