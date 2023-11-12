@@ -37,16 +37,20 @@ type watcher struct {
 func (w *watcher) RawSubscribe() <-chan string {
 	w.subMu.Lock()
 	defer w.subMu.Unlock()
+
 	subscriber := make(chan string)
 	w.rawSubscribers = append(w.rawSubscribers, subscriber)
+
 	return subscriber
 }
 
 func (w *watcher) Subscribe() <-chan string {
 	w.subMu.Lock()
 	defer w.subMu.Unlock()
+
 	subscriber := make(chan string)
 	w.subscribers = append(w.subscribers, subscriber)
+
 	return subscriber
 }
 
@@ -57,6 +61,7 @@ func (w *watcher) Watch() {
 func (w *watcher) watch() {
 	ctx := context.Background()
 	w.run(ctx)
+
 	tick := time.NewTicker(time.Minute * 10)
 	for range tick.C {
 		w.run(ctx)
@@ -83,8 +88,10 @@ func (w *watcher) runWithQuery(ctx context.Context, query string, start time.Tim
 		if errors.Is(err, tweet_finder.NoTops) {
 			return
 		}
+
 		panic(err)
 	}
+
 	for _, tweet := range tweets {
 		if _, ok := w.published[tweet.PermanentURL]; ok {
 			continue
@@ -92,11 +99,12 @@ func (w *watcher) runWithQuery(ctx context.Context, query string, start time.Tim
 		w.published[tweet.PermanentURL] = struct{}{}
 
 		w.subMu.RLock()
-		for _, subscriber := range w.subscribers {
-			subscriber <- w.formatTweet(tweet)
-		}
 		for _, subscriber := range w.rawSubscribers {
 			subscriber <- tweet.Text
+		}
+
+		for _, subscriber := range w.subscribers {
+			subscriber <- w.formatTweet(tweet)
 		}
 		w.subMu.RUnlock()
 	}
@@ -126,8 +134,8 @@ func escape(data string) string {
 func NewWatcher(finder finder, initPublished map[string]struct{}, logger log.Logger) Watcher {
 	return &watcher{
 		finder:         finder,
-		subscribers:    make([]chan string, 0),
-		rawSubscribers: make([]chan string, 0),
+		subscribers:    make([]chan string, 10),
+		rawSubscribers: make([]chan string, 10),
 		published:      initPublished,
 		logger:         logger,
 	}

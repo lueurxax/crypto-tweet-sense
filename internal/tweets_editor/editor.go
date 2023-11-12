@@ -20,16 +20,17 @@ type Editor interface {
 }
 
 type editor struct {
-	editedCh chan string
-	client   *openai.Client
-
-	log          log.Logger
+	editedCh     chan string
+	client       *openai.Client
 	sendInterval time.Duration
+
+	log log.Logger
 }
 
 func (e *editor) Edit(ctx context.Context, tweetCh <-chan string) context.Context {
 	ctx, cancel := context.WithCancel(ctx)
 	go e.editLoop(ctx, cancel, tweetCh)
+
 	return ctx
 }
 
@@ -40,23 +41,29 @@ func (e *editor) SubscribeEdited() <-chan string {
 func (e *editor) editLoop(ctx context.Context, cancel context.CancelFunc, ch <-chan string) {
 	collectedTweets := make([]string, 0)
 	ticker := time.NewTicker(e.sendInterval)
+
 	for {
 		select {
 		case <-ctx.Done():
+			close(e.editedCh)
 			e.log.Info("edit loop done")
+
 			return
-		case link := <-ch:
-			collectedTweets = append(collectedTweets, link)
+		case tweet := <-ch:
+			e.log.WithField("tweet", tweet).Debug("tweet received")
+			collectedTweets = append(collectedTweets, tweet)
 		case <-ticker.C:
 			if len(collectedTweets) == 0 {
 				e.log.Info("skip edit, because no tweets")
 				continue
 			}
+
 			requestContext := context.Background()
 			if err := e.edit(requestContext, collectedTweets); err != nil {
 				e.log.WithError(err).Error("edit error")
 				cancel()
 			}
+
 			collectedTweets = make([]string, 0)
 		}
 	}
@@ -93,16 +100,18 @@ func (e *editor) edit(ctx context.Context, tweets []string) error {
 		// TODO: try to search correct json in string
 		e.log.WithError(err).Error("summary unmarshal error")
 		e.editedCh <- resp.Choices[0].Message.Content
+
 		return nil
 	}
 
 	e.editedCh <- res.Message
+
 	return nil
 }
 
 func NewEditor(client *openai.Client, sendInterval time.Duration, log log.Logger) Editor {
 	return &editor{
-		editedCh:     make(chan string),
+		editedCh:     make(chan string, 10),
 		sendInterval: sendInterval,
 		client:       client,
 		log:          log,

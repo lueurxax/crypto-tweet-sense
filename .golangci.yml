@@ -29,6 +29,7 @@ linters:
     - thelper
     - promlinter
     - wastedassign
+    - wsl
   fast: false
 
 linters-settings:

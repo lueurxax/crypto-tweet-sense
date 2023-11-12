@@ -35,10 +35,12 @@ func (c *checker) loop(ratings <-chan *models.UsernameRating) {
 func (c *checker) Check(_ context.Context, tweet *twitterscraper.Tweet) (bool, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+
 	rating, ok := c.rating[tweet.Username]
 	if !ok {
 		return tweet.Likes > c.topCount, nil
 	}
+
 	return float32(tweet.Likes)*(1.0+float32(rating.Likes-rating.Dislikes)/10.0) > float32(c.topCount), nil
 }
 

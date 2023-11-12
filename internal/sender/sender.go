@@ -19,6 +19,7 @@ type sender struct {
 func (s *sender) Send(ctx context.Context, linkCh <-chan string) context.Context {
 	ctx, cancel := context.WithCancel(ctx)
 	go s.send(cancel, linkCh)
+
 	return ctx
 }
 
