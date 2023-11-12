@@ -34,6 +34,8 @@ var version = "dev"
 const (
 	foundationDBVersion = 710
 	pkgKey              = "pkg"
+	cookiesFilename     = "cookies.json"
+	startDelay          = 15
 )
 
 type config struct {
@@ -117,13 +119,14 @@ func main() {
 		panic(err)
 	}
 
-	scraper := twitterscraper.New().WithDelay(10).SetSearchMode(twitterscraper.SearchLatest)
+	scraper := twitterscraper.New().WithDelay(startDelay).SetSearchMode(twitterscraper.SearchLatest)
 
 	var cookies []*http.Cookie
 
-	data, err := os.ReadFile("cookies.json")
+	data, err := os.ReadFile(cookiesFilename)
 	if err != nil {
 		logger.Error(err)
+
 		if err = scrapperLogin(scraper, cfg.XLogin, cfg.XPassword); err != nil {
 			panic(err)
 		}
@@ -132,6 +135,7 @@ func main() {
 	if data != nil {
 		if err = json.Unmarshal(data, &cookies); err != nil {
 			logger.Error(err)
+
 			if err = scrapperLogin(scraper, cfg.XLogin, cfg.XPassword); err != nil {
 				panic(err)
 			}
@@ -140,6 +144,7 @@ func main() {
 
 	if cookies != nil {
 		scraper.SetCookies(cookies)
+
 		if !scraper.IsLoggedIn() {
 			if err = scrapperLogin(scraper, cfg.XLogin, cfg.XPassword); err != nil {
 				panic(err)
@@ -154,14 +159,15 @@ func main() {
 		panic(err)
 	}
 
-	if err = os.WriteFile("cookies.json", data, 0644); err != nil {
+	if err = os.WriteFile(cookiesFilename, data, 0644); err != nil {
 		panic(err)
 	}
+
 	checker := ratingCollector.NewChecker(res, cfg.TopCount)
 
 	delayManager := tweetFinder.NewDelayManager(
 		func(seconds int64) { scraper.WithDelay(seconds) },
-		10,
+		startDelay,
 		logger.WithField(pkgKey, "delay_manager"),
 	)
 	finder := tweetFinder.NewFinder(scraper, delayManager, logger.WithField(pkgKey, "finder"))

@@ -10,6 +10,7 @@ import (
 
 type RatingChecker interface {
 	Check(ctx context.Context, tweet *common.TweetSnapshot) (bool, float64, error)
+	CurrentTop() float64
 	CollectRatings(<-chan *models.UsernameRating)
 }
 
@@ -17,6 +18,10 @@ type checker struct {
 	rating   map[string]*models.Rating
 	mu       *sync.RWMutex
 	topCount int
+}
+
+func (c *checker) CurrentTop() float64 {
+	return float64(c.topCount)
 }
 
 func (c *checker) CollectRatings(ratings <-chan *models.UsernameRating) {

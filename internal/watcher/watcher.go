@@ -35,6 +35,7 @@ type repo interface {
 
 type ratingChecker interface {
 	Check(ctx context.Context, tweet *common.TweetSnapshot) (bool, float64, error)
+	CurrentTop() float64
 }
 
 type watcher struct {
@@ -97,6 +98,7 @@ func (w *watcher) search(ctx context.Context) {
 	for query, start := range w.queries {
 		w.searchWithQuery(ctx, query, start)
 	}
+
 	w.logger.Debug("watcher checked news")
 }
 
@@ -218,7 +220,7 @@ func (w *watcher) updateOldestFast() {
 }
 
 func (w *watcher) updateOldestFastTweet(ctx context.Context) error {
-	tweet, err := w.repo.GetOldestTopReachableTweet(ctx, 0)
+	tweet, err := w.repo.GetOldestTopReachableTweet(ctx, w.ratingChecker.CurrentTop())
 	if err != nil {
 		return err
 	}
@@ -236,10 +238,7 @@ func (w *watcher) updateTweet(ctx context.Context, id string) error {
 
 	_, tweet.RatingGrowSpeed = w.processTweet(ctx, tweet, time.Now())
 	if tweet.RatingGrowSpeed != 0 {
-		if err = w.repo.Save(ctx, []common.TweetSnapshot{*tweet}); err != nil {
-			return err
-		}
-		return nil
+		return w.repo.Save(ctx, []common.TweetSnapshot{*tweet})
 	}
 
 	return w.repo.DeleteTweet(ctx, tweet.ID)
@@ -281,16 +280,19 @@ func (w *watcher) cleanTooOldTweets(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	for _, tweet := range tweets {
 		if err = w.repo.DeleteTweet(ctx, tweet.ID); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
 func NewWatcher(finder finder, repo repo, checker ratingChecker, initPublished map[string]struct{}, logger log.Logger) Watcher {
 	start := time.Now().AddDate(0, 0, -1)
+
 	return &watcher{
 		queries: map[string]time.Time{
 			"bitcoin":        start,

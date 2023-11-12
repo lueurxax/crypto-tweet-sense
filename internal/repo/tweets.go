@@ -24,11 +24,13 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 	if err != nil {
 		return err
 	}
+
 	for _, tweet := range tweets {
 		data, err := jsoniter.Marshal(tweet)
 		if err != nil {
 			return err
 		}
+
 		if err = tr.Set(d.keyBuilder.Tweet(tweet.ID), data); err != nil {
 			return err
 		}
@@ -108,7 +110,7 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 		}
 
 		// skip unreachable top tweets
-		if tweet.RatingGrowSpeed*time.Now().Sub(tweet.TimeParsed).Seconds() < top {
+		if tweet.RatingGrowSpeed*time.Since(tweet.TimeParsed).Seconds() >= top {
 			continue
 		}
 
