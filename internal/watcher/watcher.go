@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 	"github.com/lueurxax/crypto-tweet-sense/internal/tweet_finder"
+	"github.com/lueurxax/crypto-tweet-sense/pkg/utils"
 )
 
 type Watcher interface {
@@ -118,29 +118,20 @@ func (w *watcher) runWithQuery(ctx context.Context, query string, start time.Tim
 }
 
 func (w *watcher) formatTweet(tweet twitterscraper.Tweet) (str string) {
-	str = fmt.Sprintf("*%s*\n", escape(tweet.TimeParsed.Format(time.RFC3339)))
-	str += fmt.Sprintf("%s\n", escape(tweet.Text))
+	str = fmt.Sprintf("*%s*\n", utils.Escape(tweet.TimeParsed.Format(time.RFC3339)))
+	str += fmt.Sprintf("%s\n", utils.Escape(tweet.Text))
 
 	for _, photo := range tweet.Photos {
-		str += fmt.Sprintf("[photo](%s)\n", escape(photo.URL))
+		str += fmt.Sprintf("[photo](%s)\n", utils.Escape(photo.URL))
 	}
 
 	for _, video := range tweet.Videos {
-		str += fmt.Sprintf("[video](%s)\n", escape(video.URL))
+		str += fmt.Sprintf("[video](%s)\n", utils.Escape(video.URL))
 	}
 
-	str += fmt.Sprintf("[link](%s)\n", escape(tweet.PermanentURL))
+	str += fmt.Sprintf("[link](%s)\n", utils.Escape(tweet.PermanentURL))
 
 	return
-}
-
-func escape(data string) string {
-	res := data
-	for _, symbol := range []string{"-", "]", "[", "{", "}", "(", ")", ">", "<", ".", "!", "*", "+", "=", "#", "~", "|", "`", "_"} {
-		res = strings.ReplaceAll(res, symbol, "\\"+symbol)
-	}
-
-	return res
 }
 
 func NewWatcher(finder finder, initPublished map[string]struct{}, logger log.Logger) Watcher {

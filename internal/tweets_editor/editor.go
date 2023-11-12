@@ -10,6 +10,7 @@ import (
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
+	"github.com/lueurxax/crypto-tweet-sense/pkg/utils"
 )
 
 const prompt = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip info if it not useful for investing. I will parse your answer by code like json `{\"message\":\"telegram message\"}`, then can you prepare message and replace \"telegram message\" in json with prepared telegram message? \nTweets: %s."
@@ -98,12 +99,12 @@ func (e *editor) edit(ctx context.Context, tweets []string) error {
 	if err = jsoniter.UnmarshalFromString(resp.Choices[0].Message.Content, &res); err != nil {
 		// TODO: try to search correct json in string
 		e.log.WithError(err).Error("summary unmarshal error")
-		e.editedCh <- resp.Choices[0].Message.Content
+		e.editedCh <- utils.Escape(resp.Choices[0].Message.Content)
 
 		return nil
 	}
 
-	e.editedCh <- res.Message
+	e.editedCh <- utils.Escape(res.Message)
 
 	return nil
 }
