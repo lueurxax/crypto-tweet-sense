@@ -19,6 +19,7 @@ func (p *pool) FindAll(ctx context.Context, start, end *time.Time, search string
 		defer func() {
 			p.freeFinders <- f
 		}()
+
 		return f.FindAll(ctx, start, end, search)
 	}
 }
@@ -28,6 +29,7 @@ func (p *pool) Find(ctx context.Context, id string) (*common.TweetSnapshot, erro
 	defer func() {
 		p.freeFinders <- f
 	}()
+
 	return f.Find(ctx, id)
 }
 
@@ -36,5 +38,6 @@ func NewPool(finders []Finder) Finder {
 	for _, f := range finders {
 		ch <- f
 	}
+
 	return &pool{freeFinders: ch}
 }

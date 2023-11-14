@@ -37,7 +37,6 @@ func (t *transaction) Clear(key []byte) {
 	t.calls = append(t.calls, func() {
 		t.tr.Clear(fdb.Key(key))
 	})
-	return
 }
 
 func (t *transaction) Get(key []byte) ([]byte, error) {
@@ -49,6 +48,7 @@ func (t *transaction) Set(key []byte, value []byte) (err error) {
 	t.calls = append(t.calls, func() {
 		t.tr.Set(fdb.Key(key), value)
 	})
+
 	return
 }
 
@@ -105,5 +105,6 @@ func NewTransaction(ctx context.Context, db fdb.Database) (Transaction, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &transaction{ctx: ctx, tr: tr, readonly: true}, nil
 }

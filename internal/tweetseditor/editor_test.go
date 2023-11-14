@@ -1,4 +1,4 @@
-package tweets_editor
+package tweetseditor
 
 import (
 	"os"

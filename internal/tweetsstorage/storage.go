@@ -1,4 +1,4 @@
-package tweets_storage
+package tweetsstorage
 
 import (
 	"context"
@@ -30,6 +30,7 @@ func (s *storage) Save(_ context.Context, tweet *common.Tweet) error {
 	s.sortedByLikesDesc = append(s.sortedByLikesDesc, tweet.ID)
 	slices.SortFunc(s.sortedByLikesDesc, s.sort)
 	s.mu.Unlock()
+
 	return nil
 }
 
@@ -41,6 +42,7 @@ func (s *storage) GetPopularAndOlderThen(_ context.Context, time time.Time) (*co
 			return s.tweets[id].Tweet, nil
 		}
 	}
+
 	return nil, common.ErrAllTweetsAreFresh
 }
 
@@ -52,17 +54,20 @@ func (s *storage) Delete(_ context.Context, id string) error {
 			break
 		}
 	}
+
 	delete(s.tweets, id)
 	s.mu.Unlock()
+
 	return nil
 }
 
 func (s *storage) sort(i string, j string) int {
-	if s.tweets[i].Likes > s.tweets[j].Likes {
+	switch {
+	case s.tweets[i].Likes > s.tweets[j].Likes:
 		return -1
-	} else if s.tweets[i].Likes < s.tweets[j].Likes {
+	case s.tweets[i].Likes < s.tweets[j].Likes:
 		return 1
-	} else {
+	default:
 		return 0
 	}
 }

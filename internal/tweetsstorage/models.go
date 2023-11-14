@@ -1,4 +1,4 @@
-package tweets_storage
+package tweetsstorage
 
 import (
 	"time"

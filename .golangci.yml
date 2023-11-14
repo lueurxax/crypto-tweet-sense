@@ -31,8 +31,6 @@ linters:
     - bidichk
     # Checks for missing semicolons.
     - bodyclose
-    # Containedctx is a linter that detects struct contained context.Context field.
-    - containedctx
     # Uheck whether the function uses a non-inherited context.
     - contextcheck
     # Go linter that checks if package imports are in a list of acceptable packages.

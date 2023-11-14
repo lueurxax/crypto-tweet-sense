@@ -1,4 +1,4 @@
-package rating_collector
+package ratingcollector
 
 import (
 	"bufio"
@@ -20,18 +20,22 @@ import (
 	"golang.org/x/term"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
-	"github.com/lueurxax/crypto-tweet-sense/internal/rating_collector/models"
+	"github.com/lueurxax/crypto-tweet-sense/internal/ratingcollector/models"
 )
 
 const (
 	likeSymbol    = "👍"
 	dislikeSymbol = "👎"
+
+	limit        = 1000
+	reactionsKey = "reactions"
+	messageKey   = "message"
 )
 
 type Fetcher interface {
 	Auth(ctx context.Context) error
 	Stop() error
-	FetchRatingsAndUniqueMessages(ctx context.Context, id int64) (map[string]*models.Rating, map[string]struct{}, error)
+	FetchRatingsAndUnique(ctx context.Context, id int64) (map[string]*models.Rating, map[string]struct{}, error)
 	Subscribe(ctx context.Context, id int64) chan *models.UsernameRating
 }
 
@@ -54,7 +58,8 @@ type fetcher struct {
 }
 
 func (f *fetcher) Subscribe(_ context.Context, id int64) chan *models.UsernameRating {
-	res := make(chan *models.UsernameRating, 1000)
+	res := make(chan *models.UsernameRating, limit)
+
 	f.updateDispatcher.OnMessageReactions(func(ctx context.Context, e tg.Entities, update *tg.UpdateMessageReactions) error {
 		select {
 		case <-ctx.Done():
@@ -62,14 +67,17 @@ func (f *fetcher) Subscribe(_ context.Context, id int64) chan *models.UsernameRa
 			return ctx.Err()
 		default:
 		}
+
 		peer, ok := update.Peer.(*tg.PeerChannel)
 		if !ok {
-			f.log.WithField("reactions", update.Reactions).WithField("message", update.MsgID).Info("Reactions")
+			f.log.WithField(reactionsKey, update.Reactions).WithField(messageKey, update.MsgID).Info("Not a channel")
 			return nil
 		}
+
 		if peer.ChannelID != id {
 			return nil
 		}
+
 		channel := e.Channels[peer.ChannelID]
 		raw, err := f.client.API().ChannelsGetMessages(ctx, &tg.ChannelsGetMessagesRequest{
 			Channel: &tg.InputChannel{ChannelID: channel.ID, AccessHash: channel.AccessHash},
@@ -80,10 +88,10 @@ func (f *fetcher) Subscribe(_ context.Context, id int64) chan *models.UsernameRa
 		}
 		msgs, isCorrect := raw.AsModified()
 		if !isCorrect {
-			f.log.WithField("reactions", update.Reactions).WithField("message", update.MsgID).Info("Reactions")
+			f.log.WithField(reactionsKey, update.Reactions).WithField(messageKey, update.MsgID).Info("Not a message")
 			return nil
 		}
-		f.log.WithField("reactions", update.Reactions).WithField("messages", msgs.GetMessages()).Info("Reactions")
+		f.log.WithField(reactionsKey, update.Reactions).WithField("messages", msgs.GetMessages()).Info("Reactions")
 
 		for _, m := range msgs.GetMessages() {
 			tgmes, ok := m.(*tg.Message)
@@ -110,24 +118,31 @@ func (f *fetcher) Subscribe(_ context.Context, id int64) chan *models.UsernameRa
 
 		return nil
 	})
+
 	return res
 }
 
-func (f *fetcher) FetchRatingsAndUniqueMessages(ctx context.Context, id int64) (map[string]*models.Rating, map[string]struct{}, error) {
-	chls, err := f.client.API().MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{Limit: 1000, OffsetPeer: &tg.InputPeerEmpty{}})
+//nolint:funlen
+func (f *fetcher) FetchRatingsAndUnique(ctx context.Context, id int64) (map[string]*models.Rating, map[string]struct{}, error) {
+	chls, err := f.client.API().MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{Limit: limit, OffsetPeer: &tg.InputPeerEmpty{}})
 	if err != nil {
 		return nil, nil, err
 	}
+
 	var (
 		ch *tg.Channel
 		ok bool
 	)
-	for _, chl := range chls.(*tg.MessagesDialogsSlice).Chats {
+
+	dialogs, ok := chls.(*tg.MessagesDialogsSlice)
+	if !ok {
+		return nil, nil, models.ErrIncorrectTypeOfResponse
+	}
+
+	for _, chl := range dialogs.Chats {
 		ch, ok = chl.(*tg.Channel)
-		if ok {
-			if ch.ID == id {
-				break
-			}
+		if ok && ch.ID == id {
+			break
 		}
 	}
 
@@ -151,9 +166,10 @@ func (f *fetcher) FetchRatingsAndUniqueMessages(ctx context.Context, id int64) (
 		if err != nil {
 			return nil, nil, err
 		}
+
 		messages, ok := raw.(*tg.MessagesChannelMessages)
 		if !ok {
-			return nil, nil, fmt.Errorf("incorrect type of response")
+			return nil, nil, models.ErrIncorrectTypeOfResponse
 		}
 
 		for _, m := range messages.Messages {
@@ -161,35 +177,46 @@ func (f *fetcher) FetchRatingsAndUniqueMessages(ctx context.Context, id int64) (
 			if !ok {
 				continue
 			}
+
 			link, err := f.messageParser.ParseLink(tgmes)
 			if err != nil {
 				if errors.Is(err, models.ErrLinkNotFound) {
 					continue
 				}
+
 				return nil, nil, err
 			}
+
 			uniqueLinks[link] = struct{}{}
+
 			username, err := f.messageParser.ParseUsername(tgmes)
 			if err != nil {
 				if errors.Is(err, models.ErrUsernameNotFound) {
 					continue
 				}
+
 				return nil, nil, err
 			}
+
 			likes, dislikes := f.parseReactions(tgmes.Reactions.Results)
+
 			rating, ok := ratings[username]
 			if !ok {
 				rating = &models.Rating{}
 			}
+
 			rating.Likes += likes
 			rating.Dislikes += dislikes
 
 			ratings[username] = rating
 		}
+
 		if len(messages.Messages) < limit {
 			break
 		}
+
 		offset += 100
+
 		time.Sleep(time.Second)
 	}
 
@@ -200,15 +227,23 @@ func (f *fetcher) parseReactions(results []tg.ReactionCount) (likes, dislikes in
 	if results == nil {
 		return
 	}
+
 	for _, res := range results {
-		emogicon := res.Reaction.(*tg.ReactionEmoji).Emoticon
+		reactionEmoji, ok := res.Reaction.(*tg.ReactionEmoji)
+		if !ok {
+			continue
+		}
+
+		emogicon := reactionEmoji.Emoticon
 		if emogicon == likeSymbol {
 			likes = res.Count
 		}
+
 		if emogicon == dislikeSymbol {
 			dislikes = res.Count
 		}
 	}
+
 	return
 }
 
@@ -224,6 +259,7 @@ func (f *fetcher) Auth(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
+
 	if err = f.client.Auth().IfNecessary(ctx, flow); err != nil {
 		return err
 	}
@@ -294,7 +330,7 @@ func NewFetcher(appID int, appHash, phone, sessionFile string, logger log.Logger
 type noSignUp struct{}
 
 func (c noSignUp) SignUp(context.Context) (auth.UserInfo, error) {
-	return auth.UserInfo{}, errors.New("not implemented")
+	return auth.UserInfo{}, models.ErrNotImplemented
 }
 
 func (c noSignUp) AcceptTermsOfService(_ context.Context, tos tg.HelpTermsOfService) error {

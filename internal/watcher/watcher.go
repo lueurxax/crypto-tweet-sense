@@ -13,7 +13,10 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/pkg/utils"
 )
 
-const subscribersKey = "subscribers"
+const (
+	subscribersKey = "subscribers"
+	tweetKey       = "tweet"
+)
 
 type Watcher interface {
 	Watch()
@@ -206,7 +209,7 @@ func (w *watcher) updateTopTweet(ctx context.Context) error {
 		return err
 	}
 
-	w.logger.WithField("tweet", tweet).Debug("top tweet")
+	w.logger.WithField(tweetKey, tweet).Debug("top tweet")
 
 	return w.updateTweet(ctx, tweet.ID)
 }
@@ -227,7 +230,7 @@ func (w *watcher) updateOldestFastTweet(ctx context.Context) error {
 		return err
 	}
 
-	w.logger.WithField("tweet", tweet).Debug("oldest fast tweet")
+	w.logger.WithField(tweetKey, tweet).Debug("oldest fast tweet")
 
 	return w.updateTweet(ctx, tweet.ID)
 }
@@ -266,7 +269,7 @@ func (w *watcher) updateOldestTweet(ctx context.Context) error {
 		return err
 	}
 
-	w.logger.WithField("tweet", tweet).Debug("oldest tweet")
+	w.logger.WithField(tweetKey, tweet).Debug("oldest tweet")
 
 	return w.updateTweet(ctx, tweet.ID)
 }

@@ -1,4 +1,4 @@
-package tweets_manager
+package tweetsmanager
 
 type Manager interface {
 	Start() error
