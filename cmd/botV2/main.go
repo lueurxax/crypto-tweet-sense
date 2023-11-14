@@ -2,11 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -14,7 +11,6 @@ import (
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	foundeationDB "github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/kelseyhightower/envconfig"
-	twitterscraper "github.com/n0madic/twitter-scraper"
 	"github.com/sashabaranov/go-openai"
 	"github.com/sirupsen/logrus"
 	"go.elastic.co/ecslogrus"
@@ -34,8 +30,6 @@ var version = "dev"
 const (
 	foundationDBVersion = 710
 	pkgKey              = "pkg"
-	cookiesFilename     = "cookies.json"
-	startDelay          = 15
 )
 
 type config struct {
@@ -44,8 +38,6 @@ type config struct {
 	TopCount           int           `envconfig:"TOP_COUNT" default:"1000"`
 	SessionFile        string        `envconfig:"SESSION_FILE" required:"true"`
 	BotToken           string        `envconfig:"BOT_TOKEN" required:"true"`
-	XLogin             string        `envconfig:"X_LOGIN" required:"true"`
-	XPassword          string        `envconfig:"X_PASSWORD" required:"true"`
 	ChannelID          int64         `envconfig:"CHANNEL_ID" required:"true"`
 	ChatID             int64         `envconfig:"CHAT_ID" required:"true"`
 	AppID              int           `envconfig:"APP_ID" required:"true"`
@@ -119,58 +111,15 @@ func main() {
 		panic(err)
 	}
 
-	scraper := twitterscraper.New().WithDelay(startDelay).SetSearchMode(twitterscraper.SearchLatest)
-
-	var cookies []*http.Cookie
-
-	data, err := os.ReadFile(cookiesFilename)
-	if err != nil {
-		logger.Error(err)
-
-		if err = scrapperLogin(scraper, cfg.XLogin, cfg.XPassword); err != nil {
-			panic(err)
-		}
-	}
-
-	if data != nil {
-		if err = json.Unmarshal(data, &cookies); err != nil {
-			logger.Error(err)
-
-			if err = scrapperLogin(scraper, cfg.XLogin, cfg.XPassword); err != nil {
-				panic(err)
-			}
-		}
-	}
-
-	if cookies != nil {
-		scraper.SetCookies(cookies)
-
-		if !scraper.IsLoggedIn() {
-			if err = scrapperLogin(scraper, cfg.XLogin, cfg.XPassword); err != nil {
-				panic(err)
-			}
-		}
-	}
-
-	cookies = scraper.GetCookies()
-
-	data, err = json.Marshal(cookies)
-	if err != nil {
-		panic(err)
-	}
-
-	if err = os.WriteFile(cookiesFilename, data, 0644); err != nil {
-		panic(err)
-	}
-
 	checker := ratingCollector.NewChecker(res, cfg.TopCount)
 
-	delayManager := tweetFinder.NewDelayManager(
-		func(seconds int64) { scraper.WithDelay(seconds) },
-		startDelay,
-		logger.WithField(pkgKey, "delay_manager"),
-	)
-	finder := tweetFinder.NewFinder(scraper, delayManager, logger.WithField(pkgKey, "finder"))
+	xConfig := tweetFinder.GetConfigPool()
+
+	finder, err := tweetFinder.NewPoolFabric(xConfig, pkgKey, logger)
+	if err != nil {
+		panic(err)
+	}
+
 	watch := watcher.NewWatcher(finder, st, checker, links, logger.WithField(pkgKey, "watcher"))
 
 	checker.CollectRatings(ratingFetcher.Subscribe(ctx, cfg.ChannelID))
@@ -197,8 +146,4 @@ func main() {
 
 	logger.Info("service started")
 	<-ctx.Done()
-}
-
-func scrapperLogin(scraper *twitterscraper.Scraper, login, password string) error {
-	return scraper.Login(login, password)
 }
