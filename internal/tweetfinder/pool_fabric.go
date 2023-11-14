@@ -17,6 +17,7 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 	finders := make([]Finder, 0, len(config.XCreds))
 	delayManagerLogger := logger.WithField(pkgKey, "delay_manager")
 	finderLogger := logger.WithField(pkgKey, "finder")
+
 	for login, password := range config.XCreds {
 		filename := strings.Join([]string{login, config.CookiesFilename}, "_")
 		scraper := twitterscraper.New().WithDelay(startDelay).SetSearchMode(twitterscraper.SearchLatest)
@@ -59,7 +60,7 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 			return nil, err
 		}
 
-		if err = os.WriteFile(filename, data, 0644); err != nil {
+		if err = os.WriteFile(filename, data, 0600); err != nil {
 			return nil, err
 		}
 
