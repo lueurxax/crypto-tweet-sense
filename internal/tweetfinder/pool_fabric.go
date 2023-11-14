@@ -28,7 +28,7 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 		if err != nil {
 			logger.Error(err)
 
-			if err = scraper.Login(login, password); err != nil {
+			if err = scrapperLogin(scraper, config.XConfirmation[len(finders)], login, password); err != nil {
 				return nil, err
 			}
 		}
@@ -37,7 +37,7 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 			if err = json.Unmarshal(data, &cookies); err != nil {
 				logger.Error(err)
 
-				if err = scraper.Login(login, password); err != nil {
+				if err = scrapperLogin(scraper, config.XConfirmation[len(finders)], login, password); err != nil {
 					return nil, err
 				}
 			}
@@ -47,7 +47,7 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 			scraper.SetCookies(cookies)
 
 			if !scraper.IsLoggedIn() {
-				if err = scraper.Login(login, password); err != nil {
+				if err = scrapperLogin(scraper, config.XConfirmation[len(finders)], login, password); err != nil {
 					return nil, err
 				}
 			}
@@ -74,4 +74,12 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 	}
 
 	return NewPool(finders), nil
+}
+
+func scrapperLogin(scraper *twitterscraper.Scraper, confirmation string, login string, password string) error {
+	if confirmation == "X" {
+		return scraper.Login(login, password)
+	} else {
+		return scraper.Login(login, password, confirmation)
+	}
 }
