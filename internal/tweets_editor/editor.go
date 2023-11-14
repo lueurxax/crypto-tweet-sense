@@ -13,7 +13,7 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/pkg/utils"
 )
 
-const prompt = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip info if it not useful for investing. I will parse your answer by code like json `{\"message\":\"telegram message\"}`, then can you prepare message and replace \"telegram message\" in json with prepared telegram message? \nTweets: %s."
+const prompt = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip information such as airdrops or giveaway, if they are not useful for investing. I will parse your answer by code like json `{\"message\":\"telegram message\"}`, then can you prepare message and replace \"telegram message\" in json with prepared telegram message? \nTweets: %s."
 
 type Editor interface {
 	Edit(ctx context.Context, tweetCh <-chan string) context.Context
