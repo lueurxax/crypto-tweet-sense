@@ -13,7 +13,10 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/pkg/utils"
 )
 
-const subscribersKey = "subscribers"
+const (
+	subscribersKey = "subscribers"
+	tweetKey       = "tweet"
+)
 
 type Watcher interface {
 	Watch()
@@ -79,29 +82,28 @@ func (w *watcher) Subscribe() <-chan string {
 }
 
 func (w *watcher) Watch() {
-	go w.searchAll()
+	for query := range w.queries {
+		go w.searchAll(query)
+	}
 	go w.updateTop()
 	go w.updateOldestFast()
 	go w.updateOldest()
 	go w.cleanTooOld()
 }
 
-func (w *watcher) searchAll() {
+func (w *watcher) searchAll(query string) {
 	ctx := context.Background()
-	w.search(ctx)
+	w.search(ctx, query)
 
-	tick := time.NewTicker(time.Minute * 10)
+	tick := time.NewTicker(time.Minute * 15)
 	for range tick.C {
-		w.search(ctx)
+		w.search(ctx, query)
 	}
 }
 
-func (w *watcher) search(ctx context.Context) {
-	for query, start := range w.queries {
-		w.searchWithQuery(ctx, query, start)
-	}
-
-	w.logger.Debug("watcher checked news")
+func (w *watcher) search(ctx context.Context, query string) {
+	w.searchWithQuery(ctx, query, w.queries[query])
+	w.logger.WithField("query", query).Debug("watcher checked news")
 }
 
 func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.Time) {
@@ -206,7 +208,7 @@ func (w *watcher) updateTopTweet(ctx context.Context) error {
 		return err
 	}
 
-	w.logger.WithField("tweet", tweet).Debug("top tweet")
+	w.logger.WithField(tweetKey, tweet).Debug("top tweet")
 
 	return w.updateTweet(ctx, tweet.ID)
 }
@@ -227,7 +229,7 @@ func (w *watcher) updateOldestFastTweet(ctx context.Context) error {
 		return err
 	}
 
-	w.logger.WithField("tweet", tweet).Debug("oldest fast tweet")
+	w.logger.WithField(tweetKey, tweet).Debug("oldest fast tweet")
 
 	return w.updateTweet(ctx, tweet.ID)
 }
@@ -266,7 +268,7 @@ func (w *watcher) updateOldestTweet(ctx context.Context) error {
 		return err
 	}
 
-	w.logger.WithField("tweet", tweet).Debug("oldest tweet")
+	w.logger.WithField(tweetKey, tweet).Debug("oldest tweet")
 
 	return w.updateTweet(ctx, tweet.ID)
 }

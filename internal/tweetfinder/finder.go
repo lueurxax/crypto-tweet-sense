@@ -17,6 +17,9 @@ const (
 	format          = "2006-01-02"
 	tooManyRequests = "429 Too Many Requests"
 	notFound        = "not found"
+	createdKey      = "created"
+	countKey        = "count"
+	mapKey          = "map"
 )
 
 type Finder interface {
@@ -72,6 +75,7 @@ func (f *finder) Find(_ context.Context, id string) (*common.TweetSnapshot, erro
 	}, nil
 }
 
+//nolint:funlen
 func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search string) ([]common.TweetSnapshot, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -104,13 +108,14 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 
 			return nil, tweet.Error
 		}
+
 		syncTime := time.Now()
 
 		const debugInterval = 100
 		if counter%debugInterval == 0 {
 			f.log.
-				WithField("created", tweet.TimeParsed).
-				WithField("count", counter).
+				WithField(createdKey, tweet.TimeParsed).
+				WithField(countKey, counter).
 				Debug("processed tweets")
 			f.delayManager.ProcessedBatchOfTweets()
 		}
@@ -150,11 +155,11 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 
 	f.delayManager.ProcessedQuery()
 
-	f.log.WithField("created", lastTweetTime).Debug("last tweet")
-	f.log.WithField("count", counter).Debug("tweets found")
-	f.log.WithField("map", likesMap).Debug("likes count")
-	f.log.WithField("map", retweetsMap).Debug("retweet count")
-	f.log.WithField("map", replyMap).Debug("reply count")
+	f.log.WithField(createdKey, lastTweetTime).Debug("last tweet")
+	f.log.WithField(countKey, counter).Debug("tweets found")
+	f.log.WithField(mapKey, likesMap).Debug("likes count")
+	f.log.WithField(mapKey, retweetsMap).Debug("retweet count")
+	f.log.WithField(mapKey, replyMap).Debug("reply count")
 
 	return response, nil
 }

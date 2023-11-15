@@ -1,4 +1,4 @@
-package tweets_editor
+package tweetseditor
 
 import (
 	"context"
@@ -13,7 +13,10 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/pkg/utils"
 )
 
-const prompt = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip information such as airdrops or giveaway, if they are not useful for investing. I will parse your answer by code like json `{\"message\":\"telegram message\"}`, then can you prepare message and replace \"telegram message\" in json with prepared telegram message? \nTweets: %s."
+const (
+	prompt   = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip information such as airdrops or giveaway, if they are not useful for investing. I will parse your answer by code like json `{\"message\":\"telegram message\"}`, then can you prepare message and replace \"telegram message\" in json with prepared telegram message? \nTweets: %s." //nolint:lll
+	queueLen = 10
+)
 
 type Editor interface {
 	Edit(ctx context.Context, tweetCh <-chan string) context.Context
@@ -59,7 +62,7 @@ func (e *editor) editLoop(ctx context.Context, cancel context.CancelFunc, ch <-c
 				continue
 			}
 
-			if err := e.edit(context.Background(), collectedTweets); err != nil {
+			if err := e.edit(context.Background(), collectedTweets); err != nil { //nolint:contextcheck
 				e.log.WithError(err).Error("edit error")
 				cancel()
 			}
@@ -114,7 +117,7 @@ func (e *editor) edit(ctx context.Context, tweets []string) error {
 
 func NewEditor(client *openai.Client, sendInterval time.Duration, log log.Logger) Editor {
 	return &editor{
-		editedCh:     make(chan string, 10),
+		editedCh:     make(chan string, queueLen),
 		sendInterval: sendInterval,
 		client:       client,
 		log:          log,
