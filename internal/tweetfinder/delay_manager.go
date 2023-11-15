@@ -13,6 +13,7 @@ type Manager interface {
 	ProcessedBatchOfTweets()
 	ProcessedQuery()
 	SetSetterFn(func(seconds int64))
+	CurrentDelay() int64
 }
 
 type manager struct {
@@ -20,6 +21,10 @@ type manager struct {
 	delay, minimalDelay int64
 
 	log log.Logger
+}
+
+func (m *manager) CurrentDelay() int64 {
+	return m.delay
 }
 
 func (m *manager) TooManyRequests() {

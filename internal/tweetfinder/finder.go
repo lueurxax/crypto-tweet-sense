@@ -25,12 +25,14 @@ const (
 type Finder interface {
 	FindAll(ctx context.Context, start, end *time.Time, search string) ([]common.TweetSnapshot, error)
 	Find(ctx context.Context, id string) (*common.TweetSnapshot, error)
+	CurrentDelay() int64
 }
 
 type delayManager interface {
 	TooManyRequests()
 	ProcessedBatchOfTweets()
 	ProcessedQuery()
+	CurrentDelay() int64
 }
 
 type finder struct {
