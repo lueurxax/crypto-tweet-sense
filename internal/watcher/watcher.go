@@ -14,11 +14,12 @@ import (
 )
 
 const (
-	subscribersKey = "subscribers"
-	tweetKey       = "tweet"
-	timeout        = time.Second * 30
-	topInterval    = time.Second * 30
-	searchInterval = time.Minute * 15
+	subscribersKey  = "subscribers"
+	tweetKey        = "tweet"
+	timeout         = time.Minute * 5
+	oldFastInterval = time.Second * 30
+	searchInterval  = time.Minute * 15
+	bufferSize      = 10
 )
 
 type Watcher interface {
@@ -65,7 +66,7 @@ type watcher struct {
 func (w *watcher) RawSubscribe() <-chan string {
 	w.subMu.Lock()
 
-	subscriber := make(chan string, 10)
+	subscriber := make(chan string, bufferSize)
 	w.rawSubscribers = append(w.rawSubscribers, subscriber)
 
 	w.subMu.Unlock()
@@ -76,7 +77,7 @@ func (w *watcher) RawSubscribe() <-chan string {
 func (w *watcher) Subscribe() <-chan string {
 	w.subMu.Lock()
 
-	subscriber := make(chan string, 10)
+	subscriber := make(chan string, bufferSize)
 	w.subscribers = append(w.subscribers, subscriber)
 
 	w.subMu.Unlock()
@@ -204,7 +205,7 @@ func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot,
 }
 
 func (w *watcher) updateTop() {
-	tick := time.NewTicker(topInterval)
+	tick := time.NewTicker(time.Minute)
 	for range tick.C {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 
@@ -228,7 +229,7 @@ func (w *watcher) updateTopTweet(ctx context.Context) error {
 }
 
 func (w *watcher) updateOldestFast() {
-	tick := time.NewTicker(time.Minute * 1)
+	tick := time.NewTicker(oldFastInterval)
 	for range tick.C {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 

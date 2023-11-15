@@ -71,7 +71,7 @@ func (p *pool) getFinder(ctx context.Context) (Finder, int, error) {
 
 func (p *pool) getFinderIndex() (int, bool) {
 	p.mu.Lock()
-	minimal := p.finderDelays[0]
+	minimal := int64(0)
 	index := 0
 
 	for i, d := range p.finderDelays {
