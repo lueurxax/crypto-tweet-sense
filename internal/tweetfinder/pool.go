@@ -3,7 +3,6 @@ package tweetfinder
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
@@ -16,10 +15,11 @@ const (
 )
 
 type pool struct {
-	finders []Finder
+	finders       []Finder
+	releaseSignal chan struct{}
 
 	mu           sync.RWMutex
-	finderDelays []*int64
+	finderDelays []int64
 
 	log log.Logger
 }
@@ -27,15 +27,20 @@ type pool struct {
 func (p *pool) CurrentDelay() int64 {
 	sum := int64(0)
 
-	for i := range p.finderDelays {
-		sum += atomic.LoadInt64(p.finderDelays[i])
+	p.mu.RLock()
+	for _, d := range p.finderDelays {
+		sum += d
 	}
+	p.mu.RUnlock()
 
 	return sum / int64(len(p.finderDelays))
 }
 
 func (p *pool) FindAll(ctx context.Context, start, end *time.Time, search string) ([]common.TweetSnapshot, error) {
-	f, index := p.getFinder()
+	f, index, err := p.getFinder(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	res, err := f.FindAll(ctx, start, end, search)
 
@@ -50,7 +55,10 @@ func (p *pool) FindAll(ctx context.Context, start, end *time.Time, search string
 }
 
 func (p *pool) Find(ctx context.Context, id string) (*common.TweetSnapshot, error) {
-	f, index := p.getFinder()
+	f, index, err := p.getFinder(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	res, err := f.Find(ctx, id)
 
@@ -64,30 +72,59 @@ func (p *pool) Find(ctx context.Context, id string) (*common.TweetSnapshot, erro
 	return res, nil
 }
 
-func (p *pool) getFinder() (Finder, int) {
+func (p *pool) getFinder(ctx context.Context) (Finder, int, error) {
+	index, ok := p.getFinderIndex()
+	for !ok {
+		select {
+		case <-ctx.Done():
+			return nil, 0, ctx.Err()
+		case <-p.releaseSignal:
+			break
+		}
+		index, ok = p.getFinderIndex()
+	}
+	return p.finders[index], index, nil
+}
+
+func (p *pool) getFinderIndex() (int, bool) {
 	p.mu.Lock()
+	minimal := p.finderDelays[0]
 	index := 0
 
-	for i := range p.finderDelays {
-		if atomic.LoadInt64(p.finderDelays[i]) < atomic.LoadInt64(p.finderDelays[index]) {
+	for i, d := range p.finderDelays {
+		if d == 0 {
+			continue
+		}
+
+		if d < minimal || minimal == 0 {
+			minimal = d
 			index = i
 		}
 	}
 
-	atomic.AddInt64(p.finderDelays[index], p.finders[index].CurrentDelay())
+	if minimal != 0 {
+		p.finderDelays[index] = 0
+	}
 
-	return p.finders[index], index
+	p.mu.Unlock()
+
+	return index, minimal != 0
 }
 
 func (p *pool) releaseFinder(index int) {
-	atomic.StoreInt64(p.finderDelays[index], p.finders[index].CurrentDelay())
+	p.mu.Lock()
+	p.finderDelays[index] = p.finders[index].CurrentDelay()
+	p.mu.Unlock()
+	select {
+	case <-p.releaseSignal:
+	default:
+	}
 }
 
 func NewPool(finders []Finder, logger log.Logger) Finder {
-	delays := make([]*int64, len(finders))
+	delays := make([]int64, len(finders))
 	for i, f := range finders {
-		delay := f.CurrentDelay()
-		delays[i] = &delay
+		delays[i] = f.CurrentDelay()
 	}
 
 	return &pool{
