@@ -29,7 +29,7 @@ func (w *spamWatcher) watch() {
 	ctx := context.Background()
 	w.run(ctx)
 
-	tick := time.NewTicker(time.Minute * 10)
+	tick := time.NewTicker(searchInterval)
 
 	for range tick.C {
 		w.run(ctx)

@@ -9,11 +9,6 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 )
 
-const (
-	finderIndexKey = "finder_index"
-	finderErrorMsg = "finder error"
-)
-
 type pool struct {
 	finders       []Finder
 	releaseSignal chan struct{}
@@ -67,8 +62,10 @@ func (p *pool) getFinder(ctx context.Context) (Finder, int, error) {
 		case <-p.releaseSignal:
 			break
 		}
+
 		index, ok = p.getFinderIndex()
 	}
+
 	return p.finders[index], index, nil
 }
 
@@ -101,8 +98,9 @@ func (p *pool) releaseFinder(index int) {
 	p.mu.Lock()
 	p.finderDelays[index] = p.finders[index].CurrentDelay()
 	p.mu.Unlock()
+
 	select {
-	case <-p.releaseSignal:
+	case p.releaseSignal <- struct{}{}:
 	default:
 	}
 }

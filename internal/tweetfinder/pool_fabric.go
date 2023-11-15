@@ -11,7 +11,10 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 )
 
-const startDelay = 15
+const (
+	startDelay     = 15
+	finderIndexKey = "finder_index"
+)
 
 func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder, error) {
 	finders := make([]Finder, 0, len(config.XCreds))
@@ -76,10 +79,10 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 		delayManager := NewDelayManager(
 			func(seconds int64) { scraper.WithDelay(seconds) },
 			startDelay,
-			delayManagerLogger.WithField("finder_index", i),
+			delayManagerLogger.WithField(finderIndexKey, i),
 		)
 
-		finders = append(finders, NewFinder(scraper, delayManager, finderLogger.WithField("finder_index", i)))
+		finders = append(finders, NewFinder(scraper, delayManager, finderLogger.WithField(finderIndexKey, i)))
 		i++
 	}
 

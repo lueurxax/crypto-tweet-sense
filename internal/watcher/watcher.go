@@ -17,6 +17,8 @@ const (
 	subscribersKey = "subscribers"
 	tweetKey       = "tweet"
 	timeout        = time.Second * 30
+	topInterval    = time.Second * 30
+	searchInterval = time.Minute * 15
 )
 
 type Watcher interface {
@@ -100,7 +102,7 @@ func (w *watcher) searchAll(query string) {
 
 	cancel()
 
-	tick := time.NewTicker(time.Minute * 15)
+	tick := time.NewTicker(searchInterval)
 	for range tick.C {
 		ctx, cancel = context.WithTimeout(context.Background(), time.Hour)
 
@@ -202,7 +204,7 @@ func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot,
 }
 
 func (w *watcher) updateTop() {
-	tick := time.NewTicker(time.Second * 30)
+	tick := time.NewTicker(topInterval)
 	for range tick.C {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 
