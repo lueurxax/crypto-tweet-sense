@@ -82,29 +82,28 @@ func (w *watcher) Subscribe() <-chan string {
 }
 
 func (w *watcher) Watch() {
-	go w.searchAll()
+	for query := range w.queries {
+		go w.searchAll(query)
+	}
 	go w.updateTop()
 	go w.updateOldestFast()
 	go w.updateOldest()
 	go w.cleanTooOld()
 }
 
-func (w *watcher) searchAll() {
+func (w *watcher) searchAll(query string) {
 	ctx := context.Background()
-	w.search(ctx)
+	w.search(ctx, query)
 
-	tick := time.NewTicker(time.Minute * 10)
+	tick := time.NewTicker(time.Minute * 15)
 	for range tick.C {
-		w.search(ctx)
+		w.search(ctx, query)
 	}
 }
 
-func (w *watcher) search(ctx context.Context) {
-	for query, start := range w.queries {
-		w.searchWithQuery(ctx, query, start)
-	}
-
-	w.logger.Debug("watcher checked news")
+func (w *watcher) search(ctx context.Context, query string) {
+	w.searchWithQuery(ctx, query, w.queries[query])
+	w.logger.WithField("query", query).Debug("watcher checked news")
 }
 
 func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.Time) {
