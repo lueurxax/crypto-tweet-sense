@@ -17,6 +17,7 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 	finders := make([]Finder, 0, len(config.XCreds))
 	delayManagerLogger := logger.WithField(pkgKey, "delay_manager")
 	finderLogger := logger.WithField(pkgKey, "finder")
+	poolLogger := logger.WithField(pkgKey, "finder_pool")
 
 	i := 0
 
@@ -82,7 +83,7 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 		i++
 	}
 
-	return NewPool(finders), nil
+	return NewPool(finders, poolLogger), nil
 }
 
 func scrapperLogin(scraper *twitterscraper.Scraper, confirmation string, login string, password string) error {

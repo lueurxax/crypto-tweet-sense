@@ -46,7 +46,7 @@ func (p *pool) Find(ctx context.Context, id string) (*common.TweetSnapshot, erro
 	return res, nil
 }
 
-func NewPool(finders []Finder) Finder {
+func NewPool(finders []Finder, logger log.Logger) Finder {
 	ch := make(chan *finderWrapper, len(finders))
 	for i, f := range finders {
 		ch <- &finderWrapper{
@@ -55,7 +55,10 @@ func NewPool(finders []Finder) Finder {
 		}
 	}
 
-	return &pool{freeFinders: ch}
+	return &pool{
+		freeFinders: ch,
+		log:         logger,
+	}
 }
 
 type finderWrapper struct {
