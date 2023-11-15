@@ -42,16 +42,9 @@ func (p *pool) FindAll(ctx context.Context, start, end *time.Time, search string
 		return nil, err
 	}
 
-	res, err := f.FindAll(ctx, start, end, search)
+	defer p.releaseFinder(index)
 
-	p.releaseFinder(index)
-
-	if err != nil {
-		p.log.WithField(finderIndexKey, index).WithError(err).Error(finderErrorMsg)
-		return nil, err
-	}
-
-	return res, nil
+	return f.FindAll(ctx, start, end, search)
 }
 
 func (p *pool) Find(ctx context.Context, id string) (*common.TweetSnapshot, error) {
@@ -60,16 +53,9 @@ func (p *pool) Find(ctx context.Context, id string) (*common.TweetSnapshot, erro
 		return nil, err
 	}
 
-	res, err := f.Find(ctx, id)
+	defer p.releaseFinder(index)
 
-	p.releaseFinder(index)
-
-	if err != nil {
-		p.log.WithField(finderIndexKey, index).WithError(err).Error(finderErrorMsg)
-		return nil, err
-	}
-
-	return res, nil
+	return f.Find(ctx, id)
 }
 
 func (p *pool) getFinder(ctx context.Context) (Finder, int, error) {
