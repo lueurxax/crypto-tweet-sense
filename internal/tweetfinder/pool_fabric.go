@@ -19,6 +19,7 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 	finderLogger := logger.WithField(pkgKey, "finder")
 
 	i := 0
+
 	for login, password := range config.XCreds {
 		filename := strings.Join([]string{login, config.CookiesFilename}, "_")
 		scraper := twitterscraper.New().WithDelay(startDelay).SetSearchMode(twitterscraper.SearchLatest)
@@ -78,6 +79,7 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 		)
 
 		finders = append(finders, NewFinder(scraper, delayManager, finderLogger))
+		i++
 	}
 
 	return NewPool(finders), nil

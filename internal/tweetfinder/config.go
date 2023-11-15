@@ -14,5 +14,6 @@ func GetConfigPool() ConfigPool {
 	if err := envconfig.Process("", cfg); err != nil {
 		panic(err)
 	}
+
 	return *cfg
 }

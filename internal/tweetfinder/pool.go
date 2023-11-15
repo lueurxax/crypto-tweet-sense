@@ -5,10 +5,12 @@ import (
 	"time"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
+	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 )
 
 type pool struct {
-	freeFinders chan Finder
+	freeFinders chan *finderWrapper
+	log         log.Logger
 }
 
 func (p *pool) FindAll(ctx context.Context, start, end *time.Time, search string) ([]common.TweetSnapshot, error) {
@@ -16,28 +18,47 @@ func (p *pool) FindAll(ctx context.Context, start, end *time.Time, search string
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case f := <-p.freeFinders:
-		defer func() {
-			p.freeFinders <- f
-		}()
+		res, err := f.finder.FindAll(ctx, start, end, search)
 
-		return f.FindAll(ctx, start, end, search)
+		p.freeFinders <- f
+
+		if err != nil {
+			p.log.WithField("finder_index", f.index).WithError(err).Error("finder error")
+			return nil, err
+		}
+
+		return res, nil
 	}
 }
 
 func (p *pool) Find(ctx context.Context, id string) (*common.TweetSnapshot, error) {
 	f := <-p.freeFinders
-	defer func() {
-		p.freeFinders <- f
-	}()
 
-	return f.Find(ctx, id)
+	res, err := f.finder.Find(ctx, id)
+
+	p.freeFinders <- f
+
+	if err != nil {
+		p.log.WithField("finder_index", f.index).WithError(err).Error("finder error")
+		return nil, err
+	}
+
+	return res, nil
 }
 
 func NewPool(finders []Finder) Finder {
-	ch := make(chan Finder, len(finders))
-	for _, f := range finders {
-		ch <- f
+	ch := make(chan *finderWrapper, len(finders))
+	for i, f := range finders {
+		ch <- &finderWrapper{
+			finder: f,
+			index:  i,
+		}
 	}
 
 	return &pool{freeFinders: ch}
+}
+
+type finderWrapper struct {
+	finder Finder
+	index  int
 }
