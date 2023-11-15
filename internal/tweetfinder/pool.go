@@ -3,6 +3,7 @@ package tweetfinder
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
@@ -18,7 +19,7 @@ type pool struct {
 	finders []Finder
 
 	mu           sync.RWMutex
-	finderDelays []int64
+	finderDelays []*int64
 
 	log log.Logger
 }
@@ -26,8 +27,8 @@ type pool struct {
 func (p *pool) CurrentDelay() int64 {
 	sum := int64(0)
 
-	for _, d := range p.finderDelays {
-		sum += d
+	for i := range p.finderDelays {
+		sum += atomic.LoadInt64(p.finderDelays[i])
 	}
 
 	return sum / int64(len(p.finderDelays))
@@ -65,33 +66,28 @@ func (p *pool) Find(ctx context.Context, id string) (*common.TweetSnapshot, erro
 
 func (p *pool) getFinder() (Finder, int) {
 	p.mu.Lock()
-	minimal := p.finderDelays[0]
 	index := 0
 
-	for i, d := range p.finderDelays {
-		if d < minimal {
-			minimal = d
+	for i := range p.finderDelays {
+		if atomic.LoadInt64(p.finderDelays[i]) < atomic.LoadInt64(p.finderDelays[index]) {
 			index = i
 		}
 	}
 
-	p.finderDelays[index] += p.finders[index].CurrentDelay()
-
-	p.mu.Unlock()
+	atomic.AddInt64(p.finderDelays[index], p.finders[index].CurrentDelay())
 
 	return p.finders[index], index
 }
 
 func (p *pool) releaseFinder(index int) {
-	p.mu.Lock()
-	p.finderDelays[index] = p.finders[index].CurrentDelay()
-	p.mu.Unlock()
+	atomic.StoreInt64(p.finderDelays[index], p.finders[index].CurrentDelay())
 }
 
 func NewPool(finders []Finder, logger log.Logger) Finder {
-	delays := make([]int64, len(finders))
+	delays := make([]*int64, len(finders))
 	for i, f := range finders {
-		delays[i] = f.CurrentDelay()
+		delay := f.CurrentDelay()
+		delays[i] = &delay
 	}
 
 	return &pool{
