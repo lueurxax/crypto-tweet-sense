@@ -76,10 +76,10 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 		delayManager := NewDelayManager(
 			func(seconds int64) { scraper.WithDelay(seconds) },
 			startDelay,
-			delayManagerLogger.WithField("index", i),
+			delayManagerLogger.WithField("finder_index", i),
 		)
 
-		finders = append(finders, NewFinder(scraper, delayManager, finderLogger.WithField("index", i)))
+		finders = append(finders, NewFinder(scraper, delayManager, finderLogger.WithField("finder_index", i)))
 		i++
 	}
 

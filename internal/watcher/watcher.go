@@ -16,6 +16,7 @@ import (
 const (
 	subscribersKey = "subscribers"
 	tweetKey       = "tweet"
+	timeout        = time.Second * 30
 )
 
 type Watcher interface {
@@ -85,6 +86,7 @@ func (w *watcher) Watch() {
 	for query := range w.queries {
 		go w.searchAll(query)
 	}
+
 	go w.updateTop()
 	go w.updateOldestFast()
 	go w.updateOldest()
@@ -92,12 +94,19 @@ func (w *watcher) Watch() {
 }
 
 func (w *watcher) searchAll(query string) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+
 	w.search(ctx, query)
+
+	cancel()
 
 	tick := time.NewTicker(time.Minute * 15)
 	for range tick.C {
+		ctx, cancel = context.WithTimeout(context.Background(), time.Hour)
+
 		w.search(ctx, query)
+
+		cancel()
 	}
 }
 
@@ -195,10 +204,13 @@ func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot,
 func (w *watcher) updateTop() {
 	tick := time.NewTicker(time.Second * 30)
 	for range tick.C {
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
 		if err := w.updateTopTweet(ctx); err != nil {
 			w.logger.WithError(err).Error("update top tweet")
 		}
+
+		cancel()
 	}
 }
 
@@ -216,10 +228,13 @@ func (w *watcher) updateTopTweet(ctx context.Context) error {
 func (w *watcher) updateOldestFast() {
 	tick := time.NewTicker(time.Minute * 1)
 	for range tick.C {
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
 		if err := w.updateOldestFastTweet(ctx); err != nil {
 			w.logger.WithError(err).Error()
 		}
+
+		cancel()
 	}
 }
 
@@ -255,10 +270,13 @@ func (w *watcher) updateTweet(ctx context.Context, id string) error {
 func (w *watcher) updateOldest() {
 	tick := time.NewTicker(time.Minute)
 	for range tick.C {
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
 		if err := w.updateOldestTweet(ctx); err != nil {
 			w.logger.WithError(err).Error()
 		}
+
+		cancel()
 	}
 }
 
@@ -276,10 +294,13 @@ func (w *watcher) updateOldestTweet(ctx context.Context) error {
 func (w *watcher) cleanTooOld() {
 	tick := time.NewTicker(time.Hour)
 	for range tick.C {
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
 		if err := w.cleanTooOldTweets(ctx); err != nil {
 			w.logger.WithError(err).Error()
 		}
+
+		cancel()
 	}
 }
 
