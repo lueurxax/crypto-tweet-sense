@@ -28,7 +28,9 @@ func (w *spamWatcher) Watch() {
 func (w *spamWatcher) watch() {
 	ctx := context.Background()
 	w.run(ctx)
+
 	tick := time.NewTicker(time.Minute * 10)
+
 	for range tick.C {
 		w.run(ctx)
 	}
@@ -40,7 +42,7 @@ func (w *spamWatcher) run(ctx context.Context) {
 	w.runWithQuery(ctx, "crypto", start)
 	w.runWithQuery(ctx, "cryptocurrency", start)
 	w.runWithQuery(ctx, "BTC", start)
-	w.logger.Debug("watcher checked news")
+	w.logger.Debug("spam watcher done")
 }
 
 func (w *spamWatcher) runWithQuery(ctx context.Context, query string, start time.Time) {
@@ -54,18 +56,22 @@ func (w *spamWatcher) runWithQuery(ctx context.Context, query string, start time
 		if errors.Is(err, tweetfinder.ErrNoTops) {
 			return
 		}
+
 		panic(err)
 	}
+
 	for _, tweet := range tweets {
 		if _, ok := w.published[tweet.ID]; ok {
 			continue
 		}
+
 		w.published[tweet.ID] = struct{}{}
+
 		for _, word := range w.spamWords {
 			if strings.Contains(tweet.Text, word) {
 				w.logger.
 					WithField("username", tweet.Username).
-					WithField("tweet", tweet.PermanentURL).
+					WithField("tweetURL", tweet.PermanentURL).
 					Info("found spam")
 			}
 		}

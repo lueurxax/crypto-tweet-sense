@@ -1,11 +1,11 @@
-package rating_collector
+package ratingcollector
 
 import (
 	"context"
 	"sync"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
-	"github.com/lueurxax/crypto-tweet-sense/internal/rating_collector/models"
+	"github.com/lueurxax/crypto-tweet-sense/internal/ratingcollector/models"
 )
 
 type RatingChecker interface {

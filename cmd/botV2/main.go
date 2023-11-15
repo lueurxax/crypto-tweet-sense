@@ -17,11 +17,11 @@ import (
 	"gopkg.in/telebot.v3"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
-	ratingCollector "github.com/lueurxax/crypto-tweet-sense/internal/rating_collector"
+	ratingCollector "github.com/lueurxax/crypto-tweet-sense/internal/ratingcollector"
 	fdb "github.com/lueurxax/crypto-tweet-sense/internal/repo"
 	"github.com/lueurxax/crypto-tweet-sense/internal/sender"
 	tweetFinder "github.com/lueurxax/crypto-tweet-sense/internal/tweetfinder"
-	"github.com/lueurxax/crypto-tweet-sense/internal/tweets_editor"
+	"github.com/lueurxax/crypto-tweet-sense/internal/tweetseditor"
 	"github.com/lueurxax/crypto-tweet-sense/internal/watcher"
 )
 
@@ -106,7 +106,7 @@ func main() {
 		}
 	}()
 
-	res, links, err := ratingFetcher.FetchRatingsAndUniqueMessages(ctx, cfg.ChannelID)
+	res, links, err := ratingFetcher.FetchRatingsAndUnique(ctx, cfg.ChannelID)
 	if err != nil {
 		panic(err)
 	}
@@ -134,7 +134,7 @@ func main() {
 	s := sender.NewSender(api, &telebot.Chat{ID: cfg.ChatID}, logger.WithField(pkgKey, "sender"))
 	ctx = s.Send(ctx, watch.Subscribe())
 
-	editor := tweets_editor.NewEditor(
+	editor := tweetseditor.NewEditor(
 		openai.NewClient(cfg.ChatGPTToken),
 		cfg.EditorSendInterval,
 		logger.WithField(pkgKey, "editor"),

@@ -20,7 +20,9 @@ func (d *database) Clear(ctx context.Context, key []byte) error {
 	if err != nil {
 		return err
 	}
+
 	tr.Clear(key)
+
 	return tr.Commit()
 }
 

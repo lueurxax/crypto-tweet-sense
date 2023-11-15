@@ -79,7 +79,7 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 func scrapperLogin(scraper *twitterscraper.Scraper, confirmation string, login string, password string) error {
 	if confirmation == "X" {
 		return scraper.Login(login, password)
-	} else {
-		return scraper.Login(login, password, confirmation)
 	}
+
+	return scraper.Login(login, password, confirmation)
 }
