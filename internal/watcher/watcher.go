@@ -105,11 +105,7 @@ func (w *watcher) searchAll(query string) {
 
 	tick := time.NewTicker(searchInterval)
 	for range tick.C {
-		ctx, cancel = context.WithTimeout(context.Background(), time.Hour)
-
-		w.search(ctx, query)
-
-		cancel()
+		w.search(context.Background(), query)
 	}
 }
 
