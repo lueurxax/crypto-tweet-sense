@@ -70,7 +70,7 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 			return nil, err
 		}
 
-		if len(config.Proxies) < i {
+		if len(config.Proxies) > i {
 			if err = scraper.SetProxy(config.Proxies[i]); err != nil {
 				return nil, err
 			}
