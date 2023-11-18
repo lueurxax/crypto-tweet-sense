@@ -56,6 +56,7 @@ func (p *pool) Find(ctx context.Context, id string) (*common.TweetSnapshot, erro
 func (p *pool) getFinder(ctx context.Context) (Finder, int, error) {
 	index, ok := p.getFinderIndex()
 	ticker := time.NewTicker(time.Second)
+
 	for !ok {
 		select {
 		case <-ctx.Done():
