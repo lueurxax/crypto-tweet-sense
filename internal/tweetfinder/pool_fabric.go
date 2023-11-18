@@ -24,6 +24,8 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 
 	i := 0
 
+	var delayManager Manager
+
 	for login, password := range config.XCreds {
 		filename := strings.Join([]string{login, config.CookiesFilename}, "_")
 		scraper := twitterscraper.New().WithDelay(startDelay).SetSearchMode(twitterscraper.SearchLatest)
@@ -76,7 +78,16 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 			}
 		}
 
-		delayManager := NewDelayManager(
+		var f func(setter func(seconds int64), minimalDelay int64, log log.Logger) Manager
+
+		if i == 4 {
+			f = NewDelayManagerV2
+
+		} else {
+			f = NewDelayManager
+		}
+
+		delayManager = f(
 			func(seconds int64) { scraper.WithDelay(seconds) },
 			startDelay,
 			delayManagerLogger.WithField(finderIndexKey, i),

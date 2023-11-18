@@ -20,6 +20,7 @@ const (
 	createdKey      = "created"
 	countKey        = "count"
 	mapKey          = "map"
+	batchInterval   = 50
 )
 
 type Finder interface {
@@ -113,8 +114,7 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 
 		syncTime := time.Now()
 
-		const debugInterval = 100
-		if counter%debugInterval == 0 {
+		if counter%batchInterval == 0 {
 			f.log.
 				WithField(createdKey, tweet.TimeParsed).
 				WithField(countKey, counter).
