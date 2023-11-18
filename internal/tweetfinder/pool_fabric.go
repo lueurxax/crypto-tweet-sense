@@ -78,15 +78,7 @@ func NewPoolFabric(config ConfigPool, pkgKey string, logger log.Logger) (Finder,
 			}
 		}
 
-		var f func(setter func(seconds int64), minimalDelay int64, log log.Logger) Manager
-
-		if i%3 == 0 {
-			f = NewDelayManagerV2
-		} else {
-			f = NewDelayManager
-		}
-
-		delayManager = f(
+		delayManager = NewDelayManagerV2(
 			func(seconds int64) { scraper.WithDelay(seconds) },
 			startDelay,
 			delayManagerLogger.WithField(finderIndexKey, i),

@@ -96,7 +96,7 @@ func NewDelayManagerV2(setter func(seconds int64), minimalDelay int64, log log.L
 	windowLimiters := make([]windowLimiter, 3)
 
 	for i, duration := range []time.Duration{
-		time.Minute,
+		time.Minute * 10,
 		time.Hour,
 		time.Hour * 24,
 	} {
