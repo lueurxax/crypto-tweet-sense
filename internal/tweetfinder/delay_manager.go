@@ -10,7 +10,7 @@ const delayKey = "delay"
 
 type Manager interface {
 	TooManyRequests()
-	ProcessedBatchOfTweets()
+	AfterRequest()
 	ProcessedQuery()
 	SetSetterFn(func(seconds int64))
 	CurrentDelay() int64
@@ -19,6 +19,7 @@ type Manager interface {
 type manager struct {
 	setter              func(seconds int64)
 	delay, minimalDelay int64
+	factor              uint64
 
 	log log.Logger
 }
@@ -33,8 +34,12 @@ func (m *manager) TooManyRequests() {
 	m.incRandomDelay()
 }
 
-func (m *manager) ProcessedBatchOfTweets() {
-	m.decDelay()
+func (m *manager) AfterRequest() {
+	if m.factor%10 == 0 {
+		m.decDelay()
+	}
+
+	m.factor++
 }
 
 func (m *manager) ProcessedQuery() {

@@ -35,7 +35,7 @@ func (m *managerV2) TooManyRequests() {
 	}
 }
 
-func (m *managerV2) ProcessedBatchOfTweets() {
+func (m *managerV2) AfterRequest() {
 	for _, limiter := range m.windowLimiters {
 		limiter.Inc()
 	}
@@ -58,6 +58,7 @@ func (m *managerV2) start() {
 
 func (m *managerV2) loop(ctx context.Context) {
 	ticker := time.NewTicker(time.Second)
+
 	for {
 		select {
 		case <-ctx.Done():

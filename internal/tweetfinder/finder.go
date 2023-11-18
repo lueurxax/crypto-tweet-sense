@@ -31,7 +31,7 @@ type Finder interface {
 
 type delayManager interface {
 	TooManyRequests()
-	ProcessedBatchOfTweets()
+	AfterRequest()
 	ProcessedQuery()
 	CurrentDelay() int64
 }
@@ -58,6 +58,8 @@ func (f *finder) Find(_ context.Context, id string) (*common.TweetSnapshot, erro
 
 		return nil, err
 	}
+
+	f.delayManager.AfterRequest()
 
 	return &common.TweetSnapshot{
 		Tweet: &common.Tweet{
@@ -121,7 +123,7 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 				WithField(createdKey, tweet.TimeParsed).
 				WithField(countKey, counter).
 				Debug("processed tweets")
-			f.delayManager.ProcessedBatchOfTweets()
+			f.delayManager.AfterRequest()
 		}
 
 		if start != nil && tweet.TimeParsed.Sub(*start).Seconds() < 0 {
