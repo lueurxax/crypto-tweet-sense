@@ -86,7 +86,7 @@ func NewDelayManagerV2(setter func(seconds int64), minimalDelay int64, log log.L
 		time.Hour,
 		time.Hour * 24,
 	} {
-		windowLimiters[i] = windowlimiter.NewLimiter(windowcounter.NewCounter(duration))
+		windowLimiters[i] = windowlimiter.NewLimiter(windowcounter.NewCounter(duration), duration, minimalDelay)
 	}
 
 	m := &managerV2{

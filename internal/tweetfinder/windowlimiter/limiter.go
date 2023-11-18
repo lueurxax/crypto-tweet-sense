@@ -37,6 +37,12 @@ func (l *limiter) TooFast() bool {
 	return atomic.LoadUint64(l.threshold) >= l.windowCounter.GetCurrent()
 }
 
-func NewLimiter(counter windowCounter) WindowLimiter {
-	return &limiter{windowCounter: counter}
+func NewLimiter(counter windowCounter, duration time.Duration, delay int64) WindowLimiter {
+	threshold := uint64(duration.Seconds() / float64(delay))
+
+	return &limiter{
+		duration:      duration,
+		windowCounter: counter,
+		threshold:     &threshold,
+	}
 }
