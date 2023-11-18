@@ -73,6 +73,7 @@ func (m *managerV2) recalculate() {
 		if limiter.TooFast() {
 			m.delay++
 			m.log.WithField("limiter_duration", limiter.Duration()).WithField(delayKey, m.delay).Debug("delay increased")
+
 			break
 		}
 	}

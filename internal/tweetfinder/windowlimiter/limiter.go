@@ -43,7 +43,8 @@ func (l *limiter) TooFast() bool {
 		WithField("counter", l.windowCounter.GetCurrent()).
 		WithField("duration", l.duration).
 		Debug("checking if too fast")
-	return t >= l.windowCounter.GetCurrent()
+
+	return t <= l.windowCounter.GetCurrent()
 }
 
 func NewLimiter(counter windowCounter, duration time.Duration, delay int64, logger log.Logger) WindowLimiter {
