@@ -54,6 +54,8 @@ func (f *finder) Find(_ context.Context, id string) (*common.TweetSnapshot, erro
 			return nil, ErrNotFound
 		}
 
+		f.log.WithField("id", id).WithError(err).Error("error while getting tweet")
+
 		return nil, err
 	}
 
