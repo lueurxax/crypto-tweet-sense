@@ -11,6 +11,7 @@ import (
 type DB interface {
 	version
 	tweetRepo
+	requestLimiter
 }
 
 type db struct {

@@ -1,6 +1,7 @@
 package tweetfinder
 
 import (
+	"context"
 	"math/rand"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
@@ -9,7 +10,7 @@ import (
 const delayKey = "delay"
 
 type Manager interface {
-	TooManyRequests()
+	TooManyRequests(ctx context.Context)
 	AfterRequest()
 	ProcessedQuery()
 	SetSetterFn(func(seconds int64))
@@ -28,7 +29,7 @@ func (m *manager) CurrentDelay() int64 {
 	return m.delay
 }
 
-func (m *manager) TooManyRequests() {
+func (m *manager) TooManyRequests(_ context.Context) {
 	m.log.WithField(delayKey, m.delay).Error("too many requests")
 	m.minimalDelay = m.delay - 1
 	m.incRandomDelay()

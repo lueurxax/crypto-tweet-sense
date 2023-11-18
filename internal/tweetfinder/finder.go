@@ -30,7 +30,7 @@ type Finder interface {
 }
 
 type delayManager interface {
-	TooManyRequests()
+	TooManyRequests(ctx context.Context)
 	AfterRequest()
 	ProcessedQuery()
 	CurrentDelay() int64
@@ -43,11 +43,11 @@ type finder struct {
 	log log.Logger
 }
 
-func (f *finder) Find(_ context.Context, id string) (*common.TweetSnapshot, error) {
+func (f *finder) Find(ctx context.Context, id string) (*common.TweetSnapshot, error) {
 	tweet, err := f.scraper.GetTweet(id)
 	if err != nil {
 		if strings.Contains(err.Error(), tooManyRequests) {
-			f.delayManager.TooManyRequests()
+			f.delayManager.TooManyRequests(ctx)
 		}
 
 		if strings.Contains(err.Error(), notFound) {
@@ -109,7 +109,7 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 	for tweet := range tweetsCh {
 		if tweet.Error != nil {
 			if strings.Contains(tweet.Error.Error(), tooManyRequests) {
-				f.delayManager.TooManyRequests()
+				f.delayManager.TooManyRequests(ctx)
 				return response, nil
 			}
 

@@ -1,63 +1,126 @@
 package windowlimiter
 
 import (
-	"sync/atomic"
+	"context"
 	"time"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 )
 
+const queueLen = 10
+
 type WindowLimiter interface {
 	Inc()
-	TrySetThreshold(startTime time.Time)
+	TrySetThreshold(ctx context.Context, startTime time.Time) error
 	Duration() time.Duration
-	TooFast() bool
+	TooFast(ctx context.Context) (bool, error)
+	Start(ctx context.Context, delay int64) error
 }
 
-type windowCounter interface {
-	Inc()
-	GetCurrent() uint64
+type repo interface {
+	AddCounter(ctx context.Context, id string, window time.Duration, counterTime time.Time) error
+	CleanCounters(ctx context.Context, id string, window time.Duration) error
+	GetCounters(ctx context.Context, id string, window time.Duration) (uint64, error)
+	SetThreshold(ctx context.Context, id string, window time.Duration) error
+	GetThreshold(ctx context.Context, id string, window time.Duration) (uint64, error)
+	CheckIfExist(ctx context.Context, id string, window time.Duration) (bool, error)
+	Create(ctx context.Context, id string, window time.Duration, threshold uint64) error
 }
 
 type limiter struct {
+	id       string
 	duration time.Duration
-	windowCounter
-	threshold *uint64
+
+	count chan time.Time
+	repo
 
 	log log.Logger
 }
 
-func (l *limiter) TrySetThreshold(startTime time.Time) {
+func (l *limiter) TrySetThreshold(ctx context.Context, startTime time.Time) error {
 	if time.Since(startTime) > l.duration {
-		atomic.StoreUint64(l.threshold, l.windowCounter.GetCurrent())
+		if err := l.SetThreshold(ctx, l.id, l.duration); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 func (l *limiter) Duration() time.Duration {
 	return l.duration
 }
 
-func (l *limiter) TooFast() bool {
-	t := atomic.LoadUint64(l.threshold)
-	isFast := t <= l.windowCounter.GetCurrent()
+func (l *limiter) TooFast(ctx context.Context) (bool, error) {
+	t, err := l.repo.GetThreshold(ctx, l.id, l.duration)
+	if err != nil {
+		return false, err
+	}
+
+	current, err := l.GetCurrent(ctx)
+
+	isFast := t <= current
 
 	if isFast {
 		l.log.WithField("threshold", t).
-			WithField("counter", l.windowCounter.GetCurrent()).
+			WithField("counter", current).
 			WithField("duration", l.duration).
 			Debug("checking if too fast")
 	}
 
-	return isFast
+	return isFast, nil
 }
 
-func NewLimiter(counter windowCounter, duration time.Duration, delay int64, logger log.Logger) WindowLimiter {
-	threshold := uint64(duration.Seconds() / float64(delay))
+func (l *limiter) Start(ctx context.Context, delay int64) error {
+	isExist, err := l.repo.CheckIfExist(ctx, l.id, l.duration)
+	if err != nil {
+		return err
+	}
 
+	if isExist {
+		return nil
+	}
+
+	threshold := uint64(l.duration.Seconds() / float64(delay))
+
+	go l.loop(ctx)
+
+	return l.repo.Create(ctx, l.id, l.duration, threshold)
+}
+
+func (l *limiter) Inc() {
+	l.count <- time.Now()
+}
+
+func (l *limiter) GetCurrent(ctx context.Context) (uint64, error) {
+	return l.repo.GetCounters(ctx, l.id, l.duration)
+}
+
+func (l *limiter) loop(ctx context.Context) {
+	ticker := time.NewTicker(time.Second)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := l.repo.CleanCounters(context.Background(), l.id, l.duration); err != nil {
+				panic(err)
+			}
+		case t := <-l.count:
+			if err := l.repo.AddCounter(context.Background(), l.id, l.duration, t); err != nil {
+				panic(err)
+			}
+		}
+	}
+}
+
+func NewLimiter(duration time.Duration, id string, repo repo, logger log.Logger) WindowLimiter {
 	return &limiter{
-		duration:      duration,
-		windowCounter: counter,
-		threshold:     &threshold,
-		log:           logger,
+		duration: duration,
+		count:    make(chan time.Time, queueLen),
+		id:       id,
+		repo:     repo,
+		log:      logger,
 	}
 }

@@ -5,15 +5,25 @@ import (
 	"time"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
-	"github.com/lueurxax/crypto-tweet-sense/internal/tweetfinder/windowcounter"
 	"github.com/lueurxax/crypto-tweet-sense/internal/tweetfinder/windowlimiter"
 )
 
 type windowLimiter interface {
 	Inc()
-	TrySetThreshold(startTime time.Time)
+	TrySetThreshold(ctx context.Context, startTime time.Time) error
 	Duration() time.Duration
-	TooFast() bool
+	TooFast(ctx context.Context) (bool, error)
+	Start(ctx context.Context, delay int64) error
+}
+
+type repo interface {
+	AddCounter(ctx context.Context, id string, window time.Duration, counterTime time.Time) error
+	CleanCounters(ctx context.Context, id string, window time.Duration) error
+	GetCounters(ctx context.Context, id string, window time.Duration) (uint64, error)
+	SetThreshold(ctx context.Context, id string, window time.Duration) error
+	GetThreshold(ctx context.Context, id string, window time.Duration) (uint64, error)
+	CheckIfExist(ctx context.Context, id string, window time.Duration) (bool, error)
+	Create(ctx context.Context, id string, window time.Duration, threshold uint64) error
 }
 
 type managerV2 struct {
@@ -28,11 +38,14 @@ type managerV2 struct {
 	log log.Logger
 }
 
-func (m *managerV2) TooManyRequests() {
+func (m *managerV2) TooManyRequests(ctx context.Context) {
 	m.log.WithField(delayKey, m.delay).Error("too many requests")
 
 	for _, limiter := range m.windowLimiters {
-		limiter.TrySetThreshold(m.startTime)
+		if err := limiter.TrySetThreshold(ctx, m.startTime); err != nil {
+			m.log.WithError(err).Error("error while setting threshold")
+			return
+		}
 	}
 }
 
@@ -53,9 +66,14 @@ func (m *managerV2) CurrentDelay() int64 {
 	return m.delay
 }
 
-func (m *managerV2) start() {
-	ctx := context.Background()
+func (m *managerV2) Start(ctx context.Context) error {
+	for _, limiter := range m.windowLimiters {
+		if err := limiter.Start(ctx, m.delay); err != nil {
+			return err
+		}
+	}
 	go m.loop(ctx)
+	return nil
 }
 
 func (m *managerV2) loop(ctx context.Context) {
@@ -66,21 +84,30 @@ func (m *managerV2) loop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-m.forceRecalculate:
-			m.recalculate(10)
+			if err := m.recalculate(ctx, 10); err != nil {
+				m.log.WithError(err).Error("error while recalculate")
+			}
 		case <-ticker.C:
-			m.recalculate(1)
+			if err := m.recalculate(ctx, 10); err != nil {
+				m.log.WithError(err).Error("error while recalculate")
+			}
 		}
 	}
 }
 
-func (m *managerV2) recalculate(factor int) {
-	var tooFast bool
+func (m *managerV2) recalculate(ctx context.Context, factor int) error {
+	var (
+		isTooFast bool
+		err       error
+	)
 
 	for _, limiter := range m.windowLimiters {
-		if limiter.TooFast() {
+		isTooFast, err = limiter.TooFast(ctx)
+		if err != nil {
+			return err
+		}
+		if isTooFast {
 			m.delay += int64(factor)
-
-			tooFast = true
 
 			m.log.WithField("limiter_duration", limiter.Duration()).WithField(delayKey, m.delay).Debug("delay increased")
 
@@ -88,28 +115,30 @@ func (m *managerV2) recalculate(factor int) {
 		}
 	}
 
-	if !tooFast && m.delay > 0 {
+	if !isTooFast && m.delay > 0 {
 		m.delay--
 		m.log.WithField(delayKey, m.delay).Debug("delay decreased")
 	}
 
 	m.setter(m.delay)
+
+	return nil
 }
 
-func NewDelayManagerV2(setter func(seconds int64), minimalDelay int64, log log.Logger) Manager {
-	windowLimiters := make([]windowLimiter, 3)
-
-	for i, duration := range []time.Duration{
+func NewDelayManagerV2(setter func(seconds int64), id string, minimalDelay int64, repo repo, log log.Logger) Manager {
+	limiterIntervals := []time.Duration{
 		time.Minute,
 		time.Hour,
 		time.Hour * 24,
-	} {
-		counter := windowcounter.NewCounter(duration)
-		windowLimiters[i] = windowlimiter.NewLimiter(counter, duration, minimalDelay, log)
-		counter.Start(context.Background())
 	}
 
-	m := &managerV2{
+	windowLimiters := make([]windowLimiter, len(limiterIntervals))
+
+	for i, duration := range limiterIntervals {
+		windowLimiters[i] = windowlimiter.NewLimiter(duration, id, repo, log)
+	}
+
+	return &managerV2{
 		forceRecalculate: make(chan struct{}, 1000),
 		setter:           setter,
 		delay:            minimalDelay,
@@ -117,7 +146,4 @@ func NewDelayManagerV2(setter func(seconds int64), minimalDelay int64, log log.L
 		startTime:        time.Now(),
 		log:              log,
 	}
-	m.start()
-
-	return m
 }
