@@ -71,16 +71,20 @@ func (m *managerV2) loop(ctx context.Context) {
 
 func (m *managerV2) recalculate() {
 	var tooFast bool
+
 	for _, limiter := range m.windowLimiters {
 		if limiter.TooFast() {
 			m.delay++
+
 			tooFast = true
+
 			m.log.WithField("limiter_duration", limiter.Duration()).WithField(delayKey, m.delay).Debug("delay increased")
 
 			break
 		}
 	}
-	if !tooFast {
+
+	if !tooFast && m.delay > 0 {
 		m.delay--
 		m.log.WithField(delayKey, m.delay).Debug("delay decreased")
 	}
