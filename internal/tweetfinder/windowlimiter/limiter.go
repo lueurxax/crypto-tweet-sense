@@ -39,12 +39,15 @@ func (l *limiter) Duration() time.Duration {
 
 func (l *limiter) TooFast() bool {
 	t := atomic.LoadUint64(l.threshold)
-	l.log.WithField("threshold", t).
-		WithField("counter", l.windowCounter.GetCurrent()).
-		WithField("duration", l.duration).
-		Debug("checking if too fast")
+	isFast := t <= l.windowCounter.GetCurrent()
+	if isFast {
+		l.log.WithField("threshold", t).
+			WithField("counter", l.windowCounter.GetCurrent()).
+			WithField("duration", l.duration).
+			Debug("checking if too fast")
+	}
 
-	return t <= l.windowCounter.GetCurrent()
+	return isFast
 }
 
 func NewLimiter(counter windowCounter, duration time.Duration, delay int64, logger log.Logger) WindowLimiter {
