@@ -20,7 +20,8 @@ type managerV2 struct {
 	setter func(seconds int64)
 	delay  int64
 
-	windowLimiters []windowLimiter
+	windowLimiters   []windowLimiter
+	forceRecalculate chan struct{}
 
 	startTime time.Time
 
@@ -39,6 +40,7 @@ func (m *managerV2) AfterRequest() {
 	for _, limiter := range m.windowLimiters {
 		limiter.Inc()
 	}
+	m.forceRecalculate <- struct{}{}
 }
 
 func (m *managerV2) ProcessedQuery() {}
@@ -57,24 +59,26 @@ func (m *managerV2) start() {
 }
 
 func (m *managerV2) loop(ctx context.Context) {
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(time.Second * 10)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-m.forceRecalculate:
+			m.recalculate(10)
 		case <-ticker.C:
-			m.recalculate()
+			m.recalculate(1)
 		}
 	}
 }
 
-func (m *managerV2) recalculate() {
+func (m *managerV2) recalculate(factor int) {
 	var tooFast bool
 
 	for _, limiter := range m.windowLimiters {
 		if limiter.TooFast() {
-			m.delay++
+			m.delay += int64(factor)
 
 			tooFast = true
 
@@ -106,11 +110,12 @@ func NewDelayManagerV2(setter func(seconds int64), minimalDelay int64, log log.L
 	}
 
 	m := &managerV2{
-		setter:         setter,
-		delay:          minimalDelay,
-		windowLimiters: windowLimiters,
-		startTime:      time.Now(),
-		log:            log,
+		forceRecalculate: make(chan struct{}, 1000),
+		setter:           setter,
+		delay:            minimalDelay,
+		windowLimiters:   windowLimiters,
+		startTime:        time.Now(),
+		log:              log,
 	}
 	m.start()
 
