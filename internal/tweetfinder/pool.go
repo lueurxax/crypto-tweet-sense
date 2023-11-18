@@ -101,7 +101,9 @@ func (p *pool) getFinderIndex() (int, bool) {
 func (p *pool) releaseFinder(index int) {
 	p.mu.Lock()
 	for index = range p.finderDelays {
-		p.finderDelays[index] = p.finders[index].CurrentDelay()
+		if p.finderDelays[index] != 0 {
+			p.finderDelays[index] = p.finders[index].CurrentDelay()
+		}
 	}
 	p.mu.Unlock()
 
