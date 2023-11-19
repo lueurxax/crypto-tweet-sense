@@ -12,7 +12,7 @@ type windowLimiter interface {
 	Inc()
 	TrySetThreshold(ctx context.Context, startTime time.Time) error
 	Duration() time.Duration
-	TooFast(ctx context.Context) (bool, error)
+	TooFast(ctx context.Context) (uint64, error)
 	Start(ctx context.Context, delay int64) error
 }
 
@@ -99,26 +99,28 @@ func (m *managerV2) loop(ctx context.Context) {
 
 func (m *managerV2) recalculate(ctx context.Context, factor int) error {
 	var (
-		isTooFast bool
-		err       error
+		recomendedDelay uint64
+		err             error
 	)
 
 	for _, limiter := range m.windowLimiters {
-		isTooFast, err = limiter.TooFast(ctx)
+		recomendedDelay, err = limiter.TooFast(ctx)
 		if err != nil {
 			return err
 		}
 
-		if isTooFast {
+		if recomendedDelay > 0 {
 			m.delay += int64(factor)
-
-			m.log.WithField("limiter_duration", limiter.Duration()).WithField(delayKey, m.delay).Debug("delay increased")
-
-			break
+			if uint64(m.delay) >= recomendedDelay*2 {
+				m.delay = int64(recomendedDelay * 2)
+			} else {
+				m.log.WithField("limiter_duration", limiter.Duration()).WithField(delayKey, m.delay).Debug("delay increased")
+				break
+			}
 		}
 	}
 
-	if !isTooFast && m.delay > 1 {
+	if recomendedDelay == 0 && m.delay > 1 {
 		m.delay--
 		m.log.WithField(delayKey, m.delay).Debug("delay decreased")
 	}

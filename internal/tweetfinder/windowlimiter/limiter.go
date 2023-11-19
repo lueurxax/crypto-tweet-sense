@@ -13,7 +13,7 @@ type WindowLimiter interface {
 	Inc()
 	TrySetThreshold(ctx context.Context, startTime time.Time) error
 	Duration() time.Duration
-	TooFast(ctx context.Context) (bool, error)
+	TooFast(ctx context.Context) (uint64, error)
 	Start(ctx context.Context, delay int64) error
 }
 
@@ -51,31 +51,33 @@ func (l *limiter) Duration() time.Duration {
 	return l.duration
 }
 
-func (l *limiter) TooFast(ctx context.Context) (bool, error) {
+func (l *limiter) TooFast(ctx context.Context) (uint64, error) {
 	t, err := l.repo.GetThreshold(ctx, l.id, l.duration)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 
 	if t == 0 {
-		return false, nil
+		return 0, nil
 	}
 
 	current, err := l.GetCurrent(ctx)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 
 	isFast := t <= current
 
-	if isFast {
-		l.log.WithField("threshold", t).
-			WithField("counter", current).
-			WithField("duration", l.duration).
-			Debug("checking if too fast")
+	if !isFast {
+		return 0, nil
 	}
 
-	return isFast, nil
+	l.log.WithField("threshold", t).
+		WithField("counter", current).
+		WithField("duration", l.duration).
+		Debug("checking if too fast")
+
+	return uint64(l.duration.Seconds()) / t, nil
 }
 
 func (l *limiter) Start(ctx context.Context, delay int64) error {
