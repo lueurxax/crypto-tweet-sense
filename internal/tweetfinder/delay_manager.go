@@ -15,6 +15,7 @@ type Manager interface {
 	ProcessedQuery()
 	SetSetterFn(func(seconds int64))
 	CurrentDelay() int64
+	Start(ctx context.Context) error
 }
 
 type manager struct {
@@ -24,6 +25,8 @@ type manager struct {
 
 	log log.Logger
 }
+
+func (m *manager) Start(ctx context.Context) error { return nil }
 
 func (m *manager) CurrentDelay() int64 {
 	return m.delay

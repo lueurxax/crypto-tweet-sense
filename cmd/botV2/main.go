@@ -115,7 +115,7 @@ func main() {
 
 	xConfig := tweetFinder.GetConfigPool()
 
-	finder, err := tweetFinder.NewPoolFabric(xConfig, pkgKey, st, logger)
+	finder, err := tweetFinder.NewPoolFabric(ctx, xConfig, pkgKey, st, logger)
 	if err != nil {
 		panic(err)
 	}

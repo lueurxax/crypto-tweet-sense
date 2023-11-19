@@ -126,7 +126,8 @@ func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.
 			return
 		}
 
-		panic(err)
+		w.logger.WithError(err).Error("find tweets")
+		return
 	}
 
 	lastTweet := start

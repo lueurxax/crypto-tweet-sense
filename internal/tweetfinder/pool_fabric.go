@@ -1,6 +1,7 @@
 package tweetfinder
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -16,7 +17,7 @@ const (
 	finderIndexKey = "finder_index"
 )
 
-func NewPoolFabric(config ConfigPool, pkgKey string, repo repo, logger log.Logger) (Finder, error) {
+func NewPoolFabric(ctx context.Context, config ConfigPool, pkgKey string, repo repo, logger log.Logger) (Finder, error) {
 	finders := make([]Finder, 0, len(config.XCreds))
 	delayManagerLogger := logger.WithField(pkgKey, "delay_manager")
 	finderLogger := logger.WithField(pkgKey, "finder")
@@ -85,6 +86,10 @@ func NewPoolFabric(config ConfigPool, pkgKey string, repo repo, logger log.Logge
 			repo,
 			delayManagerLogger.WithField(finderIndexKey, i),
 		)
+
+		if err = delayManager.Start(ctx); err != nil {
+			return nil, err
+		}
 
 		finders = append(finders, NewFinder(scraper, delayManager, finderLogger.WithField(finderIndexKey, i)))
 		i++
