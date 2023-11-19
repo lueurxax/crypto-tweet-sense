@@ -31,7 +31,7 @@ func (d *db) AddCounter(ctx context.Context, id string, window time.Duration, co
 		return err
 	}
 
-	el.CurrentRequests[counterTime] = struct{}{}
+	el.Requests = append(el.Requests, counterTime)
 
 	data, err := jsoniter.Marshal(el)
 	if err != nil {
@@ -62,6 +62,15 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		}
 	}
 
+	requests := make([]time.Time, 0, len(el.CurrentRequests))
+	for _, key := range el.Requests {
+		if time.Since(key) < window {
+			requests = append(requests, key)
+		}
+	}
+
+	el.Requests = requests
+
 	data, err := jsoniter.Marshal(el)
 	if err != nil {
 		return err
@@ -85,7 +94,7 @@ func (d *db) GetCounters(ctx context.Context, id string, window time.Duration) (
 		return 0, err
 	}
 
-	return uint64(len(el.CurrentRequests)), nil
+	return uint64(len(el.Requests)), nil
 }
 
 func (d *db) SetThreshold(ctx context.Context, id string, window time.Duration) error {
@@ -99,11 +108,11 @@ func (d *db) SetThreshold(ctx context.Context, id string, window time.Duration) 
 		return err
 	}
 
-	if uint64(len(el.CurrentRequests)) == 0 {
+	if uint64(len(el.Requests)) == 0 {
 		return nil
 	}
 
-	el.Threshold = uint64(len(el.CurrentRequests))
+	el.Threshold = uint64(len(el.Requests))
 
 	data, err := jsoniter.Marshal(el)
 	if err != nil {
@@ -165,9 +174,9 @@ func (d *db) Create(ctx context.Context, id string, window time.Duration, thresh
 	}
 
 	el := &common.RequestLimits{
-		WindowSeconds:   uint64(window.Seconds()),
-		CurrentRequests: map[time.Time]struct{}{},
-		Threshold:       threshold,
+		WindowSeconds: uint64(window.Seconds()),
+		Requests:      make([]time.Time, 0),
+		Threshold:     threshold,
 	}
 
 	data, err = jsoniter.Marshal(el)
