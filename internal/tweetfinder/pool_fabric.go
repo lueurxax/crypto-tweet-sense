@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	startDelay     = 15
-	finderIndexKey = "finder_index"
+	startDelay  = 15
+	finderLogin = "finder_login"
 )
 
 func NewPoolFabric(ctx context.Context, config ConfigPool, pkgKey string, repo repo, logger log.Logger) (Finder, error) {
@@ -84,14 +84,14 @@ func NewPoolFabric(ctx context.Context, config ConfigPool, pkgKey string, repo r
 			login,
 			startDelay,
 			repo,
-			delayManagerLogger.WithField(finderIndexKey, i),
+			delayManagerLogger.WithField(finderLogin, login),
 		)
 
 		if err = delayManager.Start(ctx); err != nil {
 			return nil, err
 		}
 
-		finders = append(finders, NewFinder(scraper, delayManager, finderLogger.WithField(finderIndexKey, i)))
+		finders = append(finders, NewFinder(scraper, delayManager, finderLogger.WithField(finderLogin, login)))
 		i++
 	}
 

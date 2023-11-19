@@ -90,7 +90,7 @@ func (m *managerV2) loop(ctx context.Context) {
 				m.log.WithError(err).Error("error while recalculate")
 			}
 		case <-ticker.C:
-			if err := m.recalculate(ctx, 10); err != nil {
+			if err := m.recalculate(ctx, 1); err != nil {
 				m.log.WithError(err).Error("error while recalculate")
 			}
 		}
