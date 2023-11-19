@@ -57,6 +57,10 @@ func (l *limiter) TooFast(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
+	if t == 0 {
+		return false, nil
+	}
+
 	current, err := l.GetCurrent(ctx)
 	if err != nil {
 		return false, err

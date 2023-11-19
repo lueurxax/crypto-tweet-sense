@@ -99,6 +99,10 @@ func (d *db) SetThreshold(ctx context.Context, id string, window time.Duration) 
 		return err
 	}
 
+	if uint64(len(el.CurrentRequests)) == 0 {
+		return nil
+	}
+
 	el.Threshold = uint64(len(el.CurrentRequests))
 
 	data, err := jsoniter.Marshal(el)
