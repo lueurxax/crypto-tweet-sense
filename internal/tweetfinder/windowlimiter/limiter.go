@@ -66,7 +66,7 @@ func (l *limiter) TooFast(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 
-	isFast := t <= current
+	isFast := t-1 <= current
 
 	if !isFast {
 		return 0, nil

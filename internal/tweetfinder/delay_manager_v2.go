@@ -86,7 +86,7 @@ func (m *managerV2) loop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-m.forceRecalculate:
-			if err := m.recalculate(ctx, 10); err != nil {
+			if err := m.recalculate(ctx, 5); err != nil {
 				m.log.WithError(err).Error("error while recalculate")
 			}
 		case <-ticker.C:
@@ -99,28 +99,24 @@ func (m *managerV2) loop(ctx context.Context) {
 
 func (m *managerV2) recalculate(ctx context.Context, factor int) error {
 	var (
-		recomendedDelay uint64
-		err             error
+		recommendedDelay uint64
+		err              error
 	)
 
 	for _, limiter := range m.windowLimiters {
-		recomendedDelay, err = limiter.TooFast(ctx)
+		recommendedDelay, err = limiter.TooFast(ctx)
 		if err != nil {
 			return err
 		}
 
-		if recomendedDelay > 0 {
-			m.delay += int64(factor)
-			if uint64(m.delay) >= recomendedDelay*2 {
-				m.delay = int64(recomendedDelay * 2)
-			} else {
-				m.log.WithField("limiter_duration", limiter.Duration()).WithField(delayKey, m.delay).Debug("delay increased")
-				break
-			}
+		if recommendedDelay > 0 {
+			m.delay = int64(recommendedDelay) * int64(factor)
+			m.log.WithField("limiter_duration", limiter.Duration()).WithField(delayKey, m.delay).Debug("delay increased")
+			break
 		}
 	}
 
-	if recomendedDelay == 0 && m.delay > 1 {
+	if recommendedDelay == 0 && m.delay > 1 {
 		m.delay--
 		m.log.WithField(delayKey, m.delay).Debug("delay decreased")
 	}
