@@ -105,16 +105,21 @@ func (l *limiter) GetCurrent(ctx context.Context) (uint64, error) {
 
 func (l *limiter) loop(ctx context.Context) {
 	ticker := time.NewTicker(time.Second)
+	l.log.WithField("duration", l.duration).Debug("start loop")
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case t := <-l.count:
+			l.log.WithField("time", t).Debug("inc counter")
+
 			if err := l.repo.AddCounter(context.Background(), l.id, l.duration, t); err != nil {
 				panic(err)
 			}
 		case <-ticker.C:
+			l.log.WithField("duration", l.duration).Debug("clean counters")
+
 			if err := l.repo.CleanCounters(context.Background(), l.id, l.duration); err != nil {
 				panic(err)
 			}
