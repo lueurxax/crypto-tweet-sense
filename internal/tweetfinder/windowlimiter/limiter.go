@@ -106,7 +106,7 @@ func (l *limiter) GetCurrent(ctx context.Context) (uint64, error) {
 func (l *limiter) loop(ctx context.Context) {
 	ticker := time.NewTicker(time.Second)
 
-	l.log.WithField("duration", l.duration).Debug("start loop")
+	l.log.WithField("duration", l.duration).Info("start loop")
 
 	for {
 		select {
