@@ -106,12 +106,12 @@ func (l *limiter) loop(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
-			if err := l.repo.CleanCounters(context.Background(), l.id, l.duration); err != nil {
-				panic(err)
-			}
 		case t := <-l.count:
 			if err := l.repo.AddCounter(context.Background(), l.id, l.duration, t); err != nil {
+				panic(err)
+			}
+		case <-ticker.C:
+			if err := l.repo.CleanCounters(context.Background(), l.id, l.duration); err != nil {
 				panic(err)
 			}
 		}

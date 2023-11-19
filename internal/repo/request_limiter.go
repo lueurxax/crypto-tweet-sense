@@ -57,7 +57,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 	}
 
 	for key := range el.CurrentRequests {
-		if time.Since(key) > time.Second*time.Duration(el.WindowSeconds) {
+		if time.Since(key) > window {
 			delete(el.CurrentRequests, key)
 		}
 	}
