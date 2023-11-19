@@ -97,9 +97,9 @@ func NewPoolFabric(ctx context.Context, config ConfigPool, pkgKey string, repo r
 				resetInterval = limiterIntervals[j+1]
 			}
 
-			windowLimiters[i] = windowlimiter.NewLimiter(limiterIntervals[j], resetInterval, login, repo, limiterLogger.WithField(finderLogin, login))
+			windowLimiters[j] = windowlimiter.NewLimiter(limiterIntervals[j], resetInterval, login, repo, limiterLogger.WithField(finderLogin, login))
 
-			if i != len(limiterIntervals)-1 {
+			if j != len(limiterIntervals)-1 {
 				windowLimiters[j].SetResetLimiter(windowLimiters[j+1])
 			}
 		}
