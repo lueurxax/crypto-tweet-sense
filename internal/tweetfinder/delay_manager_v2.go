@@ -72,7 +72,9 @@ func (m *managerV2) Start(ctx context.Context) error {
 			return err
 		}
 	}
+
 	go m.loop(ctx)
+
 	return nil
 }
 
@@ -106,6 +108,7 @@ func (m *managerV2) recalculate(ctx context.Context, factor int) error {
 		if err != nil {
 			return err
 		}
+
 		if isTooFast {
 			m.delay += int64(factor)
 

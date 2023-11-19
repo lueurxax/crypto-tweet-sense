@@ -17,9 +17,7 @@ type builder struct {
 
 func (b builder) RequestLimits(id string, window time.Duration) []byte {
 	slice := append([]byte{requestLimit}, []byte(id)...)
-	binary.LittleEndian.AppendUint64(slice, uint64(window.Seconds()))
-
-	return slice
+	return binary.LittleEndian.AppendUint16(slice, uint16(window.Seconds()))
 }
 
 func (b builder) Version() []byte {
