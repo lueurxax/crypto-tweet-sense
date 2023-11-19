@@ -37,6 +37,7 @@ func (d *db) AddCounter(ctx context.Context, id string, window time.Duration, co
 	if err != nil {
 		return err
 	}
+	d.log.WithField("request_limits", el).Debug("add counter")
 
 	if err = tx.Set(d.keyBuilder.RequestLimits(id, window), data); err != nil {
 		return err
@@ -63,6 +64,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 	}
 
 	requests := make([]time.Time, 0, len(el.CurrentRequests))
+
 	for _, key := range el.Requests {
 		if time.Since(key) < window {
 			requests = append(requests, key)
