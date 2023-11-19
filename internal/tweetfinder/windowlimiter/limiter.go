@@ -79,6 +79,8 @@ func (l *limiter) TooFast(ctx context.Context) (bool, error) {
 }
 
 func (l *limiter) Start(ctx context.Context, delay int64) error {
+	go l.loop(ctx)
+
 	isExist, err := l.repo.CheckIfExist(ctx, l.id, l.duration)
 	if err != nil {
 		return err
@@ -89,8 +91,6 @@ func (l *limiter) Start(ctx context.Context, delay int64) error {
 	}
 
 	threshold := uint64(l.duration.Seconds() / float64(delay))
-
-	go l.loop(ctx)
 
 	return l.repo.Create(ctx, l.id, l.duration, threshold)
 }
@@ -105,6 +105,7 @@ func (l *limiter) GetCurrent(ctx context.Context) (uint64, error) {
 
 func (l *limiter) loop(ctx context.Context) {
 	ticker := time.NewTicker(time.Second)
+
 	l.log.WithField("duration", l.duration).Debug("start loop")
 
 	for {
