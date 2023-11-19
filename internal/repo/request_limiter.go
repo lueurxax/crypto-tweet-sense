@@ -58,13 +58,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		return err
 	}
 
-	for key := range el.CurrentRequests {
-		if time.Since(key) > window {
-			delete(el.CurrentRequests, key)
-		}
-	}
-
-	requests := make([]time.Time, 0, len(el.CurrentRequests))
+	requests := make([]time.Time, 0, len(el.Requests))
 
 	for _, key := range el.Requests {
 		if time.Since(key) < window {
@@ -73,6 +67,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 	}
 
 	el.Requests = requests
+	el.CurrentRequests = nil
 
 	data, err := jsoniter.Marshal(el)
 	if err != nil {

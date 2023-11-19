@@ -118,7 +118,7 @@ func (m *managerV2) recalculate(ctx context.Context, factor int) error {
 		}
 	}
 
-	if !isTooFast && m.delay > 0 {
+	if !isTooFast && m.delay > 1 {
 		m.delay--
 		m.log.WithField(delayKey, m.delay).Debug("delay decreased")
 	}
