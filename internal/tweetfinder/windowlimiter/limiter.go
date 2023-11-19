@@ -10,11 +10,17 @@ import (
 const queueLen = 10
 
 type WindowLimiter interface {
+	Start(ctx context.Context, delay int64) error
 	Inc()
 	TrySetThreshold(ctx context.Context, startTime time.Time) error
 	Duration() time.Duration
 	TooFast(ctx context.Context) (uint64, error)
-	Start(ctx context.Context, delay int64) error
+	Threshold(ctx context.Context) uint64
+	SetResetLimiter(resetLimiter ResetLimiter)
+}
+
+type ResetLimiter interface {
+	Threshold(ctx context.Context) uint64
 }
 
 type repo interface {
@@ -25,16 +31,30 @@ type repo interface {
 	GetThreshold(ctx context.Context, id string, window time.Duration) (uint64, error)
 	CheckIfExist(ctx context.Context, id string, window time.Duration) (bool, error)
 	Create(ctx context.Context, id string, window time.Duration, threshold uint64) error
+	IncreaseThresholdTo(ctx context.Context, id string, duration time.Duration, threshold uint64) error
 }
 
 type limiter struct {
 	id       string
 	duration time.Duration
 
+	resetLimiter  ResetLimiter
+	resetDuration time.Duration
+
 	count chan time.Time
 	repo
 
 	log log.Logger
+}
+
+func (l *limiter) Threshold(ctx context.Context) uint64 {
+	threshold, err := l.repo.GetThreshold(ctx, l.id, l.duration)
+	if err != nil {
+		l.log.WithError(err).Error("error while getting threshold")
+		return 0
+	}
+
+	return threshold
 }
 
 func (l *limiter) TrySetThreshold(ctx context.Context, startTime time.Time) error {
@@ -107,6 +127,7 @@ func (l *limiter) GetCurrent(ctx context.Context) (uint64, error) {
 
 func (l *limiter) loop(ctx context.Context) {
 	ticker := time.NewTicker(time.Second)
+	resetTicker := time.NewTicker(l.resetDuration)
 
 	l.log.WithField("duration", l.duration).Info("start loop")
 
@@ -126,16 +147,37 @@ func (l *limiter) loop(ctx context.Context) {
 			if err := l.repo.CleanCounters(context.Background(), l.id, l.duration); err != nil {
 				panic(err)
 			}
+		case <-resetTicker.C:
+			if l.resetLimiter == nil {
+				continue
+			}
+			ctx := context.Background()
+			threshold := uint64(l.duration.Seconds()) * l.resetLimiter.Threshold(ctx) / uint64(l.resetDuration.Seconds())
+
+			if threshold == 0 {
+				continue
+			}
+
+			if err := l.repo.IncreaseThresholdTo(ctx, l.id, l.duration, threshold); err != nil {
+				panic(err)
+			}
+
+			l.log.WithField("duration", l.duration).Trace("reset threshold")
 		}
 	}
 }
 
-func NewLimiter(duration time.Duration, id string, repo repo, logger log.Logger) WindowLimiter {
+func (l *limiter) SetResetLimiter(resetLimiter ResetLimiter) {
+	l.resetLimiter = resetLimiter
+}
+
+func NewLimiter(duration, resetDuration time.Duration, id string, repo repo, logger log.Logger) WindowLimiter {
 	return &limiter{
-		duration: duration,
-		count:    make(chan time.Time, queueLen),
-		id:       id,
-		repo:     repo,
-		log:      logger,
+		duration:      duration,
+		count:         make(chan time.Time, queueLen),
+		id:            id,
+		resetDuration: resetDuration,
+		repo:          repo,
+		log:           logger,
 	}
 }

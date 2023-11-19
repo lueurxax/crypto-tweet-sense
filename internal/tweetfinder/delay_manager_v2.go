@@ -8,11 +8,13 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/internal/tweetfinder/windowlimiter"
 )
 
-type windowLimiter interface {
+type WindowLimiter interface {
 	Inc()
 	TrySetThreshold(ctx context.Context, startTime time.Time) error
 	Duration() time.Duration
 	TooFast(ctx context.Context) (uint64, error)
+	SetResetLimiter(resetLimiter windowlimiter.ResetLimiter)
+	Threshold(ctx context.Context) uint64
 	Start(ctx context.Context, delay int64) error
 }
 
@@ -24,13 +26,14 @@ type repo interface {
 	GetThreshold(ctx context.Context, id string, window time.Duration) (uint64, error)
 	CheckIfExist(ctx context.Context, id string, window time.Duration) (bool, error)
 	Create(ctx context.Context, id string, window time.Duration, threshold uint64) error
+	IncreaseThresholdTo(ctx context.Context, id string, window time.Duration, threshold uint64) error
 }
 
 type managerV2 struct {
 	setter func(seconds int64)
 	delay  int64
 
-	windowLimiters   []windowLimiter
+	windowLimiters   []WindowLimiter
 	forceRecalculate chan struct{}
 
 	startTime time.Time
@@ -103,21 +106,34 @@ func (m *managerV2) recalculate(ctx context.Context, factor int) error {
 		err              error
 	)
 
+	shouldDecrease := true
+
 	for _, limiter := range m.windowLimiters {
 		recommendedDelay, err = limiter.TooFast(ctx)
 		if err != nil {
 			return err
 		}
 
+		delay := int64(recommendedDelay) * int64(factor)
+
 		if recommendedDelay > 0 {
-			m.delay = int64(recommendedDelay) * int64(factor)
+			shouldDecrease = false
+		}
+
+		if recommendedDelay > 0 && delay != m.delay {
+			m.delay = delay
 			m.log.WithField("limiter_duration", limiter.Duration()).WithField(delayKey, m.delay).Debug("delay increased")
+
 			break
 		}
 	}
 
-	if recommendedDelay == 0 && m.delay > 1 {
-		m.delay--
+	if shouldDecrease && m.delay > 1 {
+		if m.delay < 6 {
+			m.delay--
+		} else {
+			m.delay /= 2
+		}
 		m.log.WithField(delayKey, m.delay).Debug("delay decreased")
 	}
 
@@ -126,18 +142,7 @@ func (m *managerV2) recalculate(ctx context.Context, factor int) error {
 	return nil
 }
 
-func NewDelayManagerV2(setter func(seconds int64), id string, minimalDelay int64, repo repo, log log.Logger) Manager {
-	limiterIntervals := []time.Duration{
-		time.Minute,
-		time.Hour,
-		time.Hour * 24,
-	}
-
-	windowLimiters := make([]windowLimiter, len(limiterIntervals))
-
-	for i, duration := range limiterIntervals {
-		windowLimiters[i] = windowlimiter.NewLimiter(duration, id, repo, log)
-	}
+func NewDelayManagerV2(setter func(seconds int64), windowLimiters []WindowLimiter, minimalDelay int64, log log.Logger) Manager {
 
 	return &managerV2{
 		forceRecalculate: make(chan struct{}, 1000),

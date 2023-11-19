@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	twitterscraper "github.com/n0madic/twitter-scraper"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
+	"github.com/lueurxax/crypto-tweet-sense/internal/tweetfinder/windowlimiter"
 )
 
 const (
@@ -20,6 +22,7 @@ const (
 func NewPoolFabric(ctx context.Context, config ConfigPool, pkgKey string, repo repo, logger log.Logger) (Finder, error) {
 	finders := make([]Finder, 0, len(config.XCreds))
 	delayManagerLogger := logger.WithField(pkgKey, "delay_manager")
+	limiterLogger := logger.WithField(pkgKey, "window_limiter")
 	finderLogger := logger.WithField(pkgKey, "finder")
 	poolLogger := logger.WithField(pkgKey, "finder_pool")
 
@@ -79,11 +82,32 @@ func NewPoolFabric(ctx context.Context, config ConfigPool, pkgKey string, repo r
 			}
 		}
 
+		limiterIntervals := []time.Duration{
+			time.Minute,
+			time.Hour,
+			time.Hour * 24,
+			time.Hour * 24 * 30,
+		}
+
+		windowLimiters := make([]WindowLimiter, len(limiterIntervals))
+
+		for j := len(limiterIntervals) - 1; j >= 0; j-- {
+			resetInterval := limiterIntervals[j]
+			if j != len(limiterIntervals)-1 {
+				resetInterval = limiterIntervals[j+1]
+			}
+
+			windowLimiters[i] = windowlimiter.NewLimiter(limiterIntervals[j], resetInterval, login, repo, limiterLogger.WithField(finderLogin, login))
+
+			if i != len(limiterIntervals)-1 {
+				windowLimiters[j].SetResetLimiter(windowLimiters[j+1])
+			}
+		}
+
 		delayManager = NewDelayManagerV2(
 			func(seconds int64) { scraper.WithDelay(seconds) },
-			login,
+			windowLimiters,
 			startDelay,
-			repo,
 			delayManagerLogger.WithField(finderLogin, login),
 		)
 

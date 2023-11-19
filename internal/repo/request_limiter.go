@@ -15,6 +15,7 @@ type requestLimiter interface {
 	CleanCounters(ctx context.Context, id string, window time.Duration) error
 	GetCounters(ctx context.Context, id string, window time.Duration) (uint64, error)
 	SetThreshold(ctx context.Context, id string, window time.Duration) error
+	IncreaseThresholdTo(ctx context.Context, id string, window time.Duration, threshold uint64) error
 	GetThreshold(ctx context.Context, id string, window time.Duration) (uint64, error)
 	CheckIfExist(ctx context.Context, id string, window time.Duration) (bool, error)
 	Create(ctx context.Context, id string, window time.Duration, threshold uint64) error
@@ -111,6 +112,42 @@ func (d *db) SetThreshold(ctx context.Context, id string, window time.Duration) 
 	}
 
 	el.Threshold = uint64(len(el.Requests))
+
+	data, err := jsoniter.Marshal(el)
+	if err != nil {
+		return err
+	}
+
+	if err = tx.Set(d.keyBuilder.RequestLimits(id, window), data); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (d *db) IncreaseThresholdTo(ctx context.Context, id string, window time.Duration, threshold uint64) error {
+	tx, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		return err
+	}
+
+	el, err := d.getRateLimit(tx, id, window)
+	if err != nil {
+		return err
+	}
+
+	if el.Threshold > threshold {
+		return nil
+	}
+
+	d.log.
+		WithField("id", id).
+		WithField("duration", int(window.Seconds())).
+		WithField("old_threshold", el.Threshold).
+		WithField("new_threshold", threshold).
+		Debug("increase threshold")
+
+	el.Threshold = threshold
 
 	data, err := jsoniter.Marshal(el)
 	if err != nil {
