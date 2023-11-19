@@ -38,7 +38,7 @@ func (d *db) AddCounter(ctx context.Context, id string, window time.Duration, co
 		return err
 	}
 
-	d.log.WithField("request_limits", el).Debug("add counter")
+	d.log.WithField("request_limits", el).Trace("add counter")
 
 	if err = tx.Set(d.keyBuilder.RequestLimits(id, window), data); err != nil {
 		return err

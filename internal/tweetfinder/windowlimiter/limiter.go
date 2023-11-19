@@ -113,13 +113,13 @@ func (l *limiter) loop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case t := <-l.count:
-			l.log.WithField("time", t).Debug("inc counter")
+			l.log.WithField("time", t).Trace("inc counter")
 
 			if err := l.repo.AddCounter(context.Background(), l.id, l.duration, t); err != nil {
 				panic(err)
 			}
 		case <-ticker.C:
-			l.log.WithField("duration", l.duration).Debug("clean counters")
+			l.log.WithField("duration", l.duration).Trace("clean counters")
 
 			if err := l.repo.CleanCounters(context.Background(), l.id, l.duration); err != nil {
 				panic(err)
