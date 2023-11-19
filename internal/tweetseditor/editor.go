@@ -32,8 +32,7 @@ type editor struct {
 }
 
 func (e *editor) Edit(ctx context.Context, tweetCh <-chan string) context.Context {
-	ctx, cancel := context.WithCancel(ctx)
-	go e.editLoop(ctx, cancel, tweetCh)
+	go e.editLoop(ctx, tweetCh)
 
 	return ctx
 }
@@ -42,7 +41,7 @@ func (e *editor) SubscribeEdited() <-chan string {
 	return e.editedCh
 }
 
-func (e *editor) editLoop(ctx context.Context, cancel context.CancelFunc, ch <-chan string) {
+func (e *editor) editLoop(ctx context.Context, ch <-chan string) {
 	collectedTweets := make([]string, 0)
 	ticker := time.NewTicker(e.sendInterval)
 
@@ -64,7 +63,6 @@ func (e *editor) editLoop(ctx context.Context, cancel context.CancelFunc, ch <-c
 
 			if err := e.edit(context.Background(), collectedTweets); err != nil { //nolint:contextcheck
 				e.log.WithError(err).Error("edit error")
-				cancel()
 			}
 
 			collectedTweets = make([]string, 0)
