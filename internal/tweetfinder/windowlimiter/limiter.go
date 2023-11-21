@@ -43,6 +43,7 @@ type limiter struct {
 
 	resetLimiter  ResetLimiter
 	resetDuration time.Duration
+	resetTicker   *time.Ticker
 
 	count chan time.Time
 	repo
@@ -61,6 +62,8 @@ func (l *limiter) Threshold(ctx context.Context) uint64 {
 }
 
 func (l *limiter) TrySetThreshold(ctx context.Context, startTime time.Time) error {
+	l.resetTicker.Reset(l.resetDuration)
+
 	if time.Since(startTime) > l.duration {
 		if err := l.SetThreshold(ctx, l.id, l.duration); err != nil {
 			return err
@@ -130,43 +133,45 @@ func (l *limiter) GetCurrent(ctx context.Context) (uint64, error) {
 
 func (l *limiter) loop(ctx context.Context) {
 	ticker := time.NewTicker(time.Second)
-	resetTicker := time.NewTicker(l.resetDuration)
+	l.resetTicker = time.NewTicker(l.resetDuration)
 
 	l.log.WithField(durationKey, l.duration).Info("start loop")
 
 	for {
+		requestctx, cancel := context.WithCancel(context.Background())
 		select {
 		case <-ctx.Done():
+			cancel()
 			return
 		case t := <-l.count:
 			l.log.WithField("time", t).Trace("inc counter")
 
-			if err := l.repo.AddCounter(context.Background(), l.id, l.duration, t); err != nil {
+			if err := l.repo.AddCounter(requestctx, l.id, l.duration, t); err != nil {
 				panic(err)
 			}
 		case <-ticker.C:
 			l.log.WithField(durationKey, l.duration).Trace("clean counters")
 
-			if err := l.repo.CleanCounters(context.Background(), l.id, l.duration); err != nil {
+			if err := l.repo.CleanCounters(requestctx, l.id, l.duration); err != nil {
 				panic(err)
 			}
-		case <-resetTicker.C:
+		case <-l.resetTicker.C:
 			if l.resetLimiter == nil {
 				continue
 			}
-			ctx := context.Background()
-			threshold := uint64(l.duration.Seconds()) * l.resetLimiter.Threshold(ctx) / uint64(l.resetDuration.Seconds())
 
+			threshold := uint64(l.duration.Seconds()) * l.resetLimiter.Threshold(requestctx) / uint64(l.resetDuration.Seconds())
 			if threshold == 0 {
 				continue
 			}
 
-			if err := l.repo.IncreaseThresholdTo(ctx, l.id, l.duration, threshold); err != nil {
+			if err := l.repo.IncreaseThresholdTo(requestctx, l.id, l.duration, threshold); err != nil {
 				panic(err)
 			}
 
 			l.log.WithField(durationKey, l.duration).Trace("reset threshold")
 		}
+		cancel()
 	}
 }
 

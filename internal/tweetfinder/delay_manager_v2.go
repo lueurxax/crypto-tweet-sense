@@ -78,7 +78,7 @@ func (m *managerV2) loop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-m.forceRecalculate:
-			if err := m.recalculate(ctx, 5); err != nil {
+			if err := m.recalculate(ctx, 2); err != nil {
 				m.log.WithError(err).Error("error while recalculate")
 			}
 		case <-ticker.C:
@@ -141,7 +141,6 @@ func NewDelayManagerV2(
 	minimalDelay int64,
 	log log.Logger,
 ) Manager {
-
 	return &managerV2{
 		forceRecalculate: make(chan struct{}, 1000),
 		setter:           setter,

@@ -26,7 +26,7 @@ type manager struct {
 	log log.Logger
 }
 
-func (m *manager) Start(ctx context.Context) error { return nil }
+func (m *manager) Start(context.Context) error { return nil }
 
 func (m *manager) CurrentDelay() int64 {
 	return m.delay
