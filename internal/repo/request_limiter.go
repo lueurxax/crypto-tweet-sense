@@ -31,6 +31,10 @@ func (d *db) GetRequestLimit(ctx context.Context, id string, window time.Duratio
 		return common.RequestLimitData{}, err
 	}
 
+	if err = tx.Commit(); err != nil {
+		return common.RequestLimitData{}, err
+	}
+
 	return common.RequestLimitData{
 		RequestsCount: uint64(len(el.Requests)),
 		Threshold:     el.Threshold,
@@ -173,6 +177,10 @@ func (d *db) CheckIfExist(ctx context.Context, id string, window time.Duration) 
 
 	data, err := tx.Get(key)
 	if err != nil {
+		return false, err
+	}
+
+	if err = tx.Commit(); err != nil {
 		return false, err
 	}
 
