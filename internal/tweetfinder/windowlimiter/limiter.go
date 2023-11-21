@@ -4,10 +4,14 @@ import (
 	"context"
 	"time"
 
+	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 )
 
-const queueLen = 10
+const (
+	queueLen    = 10
+	durationKey = "duration"
+)
 
 type WindowLimiter interface {
 	Start(ctx context.Context, delay int64) error
@@ -26,9 +30,8 @@ type ResetLimiter interface {
 type repo interface {
 	AddCounter(ctx context.Context, id string, window time.Duration, counterTime time.Time) error
 	CleanCounters(ctx context.Context, id string, window time.Duration) error
-	GetCounters(ctx context.Context, id string, window time.Duration) (uint64, error)
 	SetThreshold(ctx context.Context, id string, window time.Duration) error
-	GetThreshold(ctx context.Context, id string, window time.Duration) (uint64, error)
+	GetRequestLimit(ctx context.Context, id string, window time.Duration) (common.RequestLimitData, error)
 	CheckIfExist(ctx context.Context, id string, window time.Duration) (bool, error)
 	Create(ctx context.Context, id string, window time.Duration, threshold uint64) error
 	IncreaseThresholdTo(ctx context.Context, id string, duration time.Duration, threshold uint64) error
@@ -48,13 +51,13 @@ type limiter struct {
 }
 
 func (l *limiter) Threshold(ctx context.Context) uint64 {
-	threshold, err := l.repo.GetThreshold(ctx, l.id, l.duration)
+	rl, err := l.repo.GetRequestLimit(ctx, l.id, l.duration)
 	if err != nil {
 		l.log.WithError(err).Error("error while getting threshold")
 		return 0
 	}
 
-	return threshold
+	return rl.Threshold
 }
 
 func (l *limiter) TrySetThreshold(ctx context.Context, startTime time.Time) error {
@@ -72,32 +75,27 @@ func (l *limiter) Duration() time.Duration {
 }
 
 func (l *limiter) TooFast(ctx context.Context) (uint64, error) {
-	t, err := l.repo.GetThreshold(ctx, l.id, l.duration)
+	rl, err := l.repo.GetRequestLimit(ctx, l.id, l.duration)
 	if err != nil {
 		return 0, err
 	}
 
-	if t == 0 {
+	if rl.Threshold == 0 {
 		return 0, nil
 	}
 
-	current, err := l.GetCurrent(ctx)
-	if err != nil {
-		return 0, err
-	}
-
-	isFast := t-1 <= current
+	isFast := rl.Threshold-1 <= rl.RequestsCount
 
 	if !isFast {
 		return 0, nil
 	}
 
-	l.log.WithField("threshold", t).
-		WithField("counter", current).
-		WithField("duration", l.duration).
+	l.log.WithField("threshold", rl.Threshold).
+		WithField("counter", rl.RequestsCount).
+		WithField(durationKey, l.duration).
 		Debug("checking if too fast")
 
-	return uint64(l.duration.Seconds()) / t, nil
+	return uint64(l.duration.Seconds()) / rl.Threshold, nil
 }
 
 func (l *limiter) Start(ctx context.Context, delay int64) error {
@@ -122,14 +120,19 @@ func (l *limiter) Inc() {
 }
 
 func (l *limiter) GetCurrent(ctx context.Context) (uint64, error) {
-	return l.repo.GetCounters(ctx, l.id, l.duration)
+	rl, err := l.repo.GetRequestLimit(ctx, l.id, l.duration)
+	if err != nil {
+		return 0, err
+	}
+
+	return rl.RequestsCount, nil
 }
 
 func (l *limiter) loop(ctx context.Context) {
 	ticker := time.NewTicker(time.Second)
 	resetTicker := time.NewTicker(l.resetDuration)
 
-	l.log.WithField("duration", l.duration).Info("start loop")
+	l.log.WithField(durationKey, l.duration).Info("start loop")
 
 	for {
 		select {
@@ -142,7 +145,7 @@ func (l *limiter) loop(ctx context.Context) {
 				panic(err)
 			}
 		case <-ticker.C:
-			l.log.WithField("duration", l.duration).Trace("clean counters")
+			l.log.WithField(durationKey, l.duration).Trace("clean counters")
 
 			if err := l.repo.CleanCounters(context.Background(), l.id, l.duration); err != nil {
 				panic(err)
@@ -162,7 +165,7 @@ func (l *limiter) loop(ctx context.Context) {
 				panic(err)
 			}
 
-			l.log.WithField("duration", l.duration).Trace("reset threshold")
+			l.log.WithField(durationKey, l.duration).Trace("reset threshold")
 		}
 	}
 }

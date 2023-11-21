@@ -13,12 +13,28 @@ import (
 type requestLimiter interface {
 	AddCounter(ctx context.Context, id string, window time.Duration, counterTime time.Time) error
 	CleanCounters(ctx context.Context, id string, window time.Duration) error
-	GetCounters(ctx context.Context, id string, window time.Duration) (uint64, error)
 	SetThreshold(ctx context.Context, id string, window time.Duration) error
 	IncreaseThresholdTo(ctx context.Context, id string, window time.Duration, threshold uint64) error
-	GetThreshold(ctx context.Context, id string, window time.Duration) (uint64, error)
 	CheckIfExist(ctx context.Context, id string, window time.Duration) (bool, error)
 	Create(ctx context.Context, id string, window time.Duration, threshold uint64) error
+	GetRequestLimit(ctx context.Context, id string, window time.Duration) (common.RequestLimitData, error)
+}
+
+func (d *db) GetRequestLimit(ctx context.Context, id string, window time.Duration) (common.RequestLimitData, error) {
+	tx, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		return common.RequestLimitData{}, err
+	}
+
+	el, err := d.getRateLimit(tx, id, window)
+	if err != nil {
+		return common.RequestLimitData{}, err
+	}
+
+	return common.RequestLimitData{
+		RequestsCount: uint64(len(el.Requests)),
+		Threshold:     el.Threshold,
+	}, nil
 }
 
 func (d *db) AddCounter(ctx context.Context, id string, window time.Duration, counterTime time.Time) error {
@@ -80,20 +96,6 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 	}
 
 	return tx.Commit()
-}
-
-func (d *db) GetCounters(ctx context.Context, id string, window time.Duration) (uint64, error) {
-	tx, err := d.db.NewTransaction(ctx)
-	if err != nil {
-		return 0, err
-	}
-
-	el, err := d.getRateLimit(tx, id, window)
-	if err != nil {
-		return 0, err
-	}
-
-	return uint64(len(el.Requests)), nil
 }
 
 func (d *db) SetThreshold(ctx context.Context, id string, window time.Duration) error {
@@ -159,20 +161,6 @@ func (d *db) IncreaseThresholdTo(ctx context.Context, id string, window time.Dur
 	}
 
 	return tx.Commit()
-}
-
-func (d *db) GetThreshold(ctx context.Context, id string, window time.Duration) (uint64, error) {
-	tx, err := d.db.NewTransaction(ctx)
-	if err != nil {
-		return 0, err
-	}
-
-	el, err := d.getRateLimit(tx, id, window)
-	if err != nil {
-		return 0, err
-	}
-
-	return el.Threshold, nil
 }
 
 func (d *db) CheckIfExist(ctx context.Context, id string, window time.Duration) (bool, error) {

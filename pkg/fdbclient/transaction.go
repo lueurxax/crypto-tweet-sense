@@ -2,6 +2,7 @@ package fdbclient
 
 import (
 	"context"
+	"errors"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 )
@@ -16,10 +17,9 @@ type Transaction interface {
 }
 
 type transaction struct {
-	ctx      context.Context
-	tr       fdb.Transaction
-	readonly bool
-	calls    []func()
+	ctx   context.Context
+	tr    fdb.Transaction
+	calls []func()
 }
 
 func (t *transaction) GetRange(pr fdb.KeyRange, opts ...*RangeOptions) ([]fdb.KeyValue, error) {
@@ -33,7 +33,6 @@ func (t *transaction) GetIterator(pr fdb.KeyRange, opts ...*RangeOptions) *fdb.R
 }
 
 func (t *transaction) Clear(key []byte) {
-	t.readonly = false
 	t.calls = append(t.calls, func() {
 		t.tr.Clear(fdb.Key(key))
 	})
@@ -44,7 +43,6 @@ func (t *transaction) Get(key []byte) ([]byte, error) {
 }
 
 func (t *transaction) Set(key []byte, value []byte) (err error) {
-	t.readonly = false
 	t.calls = append(t.calls, func() {
 		t.tr.Set(fdb.Key(key), value)
 	})
@@ -53,10 +51,6 @@ func (t *transaction) Set(key []byte, value []byte) (err error) {
 }
 
 func (t *transaction) Commit() (err error) {
-	if t.readonly {
-		return nil
-	}
-
 	wrapped := func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -89,8 +83,8 @@ func (t *transaction) Commit() (err error) {
 			return
 		}
 
-		fe, ok := err.(fdb.Error)
-		if ok {
+		var fe fdb.Error
+		if errors.As(err, &fe) {
 			err = t.tr.OnError(fe).Get()
 		}
 
@@ -106,5 +100,5 @@ func NewTransaction(ctx context.Context, db fdb.Database) (Transaction, error) {
 		return nil, err
 	}
 
-	return &transaction{ctx: ctx, tr: tr, readonly: true}, nil
+	return &transaction{ctx: ctx, tr: tr}, nil
 }

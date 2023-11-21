@@ -11,6 +11,7 @@ import (
 	twitterscraper "github.com/n0madic/twitter-scraper"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
+	fdb "github.com/lueurxax/crypto-tweet-sense/internal/repo"
 	"github.com/lueurxax/crypto-tweet-sense/internal/tweetfinder/windowlimiter"
 )
 
@@ -19,7 +20,7 @@ const (
 	finderLogin = "finder_login"
 )
 
-func NewPoolFabric(ctx context.Context, config ConfigPool, pkgKey string, repo repo, logger log.Logger) (Finder, error) {
+func NewPoolFabric(ctx context.Context, config ConfigPool, pkgKey string, repo fdb.DB, logger log.Logger) (Finder, error) {
 	finders := make([]Finder, 0, len(config.XCreds))
 	delayManagerLogger := logger.WithField(pkgKey, "delay_manager")
 	limiterLogger := logger.WithField(pkgKey, "window_limiter")

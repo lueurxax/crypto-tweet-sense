@@ -18,17 +18,6 @@ type WindowLimiter interface {
 	Start(ctx context.Context, delay int64) error
 }
 
-type repo interface {
-	AddCounter(ctx context.Context, id string, window time.Duration, counterTime time.Time) error
-	CleanCounters(ctx context.Context, id string, window time.Duration) error
-	GetCounters(ctx context.Context, id string, window time.Duration) (uint64, error)
-	SetThreshold(ctx context.Context, id string, window time.Duration) error
-	GetThreshold(ctx context.Context, id string, window time.Duration) (uint64, error)
-	CheckIfExist(ctx context.Context, id string, window time.Duration) (bool, error)
-	Create(ctx context.Context, id string, window time.Duration, threshold uint64) error
-	IncreaseThresholdTo(ctx context.Context, id string, window time.Duration, threshold uint64) error
-}
-
 type managerV2 struct {
 	setter func(seconds int64)
 	delay  int64
@@ -122,7 +111,10 @@ func (m *managerV2) recalculate(ctx context.Context, factor int) error {
 
 		if recommendedDelay > 0 && delay != m.delay {
 			m.delay = delay
-			m.log.WithField("limiter_duration", limiter.Duration()).WithField(delayKey, m.delay).Debug("delay increased")
+			m.log.
+				WithField("limiter_duration", limiter.Duration()).
+				WithField(delayKey, m.delay).
+				Debug("delay increased")
 
 			break
 		}
@@ -134,6 +126,7 @@ func (m *managerV2) recalculate(ctx context.Context, factor int) error {
 		} else {
 			m.delay /= 2
 		}
+
 		m.log.WithField(delayKey, m.delay).Debug("delay decreased")
 	}
 
@@ -142,7 +135,12 @@ func (m *managerV2) recalculate(ctx context.Context, factor int) error {
 	return nil
 }
 
-func NewDelayManagerV2(setter func(seconds int64), windowLimiters []WindowLimiter, minimalDelay int64, log log.Logger) Manager {
+func NewDelayManagerV2(
+	setter func(seconds int64),
+	windowLimiters []WindowLimiter,
+	minimalDelay int64,
+	log log.Logger,
+) Manager {
 
 	return &managerV2{
 		forceRecalculate: make(chan struct{}, 1000),
