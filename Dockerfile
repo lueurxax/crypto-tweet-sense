@@ -1,13 +1,17 @@
+ARG FDB_VERSION
+FROM foundationdb/foundationdb:${FDB_VERSION} as fdb
 FROM golang:1.21
+ARG FDB_VERSION
 
-RUN apt-get update -q && apt-get install -yq git lld libc++-dev libc++abi-dev clang ca-certificates mono-complete wget cmake ninja-build
-RUN wget https://github.com/apple/foundationdb/releases/download/7.1.43/foundationdb-clients_7.1.43-1_amd64.deb
-RUN mkdir -p /var/lib/foundationdb
-RUN apt-get install -yq ./foundationdb-clients_7.1.43-1_amd64.deb
-WORKDIR /fdb
-RUN  git clone https://github.com/apple/foundationdb.git
-RUN  cd foundationdb && git checkout tags/7.1.43
-RUN CC=clang CXX=clang++ LD=lld cmake -S /fdb/foundationdb -B /fdb/cbuild_output  -D USE_LD=LLD -D USE_WERROR=ON  -D USE_LIBCXX=1 -G Ninja && ninja -C /fdb/cbuild_output
+WORKDIR /tmp
+
+RUN apt-get update
+# dnsutils is needed to have dig installed to create cluster file
+RUN apt-get install -y --no-install-recommends ca-certificates dnsutils
+
+RUN wget "https://github.com/apple/foundationdb/releases/download/${FDB_VERSION}/foundationdb-clients_${FDB_VERSION}-1_amd64.deb"
+RUN dpkg -i foundationdb-clients_${FDB_VERSION}-1_amd64.deb
+
 
 ARG GOPROXY
 ENV \

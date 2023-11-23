@@ -15,4 +15,4 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag crypto-tweet-sense:$(date +%s) --build-arg="VERSION=$(date +%s)"
+      run: docker build . --file Dockerfile --tag crypto-tweet-sense:$(date +%s) --build-arg="VERSION=$(date +%s),FDB_VERSION=7.3.27"
