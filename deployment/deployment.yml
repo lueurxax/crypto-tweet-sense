@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
         - name: twitter-exp
-          image: ghcr.io/lueurxax/crypto-tweet-sense:latest
+          image: ghcr.io/lueurxax/crypto-tweet-sense:v0.0.2
           env:
             - name: LOG_LEVEL
               value: trace
