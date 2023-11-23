@@ -23,10 +23,6 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/path: "/metrics"
         prometheus.io/port: "8080"
-        co.elastic.logs/json.keys_under_root: "true"
-        co.elastic.logs/json.overwrite_keys: "true"
-        co.elastic.logs/json.add_error_key: "true"
-        co.elastic.logs/json.expand_keys: "true"
     spec:
       containers:
         - name: twitter-exp
@@ -37,7 +33,7 @@ spec:
             - name: TOP_COUNT
               value: "2000"
             - name: LOG_TO_ECS
-              value: "true"
+              value: "false"
             - name: SESSION_FILE
               value: "/etc/telegram/session.json"
           volumeMounts:

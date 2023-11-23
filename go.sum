@@ -68,6 +68,8 @@ github.com/antonfisher/nested-logrus-formatter v1.3.1 h1:NFJIr+pzwv5QLHTPyKz9UME
 github.com/antonfisher/nested-logrus-formatter v1.3.1/go.mod h1:6WTfyWFkBc9+zyBaKIqRrg/KwMqBbodBjgbHjDz7zjA=
 github.com/apple/foundationdb/bindings/go v0.0.0-20230508183941-1098aa0251f4 h1:UG70EEUB0GTPbKdCd5GfEUJI5NJV/Y2uaf/qvX0UaDE=
 github.com/apple/foundationdb/bindings/go v0.0.0-20230508183941-1098aa0251f4/go.mod h1:w63jdZTFCtvdjsUj5yrdKgjxaAD5uXQX6hJ7EaiLFRs=
+github.com/apple/foundationdb/bindings/go v0.0.0-20231107151356-57ccdb8fee6d h1:qvsLbkjlCyFH875/h2dALvbkLZ/LasZBpek6fTlcJRw=
+github.com/apple/foundationdb/bindings/go v0.0.0-20231107151356-57ccdb8fee6d/go.mod h1:OMVSB21p9+xQUIqlGizHPZfjK+SHws1ht+ZytVDoz9U=
 github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e/go.mod h1:3U/XgcO3hCbHZ8TKRvWD2dDTCfh9M9ya+I9JpbB7O8o=
 github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmVTwzkszR9V5SSuryQ31EELlFMUz1kKyl939pY=
 github.com/armon/go-metrics v0.3.10/go.mod h1:4O98XIr/9W0sxpJ8UaYkvjk10Iff7SnFrb4QAOwNTFc=
@@ -335,6 +337,8 @@ github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRW
 github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/n0madic/twitter-scraper v0.0.0-20231012104931-652b5b5115a4 h1:U+UOzbyHe3Y5I/rSCUPsBKfVDq5YaMHWyLpljFU+B3I=
 github.com/n0madic/twitter-scraper v0.0.0-20231012104931-652b5b5115a4/go.mod h1:qoLNLwgpaGspT8E82iwzof9xGsQTg35j36PlXrD3R4o=
+github.com/n0madic/twitter-scraper v0.0.0-20231104223941-296710769dd8 h1:yToM7p7HL/WwEESkupFV3Nf7a8d80CHaKRoFNstGA2U=
+github.com/n0madic/twitter-scraper v0.0.0-20231104223941-296710769dd8/go.mod h1:qoLNLwgpaGspT8E82iwzof9xGsQTg35j36PlXrD3R4o=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pascaldekloe/goe v0.1.0/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pelletier/go-toml v1.9.5/go.mod h1:u1nR/EPcESfeI/szUZKdtJ0xRNbUoANCkoOuaOx1Y+c=
@@ -375,6 +379,8 @@ github.com/ryanuber/columnize v0.0.0-20160712163229-9b3edd62028f/go.mod h1:sm1tb
 github.com/sagikazarmark/crypt v0.6.0/go.mod h1:U8+INwJo3nBv1m6A/8OBXAq7Jnpspk5AxSgDyEQcea8=
 github.com/sashabaranov/go-openai v1.17.5 h1:ItBzlrrfTtkFWOFlgfOhk3y/xRBC4PJol4gdbiK7hgg=
 github.com/sashabaranov/go-openai v1.17.5/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
+github.com/sashabaranov/go-openai v1.17.8 h1:snuE7l0XQ1KAmkY/cODAEgxu2fl+g/ybXK6cKQzli/E=
+github.com/sashabaranov/go-openai v1.17.8/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
 github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529/go.mod h1:DxrIzT+xaE7yg65j358z/aeFdxmN0P9QXhEzd20vsDc=
 github.com/segmentio/asm v1.2.0 h1:9BQrFxC+YOHJlTlHGkTrFWf59nbL3XnCoFLTwDCI7ys=
 github.com/segmentio/asm v1.2.0/go.mod h1:BqMnlJP91P8d+4ibuonYZw9mfnzI9HfxselHZr5aAcs=
