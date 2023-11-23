@@ -29,8 +29,4 @@ ADD . .
 ARG VERSION
 RUN go build -v -ldflags="-w -s -X main.version=${VERSION}" -o /bin/crypto-tweet-sense cmd/botV2/*.go
 
-FROM debian:buster
-RUN apt-get update -q && apt-get install -yq ca-certificates
-ENV PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-COPY --from=0 /bin /bin
 CMD /bin/crypto-tweet-sense
