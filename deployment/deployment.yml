@@ -1,0 +1,47 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: crypto-tweet-sense
+  name: twitter-exp
+spec:
+  replicas: 1
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: twitter-exp
+  template:
+    metadata:
+      name: twitter-exp
+      labels:
+        app: twitter-exp
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: twitter-exp
+          image: ghcr.io/lueurxax/crypto-tweet-sense:v0.0.2
+          env:
+            - name: LOG_LEVEL
+              value: trace
+            - name: TOP_COUNT
+              value: "2000"
+            - name: LOG_TO_ECS
+              value: "false"
+            - name: SESSION_FILE
+              value: "/etc/telegram/.session.json"
+          volumeMounts:
+            - name: session
+              mountPath: /etc/telegram/
+      volumes:
+        - name: session
+          configMap:
+            name: telegram-session
+      imagePullSecrets:
+        - name: regcred
