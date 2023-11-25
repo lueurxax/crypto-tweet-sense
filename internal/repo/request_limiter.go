@@ -86,7 +86,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 
 	requests := make([]common.RequestTime, 0, len(el.Requests))
 	requestData := make([]int32, 0, len(el.Requests))
-	newStart := time.Now()
+	newStart := time.Now().Add(-window)
 
 	for _, key := range el.Requests {
 		tt := time.Time(key)
