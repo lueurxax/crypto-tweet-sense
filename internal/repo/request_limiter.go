@@ -93,6 +93,8 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		}
 	}
 
+	el.RequestsOld = nil
+
 	el.Requests = &common.Requests{
 		Data:  requestData,
 		Start: newStart,
