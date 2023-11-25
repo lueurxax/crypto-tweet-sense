@@ -6,6 +6,7 @@ import (
 
 type RequestLimits struct {
 	WindowSeconds uint64
+	RequestsOld   []byte    `json:"requests,omitempty"`
 	Requests      *Requests `json:"requests_v2,omitempty"`
 	Threshold     uint64
 }
