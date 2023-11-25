@@ -9,8 +9,14 @@ const requestTimeFormat = "02T15:04:05"
 
 type RequestLimits struct {
 	WindowSeconds uint64
-	Requests      []RequestTime `json:"requests"`
+	Requests      []RequestTime `json:"requests,omitempty"`
+	RequestsV2    *Requests     `json:"requests_v2,omitempty"`
 	Threshold     uint64
+}
+
+type Requests struct {
+	Data  []int32   `json:"data"`
+	Start time.Time `json:"start"`
 }
 
 type RequestTime time.Time
