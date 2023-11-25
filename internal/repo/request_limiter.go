@@ -52,7 +52,7 @@ func (d *db) AddCounter(ctx context.Context, id string, window time.Duration, co
 		return err
 	}
 
-	el.Requests = append(el.Requests, counterTime)
+	el.Requests = append(el.Requests, common.RequestTime(counterTime))
 
 	data, err := jsoniter.Marshal(el)
 	if err != nil {
@@ -79,16 +79,15 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		return err
 	}
 
-	requests := make([]time.Time, 0, len(el.Requests))
+	requests := make([]common.RequestTime, 0, len(el.Requests))
 
 	for _, key := range el.Requests {
-		if time.Since(key) < window {
+		if time.Since(time.Time(key)) < window {
 			requests = append(requests, key)
 		}
 	}
 
 	el.Requests = requests
-	el.CurrentRequests = nil
 
 	data, err := jsoniter.Marshal(el)
 	if err != nil {
@@ -206,7 +205,7 @@ func (d *db) Create(ctx context.Context, id string, window time.Duration, thresh
 
 	el := &common.RequestLimits{
 		WindowSeconds: uint64(window.Seconds()),
-		Requests:      make([]time.Time, 0),
+		Requests:      make([]common.RequestTime, 0),
 		Threshold:     threshold,
 	}
 
