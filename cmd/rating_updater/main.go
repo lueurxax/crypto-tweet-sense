@@ -81,7 +81,6 @@ func main() {
 		cfg.AppID,
 		cfg.AppHash,
 		cfg.Phone,
-		cfg.SessionFile,
 		st,
 		logger.WithField(pkgKey, "rating_fetcher"),
 	)
