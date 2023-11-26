@@ -113,6 +113,10 @@ func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot,
 	var result *common.TweetSnapshot
 
 	for _, kv := range kvs {
+		if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
+			continue
+		}
+
 		tweet := new(common.TweetSnapshot)
 		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
 			return nil, err
@@ -161,6 +165,7 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 		if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
 			continue
 		}
+
 		tweet := new(common.TweetSnapshot)
 		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
 			return nil, err
@@ -222,6 +227,10 @@ func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, e
 	var result *common.TweetSnapshot
 
 	for _, kv := range kvs {
+		if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
+			continue
+		}
+
 		tweet := new(common.TweetSnapshot)
 		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
 			return nil, err
@@ -263,6 +272,10 @@ func (d *db) GetTweetsOlderThen(ctx context.Context, after time.Time) ([]*common
 	var result []*common.TweetSnapshot
 
 	for _, kv := range kvs {
+		if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
+			continue
+		}
+
 		tweet := new(common.TweetSnapshot)
 		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
 			return nil, err
