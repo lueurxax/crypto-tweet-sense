@@ -61,9 +61,7 @@ func (d *db) AddCounter(ctx context.Context, id string, window time.Duration, co
 
 	d.log.WithField("request_limits", el).Trace("add counter")
 
-	if err = tx.Set(d.keyBuilder.RequestLimits(id, window), data); err != nil {
-		return err
-	}
+	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
 
 	return tx.Commit()
 }
@@ -105,9 +103,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		return err
 	}
 
-	if err = tx.Set(d.keyBuilder.RequestLimits(id, window), data); err != nil {
-		return err
-	}
+	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
 
 	return tx.Commit()
 }
@@ -134,9 +130,7 @@ func (d *db) SetThreshold(ctx context.Context, id string, window time.Duration) 
 		return err
 	}
 
-	if err = tx.Set(d.keyBuilder.RequestLimits(id, window), data); err != nil {
-		return err
-	}
+	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
 
 	return tx.Commit()
 }
@@ -170,9 +164,7 @@ func (d *db) IncreaseThresholdTo(ctx context.Context, id string, window time.Dur
 		return err
 	}
 
-	if err = tx.Set(d.keyBuilder.RequestLimits(id, window), data); err != nil {
-		return err
-	}
+	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
 
 	return tx.Commit()
 }
@@ -225,9 +217,7 @@ func (d *db) Create(ctx context.Context, id string, window time.Duration, thresh
 		return err
 	}
 
-	if err = tx.Set(key, data); err != nil {
-		return err
-	}
+	tx.Set(key, data)
 
 	return tx.Commit()
 }

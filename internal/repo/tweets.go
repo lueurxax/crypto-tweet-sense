@@ -17,6 +17,37 @@ type tweetRepo interface {
 	GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, error)
 	GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error)
 	GetTweetsOlderThen(ctx context.Context, after time.Time) ([]*common.TweetSnapshot, error)
+	SaveSentTweet(ctx context.Context, link string) error
+	CheckIfSentTweetExist(ctx context.Context, link string) (bool, error)
+}
+
+func (d *db) SaveSentTweet(ctx context.Context, link string) error {
+	tr, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		return err
+	}
+
+	tr.Set(d.keyBuilder.SentTweet(link), []byte{})
+
+	return tr.Commit()
+}
+
+func (d *db) CheckIfSentTweetExist(ctx context.Context, link string) (bool, error) {
+	tr, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	data, err := tr.Get(d.keyBuilder.SentTweet(link))
+	if err != nil {
+		return false, err
+	}
+
+	if err = tr.Commit(); err != nil {
+		return false, err
+	}
+
+	return data != nil, nil
 }
 
 func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
@@ -49,9 +80,7 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 			return err
 		}
 
-		if err = tr.Set(key, data); err != nil {
-			return err
-		}
+		tr.Set(key, data)
 	}
 
 	return tr.Commit()

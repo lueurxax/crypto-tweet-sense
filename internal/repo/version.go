@@ -19,9 +19,7 @@ func (d *db) WriteVersion(ctx context.Context, version uint32) error {
 	data := make([]byte, binary.Size(version))
 	binary.BigEndian.PutUint32(data, version)
 
-	if err = tr.Set(d.keyBuilder.Version(), data); err != nil {
-		return err
-	}
+	tr.Set(d.keyBuilder.Version(), data)
 
 	return tr.Commit()
 }

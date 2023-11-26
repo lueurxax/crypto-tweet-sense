@@ -12,6 +12,7 @@ type DB interface {
 	version
 	tweetRepo
 	requestLimiter
+	ratingRepo
 }
 
 type db struct {

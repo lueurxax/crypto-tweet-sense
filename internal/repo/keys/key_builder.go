@@ -10,9 +10,24 @@ type Builder interface {
 	Tweets() []byte
 	Tweet(id string) []byte
 	RequestLimits(id string, window time.Duration) []byte
+	TweetUsernameRatingKey(username string) []byte
+	TweetRatings() []byte
+	SentTweet(link string) []byte
 }
 
 type builder struct {
+}
+
+func (b builder) SentTweet(link string) []byte {
+	return append([]byte{sentTweet}, []byte(link)...)
+}
+
+func (b builder) TweetRatings() []byte {
+	return []byte{tweetRating}
+}
+
+func (b builder) TweetUsernameRatingKey(username string) []byte {
+	return append([]byte{tweetRating}, []byte(username)...)
 }
 
 func (b builder) RequestLimits(id string, window time.Duration) []byte {

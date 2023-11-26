@@ -9,7 +9,7 @@ import (
 
 type Transaction interface {
 	Get(key []byte) (value []byte, err error)
-	Set(key []byte, value []byte) (err error)
+	Set(key []byte, value []byte)
 	Clear(key []byte)
 	Commit() (err error)
 	GetRange(pr fdb.KeyRange, opts ...*RangeOptions) ([]fdb.KeyValue, error)
@@ -42,12 +42,10 @@ func (t *transaction) Get(key []byte) ([]byte, error) {
 	return t.tr.Get(fdb.Key(key)).Get()
 }
 
-func (t *transaction) Set(key []byte, value []byte) (err error) {
+func (t *transaction) Set(key []byte, value []byte) {
 	t.calls = append(t.calls, func() {
 		t.tr.Set(fdb.Key(key), value)
 	})
-
-	return
 }
 
 func (t *transaction) Commit() (err error) {

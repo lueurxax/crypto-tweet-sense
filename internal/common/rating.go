@@ -1,4 +1,4 @@
-package models
+package common
 
 type Rating struct {
 	Likes    int
