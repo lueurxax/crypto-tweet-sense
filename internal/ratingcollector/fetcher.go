@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/term"
 
+	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 	"github.com/lueurxax/crypto-tweet-sense/internal/ratingcollector/models"
 )
@@ -35,8 +36,8 @@ const (
 type Fetcher interface {
 	Auth(ctx context.Context) error
 	Stop() error
-	FetchRatingsAndUnique(ctx context.Context, id int64) (map[string]*models.Rating, map[string]struct{}, error)
-	Subscribe(ctx context.Context, id int64) chan *models.UsernameRating
+	FetchRatingsAndSave(ctx context.Context, id int64) error
+	SubscribeAndSave(ctx context.Context, id int64)
 }
 
 type messageParser interface {
@@ -44,10 +45,18 @@ type messageParser interface {
 	ParseLink(message *tg.Message) (string, error)
 }
 
+type repo interface {
+	SaveRatings(ctx context.Context, ratings []common.UsernameRating) error
+	SaveSentTweet(ctx context.Context, link string) error
+	GetRating(ctx context.Context, username string) (common.Rating, error)
+}
+
 type fetcher struct {
 	client           *telegram.Client
 	gaps             *updates.Manager
 	updateDispatcher tg.UpdateDispatcher
+
+	repo
 
 	messageParser
 
@@ -57,13 +66,112 @@ type fetcher struct {
 	stop bg.StopFunc
 }
 
-func (f *fetcher) Subscribe(_ context.Context, id int64) chan *models.UsernameRating {
-	res := make(chan *models.UsernameRating, limit)
+func (f *fetcher) FetchRatingsAndSave(ctx context.Context, id int64) error {
+	chls, err := f.client.API().MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{Limit: limit, OffsetPeer: &tg.InputPeerEmpty{}})
+	if err != nil {
+		return err
+	}
 
+	var (
+		ch *tg.Channel
+		ok bool
+	)
+
+	dialogs, ok := chls.(*tg.MessagesDialogsSlice)
+	if !ok {
+		return models.ErrIncorrectTypeOfResponse
+	}
+
+	for _, chl := range dialogs.Chats {
+		ch, ok = chl.(*tg.Channel)
+		if ok && ch.ID == id {
+			break
+		}
+	}
+
+	offset := 0
+
+	const limit = 100
+
+	ratingsMap := map[string]int{}
+
+	ratings := make([]common.UsernameRating, 0)
+
+	for {
+		raw, err := f.client.API().MessagesGetHistory(ctx, &tg.MessagesGetHistoryRequest{
+			Peer: &tg.InputPeerChannel{
+				ChannelID:  ch.ID,
+				AccessHash: ch.AccessHash,
+			},
+			Limit:     limit,
+			AddOffset: offset,
+		})
+		if err != nil {
+			return err
+		}
+
+		messages, ok := raw.(*tg.MessagesChannelMessages)
+		if !ok {
+			return models.ErrIncorrectTypeOfResponse
+		}
+
+		for _, m := range messages.Messages {
+			tgmes, ok := m.(*tg.Message)
+			if !ok {
+				continue
+			}
+
+			link, err := f.messageParser.ParseLink(tgmes)
+			if err != nil {
+				if errors.Is(err, models.ErrLinkNotFound) {
+					continue
+				}
+
+				return err
+			}
+
+			if err = f.repo.SaveSentTweet(ctx, link); err != nil {
+				return err
+			}
+
+			username, err := f.messageParser.ParseUsername(tgmes)
+			if err != nil {
+				if errors.Is(err, models.ErrUsernameNotFound) {
+					continue
+				}
+
+				return err
+			}
+
+			likes, dislikes := f.parseReactions(tgmes.Reactions.Results)
+
+			index, ok := ratingsMap[username]
+			if !ok {
+				ratings = append(ratings, common.UsernameRating{Username: username, Rating: &common.Rating{}})
+				index = len(ratings) - 1
+				ratingsMap[username] = index
+			}
+
+			ratings[index].Likes += likes
+			ratings[index].Dislikes += dislikes
+		}
+
+		if len(messages.Messages) < limit {
+			break
+		}
+
+		offset += limit
+
+		time.Sleep(time.Second)
+	}
+
+	return f.repo.SaveRatings(ctx, ratings)
+}
+
+func (f *fetcher) SubscribeAndSave(_ context.Context, id int64) {
 	f.updateDispatcher.OnMessageReactions(func(ctx context.Context, e tg.Entities, update *tg.UpdateMessageReactions) error {
 		select {
 		case <-ctx.Done():
-			close(res)
 			return ctx.Err()
 		default:
 		}
@@ -106,121 +214,20 @@ func (f *fetcher) Subscribe(_ context.Context, id int64) chan *models.UsernameRa
 				return err
 			}
 			likes, dislikes := f.parseReactions(tgmes.Reactions.Results)
-			rating := &models.UsernameRating{
+			rating := &common.UsernameRating{
 				Username: username,
-				Rating: &models.Rating{
+				Rating: &common.Rating{
 					Likes:    likes,
 					Dislikes: dislikes,
 				},
 			}
-			res <- rating
+			if err = f.repo.SaveRatings(ctx, []common.UsernameRating{*rating}); err != nil {
+				return err
+			}
 		}
 
 		return nil
 	})
-
-	return res
-}
-
-//nolint:funlen
-func (f *fetcher) FetchRatingsAndUnique(ctx context.Context, id int64) (map[string]*models.Rating, map[string]struct{}, error) {
-	chls, err := f.client.API().MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{Limit: limit, OffsetPeer: &tg.InputPeerEmpty{}})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var (
-		ch *tg.Channel
-		ok bool
-	)
-
-	dialogs, ok := chls.(*tg.MessagesDialogsSlice)
-	if !ok {
-		return nil, nil, models.ErrIncorrectTypeOfResponse
-	}
-
-	for _, chl := range dialogs.Chats {
-		ch, ok = chl.(*tg.Channel)
-		if ok && ch.ID == id {
-			break
-		}
-	}
-
-	offset := 0
-
-	const limit = 100
-
-	ratings := map[string]*models.Rating{}
-
-	uniqueLinks := map[string]struct{}{}
-
-	for {
-		raw, err := f.client.API().MessagesGetHistory(ctx, &tg.MessagesGetHistoryRequest{
-			Peer: &tg.InputPeerChannel{
-				ChannelID:  ch.ID,
-				AccessHash: ch.AccessHash,
-			},
-			Limit:     limit,
-			AddOffset: offset,
-		})
-		if err != nil {
-			return nil, nil, err
-		}
-
-		messages, ok := raw.(*tg.MessagesChannelMessages)
-		if !ok {
-			return nil, nil, models.ErrIncorrectTypeOfResponse
-		}
-
-		for _, m := range messages.Messages {
-			tgmes, ok := m.(*tg.Message)
-			if !ok {
-				continue
-			}
-
-			link, err := f.messageParser.ParseLink(tgmes)
-			if err != nil {
-				if errors.Is(err, models.ErrLinkNotFound) {
-					continue
-				}
-
-				return nil, nil, err
-			}
-
-			uniqueLinks[link] = struct{}{}
-
-			username, err := f.messageParser.ParseUsername(tgmes)
-			if err != nil {
-				if errors.Is(err, models.ErrUsernameNotFound) {
-					continue
-				}
-
-				return nil, nil, err
-			}
-
-			likes, dislikes := f.parseReactions(tgmes.Reactions.Results)
-
-			rating, ok := ratings[username]
-			if !ok {
-				rating = &models.Rating{}
-			}
-
-			rating.Likes += likes
-			rating.Dislikes += dislikes
-
-			ratings[username] = rating
-		}
-
-		if len(messages.Messages) < limit {
-			break
-		}
-
-		offset += 100
-
-		time.Sleep(time.Second)
-	}
-
-	return ratings, uniqueLinks, nil
 }
 
 func (f *fetcher) parseReactions(results []tg.ReactionCount) (likes, dislikes int) {
@@ -287,7 +294,7 @@ func (f *fetcher) run(ctx context.Context, user *tg.User) {
 	}
 }
 
-func NewFetcher(appID int, appHash, phone, sessionFile string, logger log.Logger) Fetcher {
+func NewFetcher(appID int, appHash, phone, sessionFile string, repo repo, logger log.Logger) Fetcher {
 	d := tg.NewUpdateDispatcher()
 	gaps := updates.New(updates.Config{
 		Handler: d,
@@ -320,6 +327,7 @@ func NewFetcher(appID int, appHash, phone, sessionFile string, logger log.Logger
 		client:           client,
 		gaps:             gaps,
 		updateDispatcher: d,
+		repo:             repo,
 		messageParser:    newParser(),
 		phone:            phone,
 		log:              logger,

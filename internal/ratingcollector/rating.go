@@ -2,21 +2,18 @@ package ratingcollector
 
 import (
 	"context"
-	"sync"
+	"errors"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
-	"github.com/lueurxax/crypto-tweet-sense/internal/ratingcollector/models"
 )
 
 type RatingChecker interface {
 	Check(ctx context.Context, tweet *common.TweetSnapshot) (bool, float64, error)
 	CurrentTop() float64
-	CollectRatings(<-chan *models.UsernameRating)
 }
 
 type checker struct {
-	rating   map[string]*models.Rating
-	mu       *sync.RWMutex
+	repo
 	topCount int
 }
 
@@ -24,40 +21,28 @@ func (c *checker) CurrentTop() float64 {
 	return float64(c.topCount)
 }
 
-func (c *checker) CollectRatings(ratings <-chan *models.UsernameRating) {
-	go c.loop(ratings)
-}
-
-func (c *checker) loop(ratings <-chan *models.UsernameRating) {
-	for rating := range ratings {
-		c.mu.Lock()
-		c.rating[rating.Username] = rating.Rating
-		c.mu.Unlock()
-	}
-}
-
-func (c *checker) Check(_ context.Context, tweet *common.TweetSnapshot) (bool, float64, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+func (c *checker) Check(ctx context.Context, tweet *common.TweetSnapshot) (bool, float64, error) {
 	liveDuration := tweet.CheckedAt.Sub(tweet.TimeParsed).Seconds()
 
 	likes := float64(tweet.Likes)
 
-	rating, ok := c.rating[tweet.Username]
-	if !ok {
-		return tweet.Likes > c.topCount, likes / liveDuration, nil
+	rating, err := c.repo.GetRating(ctx, tweet.Username)
+	if err != nil {
+		if errors.Is(err, common.ErrRatingNotFound) {
+			return tweet.Likes > c.topCount, likes / liveDuration, nil
+		}
+
+		return false, 0, err
 	}
 
-	raiting := likes * (1.0 + float64(rating.Likes-rating.Dislikes)/10.0)
+	rate := likes * (1.0 + float64(rating.Likes-rating.Dislikes)/10.0)
 
-	return raiting > float64(c.topCount), raiting / liveDuration, nil
+	return rate > float64(c.topCount), rate / liveDuration, nil
 }
 
-func NewChecker(rating map[string]*models.Rating, topCount int) RatingChecker {
+func NewChecker(db repo, topCount int) RatingChecker {
 	return &checker{
-		rating:   rating,
-		mu:       &sync.RWMutex{},
+		repo:     db,
 		topCount: topCount,
 	}
 }

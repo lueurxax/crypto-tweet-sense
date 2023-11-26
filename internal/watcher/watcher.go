@@ -25,7 +25,7 @@ const (
 type Watcher interface {
 	Watch()
 	Subscribe() <-chan string
-	RawSubscribe() <-chan string
+	RawSubscribe() <-chan *common.Tweet
 }
 
 type finder interface {
@@ -40,6 +40,8 @@ type repo interface {
 	GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, error)
 	GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error)
 	GetTweetsOlderThen(ctx context.Context, after time.Time) ([]*common.TweetSnapshot, error)
+	CheckIfSentTweetExist(ctx context.Context, link string) (bool, error)
+	SaveSentTweet(ctx context.Context, link string) error
 }
 
 type ratingChecker interface {
@@ -56,17 +58,15 @@ type watcher struct {
 
 	subMu          sync.RWMutex
 	subscribers    []chan string
-	rawSubscribers []chan string
-
-	published map[string]struct{}
+	rawSubscribers []chan *common.Tweet
 
 	logger log.Logger
 }
 
-func (w *watcher) RawSubscribe() <-chan string {
+func (w *watcher) RawSubscribe() <-chan *common.Tweet {
 	w.subMu.Lock()
 
-	subscriber := make(chan string, bufferSize)
+	subscriber := make(chan *common.Tweet, bufferSize)
 	w.rawSubscribers = append(w.rawSubscribers, subscriber)
 
 	w.subMu.Unlock()
@@ -162,7 +162,12 @@ func (w *watcher) formatTweet(tweet common.TweetSnapshot) (str string) {
 }
 
 func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot, lastTweet time.Time) (time.Time, float64) {
-	if _, ok := w.published[tweet.PermanentURL]; ok {
+	isExist, err := w.repo.CheckIfSentTweetExist(ctx, tweet.PermanentURL)
+	if err != nil {
+		w.logger.WithError(err).Error("check tweet if sent")
+		return lastTweet, 0
+	}
+	if isExist {
 		return lastTweet, 0
 	}
 
@@ -177,7 +182,7 @@ func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot,
 		w.logger.WithField(subscribersKey, len(w.rawSubscribers)).Debug("send raw tweet")
 
 		for j := range w.rawSubscribers {
-			w.rawSubscribers[j] <- tweet.Text
+			w.rawSubscribers[j] <- tweet.Tweet
 		}
 
 		w.logger.WithField(subscribersKey, len(w.subscribers)).Debug("send formatted tweet")
@@ -192,7 +197,9 @@ func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot,
 			WithField("text", tweet.Text).
 			Debug("found tweet")
 
-		w.published[tweet.PermanentURL] = struct{}{}
+		if err = w.repo.SaveSentTweet(ctx, tweet.PermanentURL); err != nil {
+			w.logger.WithError(err).Error("save sent tweet")
+		}
 	}
 
 	if lastTweet.Before(tweet.TimeParsed) {
@@ -320,7 +327,7 @@ func (w *watcher) cleanTooOldTweets(ctx context.Context) error {
 	return nil
 }
 
-func NewWatcher(finder finder, repo repo, checker ratingChecker, initPublished map[string]struct{}, logger log.Logger) Watcher {
+func NewWatcher(finder finder, repo repo, checker ratingChecker, logger log.Logger) Watcher {
 	start := time.Now().AddDate(0, 0, -1)
 
 	return &watcher{
@@ -335,8 +342,7 @@ func NewWatcher(finder finder, repo repo, checker ratingChecker, initPublished m
 		ratingChecker:  checker,
 		subMu:          sync.RWMutex{},
 		subscribers:    make([]chan string, 0),
-		rawSubscribers: make([]chan string, 0),
-		published:      initPublished,
+		rawSubscribers: make([]chan *common.Tweet, 0),
 		logger:         logger,
 	}
 }

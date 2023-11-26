@@ -27,6 +27,6 @@ RUN go mod download -x
 ADD . .
 
 ARG VERSION
-RUN go build -v -ldflags="-w -s -X main.version=${VERSION}" -o /bin/crypto-tweet-sense cmd/botV2/*.go
+RUN go build -v -ldflags="-w -s -X main.version=${VERSION}" -o /bin/crypto-tweet-sense cmd/rating_updater/*.go
 
 CMD /bin/crypto-tweet-sense

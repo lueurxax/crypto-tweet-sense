@@ -33,19 +33,18 @@ const (
 )
 
 type config struct {
-	LoggerLevel        logrus.Level  `envconfig:"LOG_LEVEL" default:"info"`
-	LogToEcs           bool          `envconfig:"LOG_TO_ECS" default:"false"`
-	TopCount           int           `envconfig:"TOP_COUNT" default:"1000"`
-	SessionFile        string        `envconfig:"SESSION_FILE" required:"true"`
-	BotToken           string        `envconfig:"BOT_TOKEN" required:"true"`
-	ChannelID          int64         `envconfig:"CHANNEL_ID" required:"true"`
-	ChatID             int64         `envconfig:"CHAT_ID" required:"true"`
-	AppID              int           `envconfig:"APP_ID" required:"true"`
-	AppHash            string        `envconfig:"APP_HASH" required:"true"`
-	Phone              string        `envconfig:"PHONE" required:"true"`
-	ChatGPTToken       string        `envconfig:"CHAT_GPT_TOKEN" required:"true"`    // OpenAI token
-	EditorSendInterval time.Duration `envconfig:"EDITOR_SEND_INTERVAL" default:"2h"` // Interval to send edited tweets to telegram
-	DatabasePath       string        `default:"/usr/local/etc/foundationdb/fdb.cluster"`
+	LoggerLevel                logrus.Level  `envconfig:"LOG_LEVEL" default:"info"`
+	LogToEcs                   bool          `envconfig:"LOG_TO_ECS" default:"false"`
+	TopCount                   int           `envconfig:"TOP_COUNT" default:"1000"`
+	BotToken                   string        `envconfig:"BOT_TOKEN" required:"true"`
+	ChatID                     int64         `envconfig:"CHAT_ID" required:"true"`
+	AppID                      int           `envconfig:"APP_ID" required:"true"`
+	AppHash                    string        `envconfig:"APP_HASH" required:"true"`
+	Phone                      string        `envconfig:"PHONE" required:"true"`
+	ChatGPTToken               string        `envconfig:"CHAT_GPT_TOKEN" required:"true"`              // OpenAI token
+	EditorSendInterval         time.Duration `envconfig:"EDITOR_SEND_INTERVAL" default:"30m"`          // Interval to send edited tweets to telegram
+	EditorCleanContextInterval time.Duration `envconfig:"EDITOR_CLEAN_CONTEXT_INTERVAL" default:"24h"` // Interval to clean chatgpt context
+	DatabasePath               string        `default:"/usr/local/etc/foundationdb/fdb.cluster"`
 }
 
 func main() {
@@ -89,29 +88,7 @@ func main() {
 
 	st := fdb.NewDB(db, logrusLogger.WithField(pkgKey, "fdb"))
 
-	ratingFetcher := ratingCollector.NewFetcher(
-		cfg.AppID,
-		cfg.AppHash,
-		cfg.Phone,
-		cfg.SessionFile,
-		logger.WithField(pkgKey, "rating_fetcher"),
-	)
-	if err := ratingFetcher.Auth(ctx); err != nil {
-		panic(err)
-	}
-
-	defer func() {
-		if err := ratingFetcher.Stop(); err != nil {
-			logger.Error(err)
-		}
-	}()
-
-	res, links, err := ratingFetcher.FetchRatingsAndUnique(ctx, cfg.ChannelID)
-	if err != nil {
-		panic(err)
-	}
-
-	checker := ratingCollector.NewChecker(res, cfg.TopCount)
+	checker := ratingCollector.NewChecker(st, cfg.TopCount)
 
 	xConfig := tweetFinder.GetConfigPool()
 
@@ -120,9 +97,7 @@ func main() {
 		panic(err)
 	}
 
-	watch := watcher.NewWatcher(finder, st, checker, links, logger.WithField(pkgKey, "watcher"))
-
-	checker.CollectRatings(ratingFetcher.Subscribe(ctx, cfg.ChannelID))
+	watch := watcher.NewWatcher(finder, st, checker, logger.WithField(pkgKey, "watcher"))
 
 	api, err := telebot.NewBot(
 		telebot.Settings{Token: cfg.BotToken, Poller: &telebot.LongPoller{Timeout: 10 * time.Second}},
@@ -137,6 +112,7 @@ func main() {
 	editor := tweetseditor.NewEditor(
 		openai.NewClient(cfg.ChatGPTToken),
 		cfg.EditorSendInterval,
+		cfg.EditorCleanContextInterval,
 		logger.WithField(pkgKey, "editor"),
 	)
 	editor.Edit(ctx, watch.RawSubscribe())
