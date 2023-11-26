@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gotd/contrib/bg"
-	"github.com/gotd/td/session"
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
 	"github.com/gotd/td/telegram/updates"
@@ -49,6 +48,9 @@ type repo interface {
 	SaveRatings(ctx context.Context, ratings []common.UsernameRating) error
 	SaveSentTweet(ctx context.Context, link string) error
 	GetRating(ctx context.Context, username string) (common.Rating, error)
+
+	LoadSession(ctx context.Context) ([]byte, error)
+	StoreSession(ctx context.Context, data []byte) error
 }
 
 type fetcher struct {
@@ -294,7 +296,7 @@ func (f *fetcher) run(ctx context.Context, user *tg.User) {
 	}
 }
 
-func NewFetcher(appID int, appHash, phone, sessionFile string, repo repo, logger log.Logger) Fetcher {
+func NewFetcher(appID int, appHash, phone string, repo repo, logger log.Logger) Fetcher {
 	d := tg.NewUpdateDispatcher()
 	gaps := updates.New(updates.Config{
 		Handler: d,
@@ -317,10 +319,8 @@ func NewFetcher(appID int, appHash, phone, sessionFile string, repo repo, logger
 		Middlewares: []telegram.Middleware{
 			hook.UpdateHook(gaps.Handle),
 		},
-		SessionStorage: &session.FileStorage{
-			Path: sessionFile,
-		},
-		Logger: zapLogger,
+		SessionStorage: repo,
+		Logger:         zapLogger,
 	})
 
 	return &fetcher{

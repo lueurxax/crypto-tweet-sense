@@ -13,9 +13,14 @@ type Builder interface {
 	TweetUsernameRatingKey(username string) []byte
 	TweetRatings() []byte
 	SentTweet(link string) []byte
+	TelegramSessionStorage() []byte
 }
 
 type builder struct {
+}
+
+func (b builder) TelegramSessionStorage() []byte {
+	return []byte(telegramSessionStorage)
 }
 
 func (b builder) SentTweet(link string) []byte {

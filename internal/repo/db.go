@@ -2,6 +2,7 @@ package fdb
 
 import (
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
+	"github.com/gotd/td/telegram"
 	"github.com/sirupsen/logrus"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/repo/keys"
@@ -13,6 +14,7 @@ type DB interface {
 	tweetRepo
 	requestLimiter
 	ratingRepo
+	telegram.SessionStorage
 }
 
 type db struct {
