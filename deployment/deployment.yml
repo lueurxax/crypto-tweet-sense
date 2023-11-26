@@ -43,7 +43,7 @@ spec:
               value: "1289077992"
             - name: PHONE
               value: "+35797699363"
-            - name: DATABASE_PATH
+            - name: DATABASEPATH
               value: "/etc/fdb/fdb.cluster"
           volumeMounts:
             - name: db-cluster
