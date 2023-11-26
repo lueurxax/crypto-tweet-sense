@@ -158,6 +158,9 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 	best := 0.0
 
 	for _, kv := range kvs {
+		if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
+			continue
+		}
 		tweet := new(common.TweetSnapshot)
 		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
 			return nil, err
