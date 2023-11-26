@@ -29,8 +29,6 @@ spec:
           image: ghcr.io/lueurxax/crypto-tweet-sense:main
           imagePullPolicy: Always
           env:
-            - name: SESSION_FILE
-              value: "/etc/fdb/fdb.cluster"
             - name: LOG_LEVEL
               value: trace
             - name: LOG_TO_ECS
@@ -43,7 +41,7 @@ spec:
               value: "1289077992"
             - name: PHONE
               value: "+35797699363"
-            - name: DATABASE_PATH
+            - name: DATABASEPATH
               value: "/etc/fdb/fdb.cluster"
           volumeMounts:
             - name: db-cluster
