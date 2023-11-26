@@ -27,13 +27,14 @@ spec:
       containers:
         - name: twitter-exp
           image: ghcr.io/lueurxax/crypto-tweet-sense:main
+          imagePullPolicy: Always
           env:
+            - name: SESSION_FILE
+              value: "/etc/fdb/fdb.cluster"
             - name: LOG_LEVEL
               value: trace
             - name: LOG_TO_ECS
               value: "false"
-            - name: SESSION_FILE
-              value: "/etc/telegram/.session.json"
             - name: APP_HASH
               value: "2d7434d1785f8c11b3484379ff7b185c"
             - name: APP_ID
@@ -45,15 +46,9 @@ spec:
             - name: DATABASE_PATH
               value: "/etc/fdb/fdb.cluster"
           volumeMounts:
-            - name: session
-              mountPath: /etc/telegram/
             - name: db-cluster
               mountPath: /etc/fdb/
       volumes:
-        - name: session
-          configMap:
-            name: telegram-session
-            defaultMode: 0777
         - name: db-cluster
           configMap:
             name: fdb.cluster

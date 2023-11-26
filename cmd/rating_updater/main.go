@@ -28,7 +28,6 @@ const (
 type config struct {
 	LoggerLevel  logrus.Level `envconfig:"LOG_LEVEL" default:"info"`
 	LogToEcs     bool         `envconfig:"LOG_TO_ECS" default:"false"`
-	SessionFile  string       `envconfig:"SESSION_FILE" required:"true"`
 	ChannelID    int64        `envconfig:"CHANNEL_ID" required:"true"`
 	AppID        int          `envconfig:"APP_ID" required:"true"`
 	AppHash      string       `envconfig:"APP_HASH" required:"true"`
@@ -69,6 +68,8 @@ func main() {
 	defer stop()
 
 	foundeationDB.MustAPIVersion(foundationDBVersion)
+
+	logger.WithField("cluster_location", cfg.DatabasePath).Info("starting foundationdb")
 
 	db, err := foundeationDB.OpenDatabase(cfg.DatabasePath)
 	if err != nil {
