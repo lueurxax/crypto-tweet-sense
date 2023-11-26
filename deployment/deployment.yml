@@ -29,6 +29,8 @@ spec:
           image: ghcr.io/lueurxax/crypto-tweet-sense:main
           imagePullPolicy: Always
           env:
+            - name: SESSION_FILE
+              value: "/etc/fdb/fdb.cluster"
             - name: LOG_LEVEL
               value: trace
             - name: LOG_TO_ECS
