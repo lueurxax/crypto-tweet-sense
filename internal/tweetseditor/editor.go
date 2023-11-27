@@ -78,7 +78,7 @@ func (e *editor) editLoop(ctx context.Context, ch <-chan *common.Tweet) {
 			collectedTweets = make([]*common.Tweet, 0)
 		case <-contextCleanerTicker.C:
 			if len(e.existMessages) > 0 {
-				e.existMessages = e.existMessages[:1]
+				e.existMessages = make([]openai.ChatCompletionMessage, 0)
 			}
 		}
 	}

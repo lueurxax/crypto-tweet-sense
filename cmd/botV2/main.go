@@ -43,7 +43,7 @@ type config struct {
 	Phone                      string        `envconfig:"PHONE" required:"true"`
 	ChatGPTToken               string        `envconfig:"CHAT_GPT_TOKEN" required:"true"`              // OpenAI token
 	EditorSendInterval         time.Duration `envconfig:"EDITOR_SEND_INTERVAL" default:"30m"`          // Interval to send edited tweets to telegram
-	EditorCleanContextInterval time.Duration `envconfig:"EDITOR_CLEAN_CONTEXT_INTERVAL" default:"24h"` // Interval to clean chatgpt context
+	EditorCleanContextInterval time.Duration `envconfig:"EDITOR_CLEAN_CONTEXT_INTERVAL" default:"12h"` // Interval to clean chatgpt context
 	DatabasePath               string        `default:"/usr/local/etc/foundationdb/fdb.cluster"`
 }
 

@@ -7,10 +7,7 @@ metadata:
 spec:
   replicas: 1
   strategy:
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 1
-    type: RollingUpdate
+    type: Recreate
   selector:
     matchLabels:
       app: twitter-exp
@@ -29,8 +26,6 @@ spec:
           image: ghcr.io/lueurxax/crypto-tweet-sense:main
           imagePullPolicy: Always
           env:
-            - name: SESSION_FILE
-              value: "/etc/fdb/fdb.cluster"
             - name: LOG_LEVEL
               value: trace
             - name: LOG_TO_ECS

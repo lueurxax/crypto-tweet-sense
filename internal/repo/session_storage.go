@@ -1,6 +1,10 @@
 package fdb
 
-import "context"
+import (
+	"context"
+
+	"github.com/gotd/td/session"
+)
 
 func (d *db) LoadSession(ctx context.Context) ([]byte, error) {
 	tx, err := d.db.NewTransaction(ctx)
@@ -14,7 +18,7 @@ func (d *db) LoadSession(ctx context.Context) ([]byte, error) {
 	}
 
 	if data == nil {
-		return nil, ErrTelegramSessionNotFound
+		return nil, session.ErrNotFound
 	}
 
 	if err = tx.Commit(); err != nil {
