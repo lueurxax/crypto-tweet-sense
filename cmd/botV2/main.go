@@ -107,7 +107,6 @@ func main() {
 	}
 
 	s := sender.NewSender(api, &telebot.Chat{ID: cfg.ChatID}, logger.WithField(pkgKey, "sender"))
-	ctx = s.Send(ctx, watch.Subscribe())
 
 	editor := tweetseditor.NewEditor(
 		openai.NewClient(cfg.ChatGPTToken),

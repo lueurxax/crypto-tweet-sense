@@ -24,7 +24,6 @@ const (
 
 type Watcher interface {
 	Watch()
-	Subscribe() <-chan string
 	RawSubscribe() <-chan *common.Tweet
 }
 
@@ -57,7 +56,6 @@ type watcher struct {
 	ratingChecker
 
 	subMu          sync.RWMutex
-	subscribers    []chan string
 	rawSubscribers []chan *common.Tweet
 
 	logger log.Logger
@@ -68,17 +66,6 @@ func (w *watcher) RawSubscribe() <-chan *common.Tweet {
 
 	subscriber := make(chan *common.Tweet, bufferSize)
 	w.rawSubscribers = append(w.rawSubscribers, subscriber)
-
-	w.subMu.Unlock()
-
-	return subscriber
-}
-
-func (w *watcher) Subscribe() <-chan string {
-	w.subMu.Lock()
-
-	subscriber := make(chan string, bufferSize)
-	w.subscribers = append(w.subscribers, subscriber)
 
 	w.subMu.Unlock()
 
@@ -185,11 +172,6 @@ func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot,
 			w.rawSubscribers[j] <- tweet.Tweet
 		}
 
-		w.logger.WithField(subscribersKey, len(w.subscribers)).Debug("send formatted tweet")
-
-		for j := range w.subscribers {
-			w.subscribers[j] <- w.formatTweet(*tweet)
-		}
 		w.subMu.RUnlock()
 
 		w.logger.
@@ -341,7 +323,6 @@ func NewWatcher(finder finder, repo repo, checker ratingChecker, logger log.Logg
 		repo:           repo,
 		ratingChecker:  checker,
 		subMu:          sync.RWMutex{},
-		subscribers:    make([]chan string, 0),
 		rawSubscribers: make([]chan *common.Tweet, 0),
 		logger:         logger,
 	}
