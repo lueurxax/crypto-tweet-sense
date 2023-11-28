@@ -3,28 +3,22 @@ package watcher
 import (
 	"context"
 	"errors"
-	"fmt"
-	"sync"
 	"time"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 	"github.com/lueurxax/crypto-tweet-sense/internal/tweetfinder"
-	"github.com/lueurxax/crypto-tweet-sense/pkg/utils"
 )
 
 const (
-	subscribersKey  = "subscribers"
 	tweetKey        = "tweet"
 	timeout         = time.Minute * 5
 	oldFastInterval = time.Second * 30
 	searchInterval  = time.Minute * 15
-	bufferSize      = 10
 )
 
 type Watcher interface {
 	Watch()
-	RawSubscribe() <-chan *common.Tweet
 }
 
 type finder interface {
@@ -41,6 +35,7 @@ type repo interface {
 	GetTweetsOlderThen(ctx context.Context, after time.Time) ([]*common.TweetSnapshot, error)
 	CheckIfSentTweetExist(ctx context.Context, link string) (bool, error)
 	SaveSentTweet(ctx context.Context, link string) error
+	SaveTweetForEdit(ctx context.Context, tweet *common.Tweet) error
 }
 
 type ratingChecker interface {
@@ -55,21 +50,7 @@ type watcher struct {
 	repo
 	ratingChecker
 
-	subMu          sync.RWMutex
-	rawSubscribers []chan *common.Tweet
-
 	logger log.Logger
-}
-
-func (w *watcher) RawSubscribe() <-chan *common.Tweet {
-	w.subMu.Lock()
-
-	subscriber := make(chan *common.Tweet, bufferSize)
-	w.rawSubscribers = append(w.rawSubscribers, subscriber)
-
-	w.subMu.Unlock()
-
-	return subscriber
 }
 
 func (w *watcher) Watch() {
@@ -131,29 +112,13 @@ func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.
 	w.queries[query] = lastTweet
 }
 
-func (w *watcher) formatTweet(tweet common.TweetSnapshot) (str string) {
-	str = fmt.Sprintf("*%s*\n", utils.Escape(tweet.TimeParsed.Format(time.RFC3339)))
-	str += fmt.Sprintf("%s\n", utils.Escape(tweet.Text))
-
-	for _, photo := range tweet.Photos {
-		str += fmt.Sprintf("[photo](%s)\n", utils.Escape(photo.URL))
-	}
-
-	for _, video := range tweet.Videos {
-		str += fmt.Sprintf("[video](%s)\n", utils.Escape(video.URL))
-	}
-
-	str += fmt.Sprintf("[link](%s)\n", utils.Escape(tweet.PermanentURL))
-
-	return
-}
-
 func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot, lastTweet time.Time) (time.Time, float64) {
 	isExist, err := w.repo.CheckIfSentTweetExist(ctx, tweet.PermanentURL)
 	if err != nil {
 		w.logger.WithError(err).Error("check tweet if sent")
 		return lastTweet, 0
 	}
+
 	if isExist {
 		return lastTweet, 0
 	}
@@ -165,14 +130,10 @@ func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot,
 	}
 
 	if ok {
-		w.subMu.RLock()
-		w.logger.WithField(subscribersKey, len(w.rawSubscribers)).Debug("send raw tweet")
-
-		for j := range w.rawSubscribers {
-			w.rawSubscribers[j] <- tweet.Tweet
+		if err = w.repo.SaveTweetForEdit(ctx, tweet.Tweet); err != nil {
+			w.logger.WithError(err).Error("save tweet for edit")
+			return time.Now().AddDate(0, 0, -1), ratingSpeed
 		}
-
-		w.subMu.RUnlock()
 
 		w.logger.
 			WithField("ts", tweet.TimeParsed).
@@ -319,11 +280,9 @@ func NewWatcher(finder finder, repo repo, checker ratingChecker, logger log.Logg
 			"cryptocurrency": start,
 			"BTC":            start,
 		},
-		finder:         finder,
-		repo:           repo,
-		ratingChecker:  checker,
-		subMu:          sync.RWMutex{},
-		rawSubscribers: make([]chan *common.Tweet, 0),
-		logger:         logger,
+		finder:        finder,
+		repo:          repo,
+		ratingChecker: checker,
+		logger:        logger,
 	}
 }

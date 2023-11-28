@@ -1,6 +1,7 @@
 package tweetseditor
 
 import (
+	"context"
 	"os"
 	"strconv"
 	"testing"
@@ -9,7 +10,6 @@ import (
 	"github.com/sashabaranov/go-openai"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 	"gopkg.in/telebot.v3"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
@@ -63,38 +63,41 @@ var moreTestTweets = []common.Tweet{
 	},
 }
 
+type testRepo struct {
+	data []common.Tweet
+}
+
+func (t *testRepo) GetTweetForEdit(context.Context) ([]common.Tweet, error) {
+	return t.data, nil
+}
+
+func (t *testRepo) DeleteEditedTweets(context.Context, []string) error {
+	return nil
+}
+
 func TestNewEditor(t *testing.T) {
 	t.Run("some tweets request", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		client := openai.NewClient(os.Getenv("openai_token"))
+		client := openai.NewClient(os.Getenv("CHAT_GPT_TOKEN"))
 		logrusLogger := logrus.New()
 		logrusLogger.SetLevel(logrus.TraceLevel)
 		logger := log.NewLogger(logrusLogger)
-		ed := NewEditor(client, time.Second, time.Hour*24, logger)
-		input := make(chan *common.Tweet)
-		ctx = ed.Edit(ctx, input)
+		r := &testRepo{data: testTweets}
+		ed := NewEditor(client, r, time.Second, time.Hour*24, logger)
+		ctx = ed.Edit(ctx)
 		output := ed.SubscribeEdited()
 
-		chatID, err := strconv.ParseInt(os.Getenv("chat_id"), 10, 64)
+		chatID, err := strconv.ParseInt(os.Getenv("CHAT_ID"), 10, 64)
 		require.NoError(t, err)
 
 		api, err := telebot.NewBot(
-			telebot.Settings{Token: os.Getenv("bot_token"), Poller: &telebot.LongPoller{Timeout: 10 * time.Second}},
+			telebot.Settings{Token: os.Getenv("BOT_TOKEN"), Poller: &telebot.LongPoller{Timeout: 10 * time.Second}},
 		)
 		require.NoError(t, err)
 		s := sender.NewSender(api, &telebot.Chat{ID: chatID}, logger)
 		s.Send(ctx, output)
-		go func(input chan *common.Tweet) {
-			for i := range testTweets {
-				input <- &testTweets[i]
-			}
-		}(input)
 		time.Sleep(time.Second)
-		go func(input chan *common.Tweet) {
-			for i := range moreTestTweets {
-				input <- &testTweets[i]
-			}
-		}(input)
+		r.data = moreTestTweets
 		time.Sleep(time.Minute)
 		cancel()
 	})

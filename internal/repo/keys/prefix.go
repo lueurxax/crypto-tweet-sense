@@ -1,10 +1,12 @@
 package keys
 
 const (
-	version                = 'v'
-	tweet                  = 't'
-	sentTweet              = 's'
-	requestLimit           = 'r'
-	tweetRating            = 'a'
-	telegramSessionStorage = "telegramSessionStorage"
+	version                   = 'v'
+	tweet                     = 't'
+	sentTweet                 = 's'
+	requestLimit              = 'r'
+	tweetRating               = 'a'
+	editingTweet              = 'e'
+	telegramSessionStorageOld = "telegramSessionStorage"
+	telegramSessionStorage    = "xtelegramSessionStorage"
 )

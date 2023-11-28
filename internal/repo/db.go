@@ -15,6 +15,7 @@ type DB interface {
 	requestLimiter
 	ratingRepo
 	telegram.SessionStorage
+	editingTweetsRepo
 }
 
 type db struct {

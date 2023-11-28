@@ -2,6 +2,7 @@ package tweetseditor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
+	fdb "github.com/lueurxax/crypto-tweet-sense/internal/repo"
 	"github.com/lueurxax/crypto-tweet-sense/pkg/utils"
 )
 
@@ -25,8 +27,13 @@ type Tweet struct {
 	Link    string `json:"link"`
 }
 
+type repo interface {
+	GetTweetForEdit(ctx context.Context) ([]common.Tweet, error)
+	DeleteEditedTweets(ctx context.Context, ids []string) error
+}
+
 type Editor interface {
-	Edit(ctx context.Context, tweetCh <-chan *common.Tweet) context.Context
+	Edit(ctx context.Context) context.Context
 	SubscribeEdited() <-chan string
 }
 
@@ -36,12 +43,13 @@ type editor struct {
 	sendInterval  time.Duration
 	cleanInterval time.Duration
 	existMessages []openai.ChatCompletionMessage
+	repo
 
 	log log.Logger
 }
 
-func (e *editor) Edit(ctx context.Context, tweetCh <-chan *common.Tweet) context.Context {
-	go e.editLoop(ctx, tweetCh)
+func (e *editor) Edit(ctx context.Context) context.Context {
+	go e.editLoop(ctx)
 
 	return ctx
 }
@@ -50,8 +58,7 @@ func (e *editor) SubscribeEdited() <-chan string {
 	return e.editedCh
 }
 
-func (e *editor) editLoop(ctx context.Context, ch <-chan *common.Tweet) {
-	collectedTweets := make([]*common.Tweet, 0)
+func (e *editor) editLoop(ctx context.Context) {
 	ticker := time.NewTicker(e.sendInterval)
 	contextCleanerTicker := time.NewTicker(e.sendInterval)
 
@@ -62,20 +69,29 @@ func (e *editor) editLoop(ctx context.Context, ch <-chan *common.Tweet) {
 			e.log.Info("edit loop done")
 
 			return
-		case tweet := <-ch:
-			e.log.WithField("tweet", tweet).Debug("tweet received")
-			collectedTweets = append(collectedTweets, tweet)
 		case <-ticker.C:
-			if len(collectedTweets) == 0 {
-				e.log.Info("skip edit, because no tweets")
+			collectedTweets, err := e.repo.GetTweetForEdit(ctx)
+			if err != nil {
+				if errors.Is(err, fdb.ErrTweetsNotFound) {
+					e.log.Info("skip edit, because no tweets")
+					continue
+				}
+				e.log.WithError(err).Error("get tweets for edit error")
 				continue
 			}
 
-			if err := e.edit(context.Background(), collectedTweets); err != nil { //nolint:contextcheck
+			if err = e.edit(context.Background(), collectedTweets); err != nil { //nolint:contextcheck
 				e.log.WithError(err).Error("edit error")
 			}
 
-			collectedTweets = make([]*common.Tweet, 0)
+			deletingTweets := make([]string, 0, len(collectedTweets))
+			for _, tweet := range collectedTweets {
+				deletingTweets = append(deletingTweets, tweet.ID)
+			}
+
+			if err = e.repo.DeleteEditedTweets(ctx, deletingTweets); err != nil {
+				e.log.WithError(err).Error("delete edited tweets error")
+			}
 		case <-contextCleanerTicker.C:
 			if len(e.existMessages) > 0 {
 				e.existMessages = make([]openai.ChatCompletionMessage, 0)
@@ -84,7 +100,7 @@ func (e *editor) editLoop(ctx context.Context, ch <-chan *common.Tweet) {
 	}
 }
 
-func (e *editor) edit(ctx context.Context, tweets []*common.Tweet) error {
+func (e *editor) edit(ctx context.Context, tweets []common.Tweet) error {
 	tweetsStr := ""
 
 	for _, twee := range tweets {
@@ -162,12 +178,13 @@ func (e *editor) formatTweet(tweet Tweet) (str string) {
 	return
 }
 
-func NewEditor(client *openai.Client, sendInterval, cleanInterval time.Duration, log log.Logger) Editor {
+func NewEditor(client *openai.Client, db repo, sendInterval, cleanInterval time.Duration, log log.Logger) Editor {
 	return &editor{
 		editedCh:      make(chan string, queueLen),
 		sendInterval:  sendInterval,
 		cleanInterval: cleanInterval,
 		client:        client,
+		repo:          db,
 		log:           log,
 	}
 }
