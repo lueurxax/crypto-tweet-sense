@@ -66,9 +66,6 @@ jobs:
         uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934 # v5.0.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-rating-updater
-          tags: |
-            type=ref,event=branch
-            type=ref,event=tag
 
       # Build and push Docker image with Buildx (don't push on PR)
       # https://github.com/docker/build-push-action
@@ -78,10 +75,10 @@ jobs:
         with:
           file: rating_updater.Dockerfile
           context: .
-          build-args: VERSION=${{ steps.meta.outputs.tags }}
+          build-args: VERSION=${{ steps.meta-rating-updater.outputs.tags }}
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-rating-updater.outputs.tags }}
+          labels: ${{ steps.meta-rating-updater.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -92,9 +89,6 @@ jobs:
         uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934 # v5.0.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-channel-contentmaker
-          tags: |
-            type=ref,event=branch
-            type=ref,event=tag
 
       # Build and push Docker image with Buildx (don't push on PR)
       # https://github.com/docker/build-push-action
@@ -104,10 +98,10 @@ jobs:
         with:
           file: channel_contentmaker.Dockerfile
           context: .
-          build-args: VERSION=${{ steps.meta.outputs.tags }}
+          build-args: VERSION=${{ steps.meta-channel-contentmaker.outputs.tags }}
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-channel-contentmaker.outputs.tags }}
+          labels: ${{ steps.meta-channel-contentmaker.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -118,9 +112,6 @@ jobs:
         uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934 # v5.0.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-twitter-scrapper
-          tags: |
-            type=ref,event=branch
-            type=ref,event=tag
 
       # Build and push Docker image with Buildx (don't push on PR)
       # https://github.com/docker/build-push-action
@@ -130,10 +121,10 @@ jobs:
         with:
           file: twitter_scrapper.Dockerfile
           context: .
-          build-args: VERSION=${{ steps.meta.outputs.tags }}
+          build-args: VERSION=${{ steps.meta-twitter-scrapper.outputs.tags }}
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-twitter-scrapper.outputs.tags }}
+          labels: ${{ steps.meta-twitter-scrapper.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -142,12 +133,30 @@ jobs:
       # repository is public to avoid leaking data.  If you would like to publish
       # transparency data even for private images, pass --force to cosign below.
       # https://github.com/sigstore/cosign
-      - name: Sign the published Docker image
+      - name: Sign the published Docker image contentmaker
         if: ${{ github.event_name != 'pull_request' }}
         env:
           # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-an-intermediate-environment-variable
-          TAGS: ${{ steps.meta.outputs.tags }}
-          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          TAGS: ${{ steps.meta-channel-contentmaker.outputs.tags }}
+          DIGEST: ${{ steps.build-and-push-channel-contentmaker.outputs.digest }}
+        # This step uses the identity token to provision an ephemeral certificate
+        # against the sigstore community Fulcio instance.
+        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+      - name: Sign the published Docker image twitter-scrapper
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-an-intermediate-environment-variable
+          TAGS: ${{ steps.meta-twitter-scrapper.outputs.tags }}
+          DIGEST: ${{ steps.build-and-push-twitter-scrapper.outputs.digest }}
+        # This step uses the identity token to provision an ephemeral certificate
+        # against the sigstore community Fulcio instance.
+        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+      - name: Sign the published Docker image rating-updater
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-an-intermediate-environment-variable
+          TAGS: ${{ steps.meta-rating-updater.outputs.tags }}
+          DIGEST: ${{ steps.build-and-push-rating-updater.outputs.digest }}
         # This step uses the identity token to provision an ephemeral certificate
         # against the sigstore community Fulcio instance.
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
