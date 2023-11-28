@@ -1,0 +1,51 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: crypto-tweet-sense
+  name: rating-updater
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: rating-updater
+  template:
+    metadata:
+      name: rating-updater
+      labels:
+        app: rating-updater
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: twitter-exp
+          image: ghcr.io/lueurxax/crypto-tweet-sense-rating-updater:main
+          imagePullPolicy: Always
+          env:
+            - name: LOG_LEVEL
+              value: trace
+            - name: LOG_TO_ECS
+              value: "false"
+            - name: APP_HASH
+              value: "2d7434d1785f8c11b3484379ff7b185c"
+            - name: APP_ID
+              value: "106111"
+            - name: CHANNEL_ID
+              value: "1289077992"
+            - name: PHONE
+              value: "+35797699363"
+            - name: DATABASEPATH
+              value: "/etc/fdb/fdb.cluster"
+          volumeMounts:
+            - name: db-cluster
+              mountPath: /etc/fdb/
+      volumes:
+        - name: db-cluster
+          configMap:
+            name: fdb.cluster
+      imagePullSecrets:
+        - name: regcred

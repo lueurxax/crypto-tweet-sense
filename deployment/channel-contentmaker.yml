@@ -3,19 +3,22 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   namespace: crypto-tweet-sense
-  name: twitter-exp
+  name: channel-contentmaker
 spec:
   replicas: 1
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
-      app: twitter-exp
+      app: channel-contentmaker
   template:
     metadata:
-      name: twitter-exp
+      name: channel-contentmaker
       labels:
-        app: twitter-exp
+        app: channel-contentmaker
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/path: "/metrics"
@@ -23,21 +26,19 @@ spec:
     spec:
       containers:
         - name: twitter-exp
-          image: ghcr.io/lueurxax/crypto-tweet-sense:main
+          image: ghcr.io/lueurxax/crypto-tweet-sense-channel-contentmaker:main
           imagePullPolicy: Always
           env:
             - name: LOG_LEVEL
               value: trace
+            - name: BOT_TOKEN
+              value: 5012820190:AAE7noRh3G_mIivRKRkQq3TfM5wh60u_Vpo
+            - name: CHAT_GPT_TOKEN
+              value: -arnFyJDaITRuVlKn00muT3BlbkFJpmf5HQad88hntVne2hel
+            - name: CHAT_ID
+              value: "-1001289077992"
             - name: LOG_TO_ECS
               value: "false"
-            - name: APP_HASH
-              value: "2d7434d1785f8c11b3484379ff7b185c"
-            - name: APP_ID
-              value: "106111"
-            - name: CHANNEL_ID
-              value: "1289077992"
-            - name: PHONE
-              value: "+35797699363"
             - name: DATABASEPATH
               value: "/etc/fdb/fdb.cluster"
           volumeMounts:
