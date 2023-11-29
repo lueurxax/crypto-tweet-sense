@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	prompt     = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip information such as airdrops or giveaway, if they are not useful for investing. I will parse your answer by code like json `{\"tweets\":[{\"telegram_message\":\"summarized message by tweet\", \"link\":\"link to tweet\"}], \"new_information\":true}`, then can you prepare messages in json with prepared telegram message? \nTweets: %s." //nolint:lll
-	nextPrompt = "Additional tweets, create new message only for new information: %s."                                                                                                                                                                                                                                                                                                                                                                                                                                //nolint:lll
+	prompt     = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip information such as airdrops or giveaway, if they are not useful for investing. I will parse your answer by code like json `{\"tweets\":[{\"telegram_message\":\"summarized message by tweet\", \"link\":\"link to tweet\"}], \"new_useful_information\":true}`, then can you prepare messages in json with prepared telegram message? \nTweets: %s." //nolint:lll
+	nextPrompt = "Additional tweets, create new message only for new information: %s."                                                                                                                                                                                                                                                                                                                                                                                                                                       //nolint:lll
 	queueLen   = 10
 )
 
@@ -103,7 +103,10 @@ func (e *editor) editLoop(ctx context.Context) {
 func (e *editor) edit(ctx context.Context, tweets []common.Tweet) error {
 	tweetsStr := ""
 
+	tweetsMap := map[string]common.Tweet{}
+
 	for _, twee := range tweets {
+		tweetsMap[twee.PermanentURL] = twee
 		text := twee.Text + "Link - " + twee.PermanentURL
 		tweetsStr = strings.Join([]string{tweetsStr, text}, "\n")
 	}
@@ -114,11 +117,6 @@ func (e *editor) edit(ctx context.Context, tweets []common.Tweet) error {
 	} else {
 		request = fmt.Sprintf(nextPrompt, tweetsStr)
 	}
-
-	e.existMessages = append(e.existMessages, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleUser,
-		Content: request,
-	})
 
 	resp, err := e.client.CreateChatCompletion(
 		ctx,
@@ -136,16 +134,11 @@ func (e *editor) edit(ctx context.Context, tweets []common.Tweet) error {
 		return err
 	}
 
-	e.existMessages = append(e.existMessages, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleAssistant,
-		Content: resp.Choices[0].Message.Content,
-	})
-
 	e.log.WithField("response", resp).Debug("summary generation result")
 
 	res := struct {
-		Tweets         []Tweet `json:"tweets"`
-		NewInformation bool    `json:"new_information"`
+		Tweets               []Tweet `json:"tweets"`
+		NewUsefulInformation bool    `json:"new_useful_information"`
 	}{}
 
 	if err = jsoniter.UnmarshalFromString(resp.Choices[0].Message.Content, &res); err != nil {
@@ -156,13 +149,26 @@ func (e *editor) edit(ctx context.Context, tweets []common.Tweet) error {
 		return nil
 	}
 
-	if !res.NewInformation {
+	if !res.NewUsefulInformation {
+		e.log.Info("skip edit, no new useful information")
 		return nil
 	}
 
+	e.existMessages = append(e.existMessages, openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleUser,
+		Content: request,
+	}, openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleAssistant,
+		Content: resp.Choices[0].Message.Content,
+	})
+
 	data := ""
+
 	for _, el := range res.Tweets {
-		data = fmt.Sprintf("%s\n%s", data, e.formatTweet(el))
+		tweet, ok := tweetsMap[el.Link]
+		if ok {
+			data = fmt.Sprintf("%s\n%s", data, e.formatTweet(tweet, el.Content))
+		}
 	}
 
 	e.editedCh <- strings.Trim(data, "\n")
@@ -170,10 +176,19 @@ func (e *editor) edit(ctx context.Context, tweets []common.Tweet) error {
 	return nil
 }
 
-func (e *editor) formatTweet(tweet Tweet) (str string) {
-	str += fmt.Sprintf("%s\n", utils.Escape(tweet.Content))
+func (e *editor) formatTweet(tweet common.Tweet, text string) (str string) {
+	str = fmt.Sprintf("*%s*\n", utils.Escape(tweet.TimeParsed.Format(time.RFC3339)))
+	str += fmt.Sprintf("%s\n", utils.Escape(text))
 
-	str += fmt.Sprintf("[link](%s)\n", utils.Escape(tweet.Link))
+	for _, photo := range tweet.Photos {
+		str += fmt.Sprintf("[photo](%s)\n", utils.Escape(photo.URL))
+	}
+
+	for _, video := range tweet.Videos {
+		str += fmt.Sprintf("[video](%s)\n", utils.Escape(video.URL))
+	}
+
+	str += fmt.Sprintf("[link](%s)\n", utils.Escape(tweet.PermanentURL))
 
 	return
 }

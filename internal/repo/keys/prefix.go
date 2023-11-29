@@ -8,5 +8,6 @@ const (
 	tweetRating               = 'a'
 	editingTweet              = 'e'
 	telegramSessionStorageOld = "telegramSessionStorage"
-	telegramSessionStorage    = "xtelegramSessionStorage"
+	telegramSessionStorage    = "_telegramSessionStorage"
+	twitterAccounts           = "_twitterAccounts"
 )

@@ -16,6 +16,7 @@ type DB interface {
 	ratingRepo
 	telegram.SessionStorage
 	editingTweetsRepo
+	twitterAccountsRepo
 }
 
 type db struct {

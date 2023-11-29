@@ -16,9 +16,17 @@ type Builder interface {
 	EditingTweet(id string) []byte
 	EditingTweets() []byte
 	TelegramSessionStorage() []byte
+	TwitterAccount(login string) []byte
 }
 
 type builder struct {
+	prefixesCache map[string][]byte
+}
+
+func (b builder) TwitterAccount(login string) []byte {
+	prefix := b.getPrefix(twitterAccounts)
+
+	return append(prefix, []byte(login)...)
 }
 
 func (b builder) EditingTweet(id string) []byte {
@@ -60,6 +68,16 @@ func (b builder) Tweets() []byte {
 
 func (b builder) Tweet(id string) []byte {
 	return append([]byte{tweet}, []byte(id)...)
+}
+
+func (b builder) getPrefix(key string) []byte {
+	prefix, ok := b.prefixesCache[key]
+	if !ok {
+		prefix = []byte(key)
+		b.prefixesCache[key] = prefix
+	}
+
+	return prefix
 }
 
 func NewBuilder() Builder {
