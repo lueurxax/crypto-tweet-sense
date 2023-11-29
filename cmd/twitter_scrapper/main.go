@@ -80,7 +80,7 @@ func main() {
 
 	xConfig := tweetFinder.GetConfigPool()
 
-	accountManager := account_manager.NewManager(st)
+	accountManager := account_manager.NewManager(st, logger.WithField(pkgKey, "account_manager"))
 
 	finder := tweetFinder.NewPool(xConfig, accountManager, st, logger.WithField(pkgKey, "tweet_finder_pool"))
 	if err = finder.Init(ctx); err != nil {

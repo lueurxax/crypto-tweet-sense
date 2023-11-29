@@ -10,6 +10,7 @@ import (
 	twitterscraper "github.com/n0madic/twitter-scraper"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
+	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 	fdb "github.com/lueurxax/crypto-tweet-sense/internal/repo"
 )
 
@@ -30,6 +31,8 @@ type repo interface {
 type manager struct {
 	repo
 	authAccounts map[string]struct{}
+
+	log log.Logger
 }
 
 func (m *manager) SearchUnAuthAccounts(ctx context.Context) ([]common.TwitterAccount, error) {
@@ -39,6 +42,7 @@ func (m *manager) SearchUnAuthAccounts(ctx context.Context) ([]common.TwitterAcc
 	}
 
 	res := make([]common.TwitterAccount, 0, len(accounts))
+
 	for _, account := range accounts {
 		if _, ok := m.authAccounts[account.Login]; !ok {
 			res = append(res, account)
@@ -52,9 +56,12 @@ func (m *manager) AuthScrapper(ctx context.Context, account common.TwitterAccoun
 	cookies, err := m.repo.GetCookie(ctx, account.Login)
 	if err != nil {
 		if !errors.Is(err, fdb.ErrCookieNotFound) {
+			m.log.WithError(err).WithField("login", account.Login).Error("error while login")
 			return err
 		}
+
 		if err = scrapperLogin(scraper, account); err != nil {
+			m.log.WithError(err).WithField("login", account.Login).Error("error while login")
 			return err
 		}
 	}
@@ -63,6 +70,7 @@ func (m *manager) AuthScrapper(ctx context.Context, account common.TwitterAccoun
 
 	if !scraper.IsLoggedIn() {
 		if err = scrapperLogin(scraper, account); err != nil {
+			m.log.WithError(err).WithField("login", account.Login).Error("error while login")
 			return err
 		}
 	}
@@ -70,6 +78,7 @@ func (m *manager) AuthScrapper(ctx context.Context, account common.TwitterAccoun
 	cookies = scraper.GetCookies()
 
 	if err = m.repo.SaveCookie(ctx, account.Login, cookies); err != nil {
+		m.log.WithError(err).WithField("login", account.Login).Error("error while login")
 		return err
 	}
 
@@ -117,6 +126,6 @@ func scrapperLogin(scraper *twitterscraper.Scraper, account common.TwitterAccoun
 	return scraper.Login(account.Login, account.AccessToken, account.Confirmation)
 }
 
-func NewManager(repo repo) Manager {
-	return &manager{repo: repo, authAccounts: make(map[string]struct{})}
+func NewManager(repo repo, logger log.Logger) Manager {
+	return &manager{repo: repo, authAccounts: make(map[string]struct{}), log: logger}
 }

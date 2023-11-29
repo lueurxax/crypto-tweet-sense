@@ -62,7 +62,7 @@ func main() {
 
 	st := fdb.NewDB(db, logrusLogger.WithField(pkgKey, "fdb"))
 
-	if err = account_manager.NewManager(st).AddAccount(ctx, account_manager.GetConfig()); err != nil {
+	if err = account_manager.NewManager(st, logger.WithField(pkgKey, "account_manager")).AddAccount(ctx, account_manager.GetConfig()); err != nil {
 		panic(err)
 	}
 
