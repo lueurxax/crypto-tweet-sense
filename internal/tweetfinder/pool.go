@@ -12,6 +12,12 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/internal/tweetfinder/windowlimiter"
 )
 
+const (
+	startDelay  = 15
+	finderLogin = "finder_login"
+	pkgKey      = "pkg"
+)
+
 type accountManager interface {
 	AuthScrapper(ctx context.Context, account common.TwitterAccount, scraper *twitterscraper.Scraper) error
 	SearchUnAuthAccounts(ctx context.Context) ([]common.TwitterAccount, error)
@@ -45,7 +51,9 @@ func (p *pool) Init(ctx context.Context) error {
 	if err := p.init(ctx); err != nil {
 		return err
 	}
+
 	go p.reinit()
+
 	return nil
 }
 
@@ -162,8 +170,8 @@ func (p *pool) init(ctx context.Context) error {
 			return err
 		}
 
-		if len(p.config.Proxies) > i {
-			if err = scraper.SetProxy(p.config.Proxies[i]); err != nil {
+		if len(p.config.Proxies) > len(p.finders)+i {
+			if err = scraper.SetProxy(p.config.Proxies[len(p.finders)+i]); err != nil {
 				return err
 			}
 		}
