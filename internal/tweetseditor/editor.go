@@ -76,12 +76,15 @@ func (e *editor) editLoop(ctx context.Context) {
 					e.log.Info("skip edit, because no tweets")
 					continue
 				}
+
 				e.log.WithError(err).Error("get tweets for edit error")
+
 				continue
 			}
 
-			if err = e.edit(context.Background(), collectedTweets); err != nil { //nolint:contextcheck
+			if err = e.edit(ctx, collectedTweets); err != nil {
 				e.log.WithError(err).Error("edit error")
+				continue
 			}
 
 			deletingTweets := make([]string, 0, len(collectedTweets))
@@ -118,6 +121,11 @@ func (e *editor) edit(ctx context.Context, tweets []common.Tweet) error {
 		request = fmt.Sprintf(nextPrompt, tweetsStr)
 	}
 
+	requestMessage := openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleUser,
+		Content: request,
+	}
+
 	resp, err := e.client.CreateChatCompletion(
 		ctx,
 		openai.ChatCompletionRequest{
@@ -125,7 +133,7 @@ func (e *editor) edit(ctx context.Context, tweets []common.Tweet) error {
 				Type: openai.ChatCompletionResponseFormatTypeJSONObject,
 			},
 			Model:    openai.GPT4TurboPreview,
-			Messages: e.existMessages,
+			Messages: append(e.existMessages, requestMessage),
 		},
 	)
 
@@ -154,10 +162,7 @@ func (e *editor) edit(ctx context.Context, tweets []common.Tweet) error {
 		return nil
 	}
 
-	e.existMessages = append(e.existMessages, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleUser,
-		Content: request,
-	}, openai.ChatCompletionMessage{
+	e.existMessages = append(e.existMessages, requestMessage, openai.ChatCompletionMessage{
 		Role:    openai.ChatMessageRoleAssistant,
 		Content: resp.Choices[0].Message.Content,
 	})
