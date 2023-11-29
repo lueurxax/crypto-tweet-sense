@@ -51,12 +51,12 @@ func (m *manager) SearchUnAuthAccounts(ctx context.Context) ([]common.TwitterAcc
 func (m *manager) AuthScrapper(ctx context.Context, account common.TwitterAccount, scraper *twitterscraper.Scraper) error {
 	cookies, err := m.repo.GetCookie(ctx, account.Login)
 	if err != nil {
-		if errors.Is(err, fdb.ErrCookieNotFound) {
-			if err = scrapperLogin(scraper, account); err != nil {
-				return err
-			}
+		if !errors.Is(err, fdb.ErrCookieNotFound) {
+			return err
 		}
-		return err
+		if err = scrapperLogin(scraper, account); err != nil {
+			return err
+		}
 	}
 
 	scraper.SetCookies(cookies)

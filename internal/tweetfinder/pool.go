@@ -166,14 +166,14 @@ func (p *pool) init(ctx context.Context) error {
 	for i, account := range accounts {
 		scraper := twitterscraper.New().WithDelay(startDelay).SetSearchMode(twitterscraper.SearchLatest)
 
-		if err = p.manager.AuthScrapper(ctx, account, scraper); err != nil {
-			return err
-		}
-
 		if len(p.config.Proxies) > len(p.finders)+i {
 			if err = scraper.SetProxy(p.config.Proxies[len(p.finders)+i]); err != nil {
 				return err
 			}
+		}
+
+		if err = p.manager.AuthScrapper(ctx, account, scraper); err != nil {
+			return err
 		}
 
 		limiterIntervals := []time.Duration{
