@@ -10,4 +10,5 @@ const (
 	telegramSessionStorageOld = "telegramSessionStorage"
 	telegramSessionStorage    = "_telegramSessionStorage"
 	twitterAccounts           = "_twitterAccounts"
+	twitterAccountsCookie     = "_twitterAccountsCookie"
 )

@@ -167,11 +167,9 @@ func (e *editor) edit(ctx context.Context, tweets []common.Tweet) error {
 	for _, el := range res.Tweets {
 		tweet, ok := tweetsMap[el.Link]
 		if ok {
-			data = fmt.Sprintf("%s\n%s", data, e.formatTweet(tweet, el.Content))
+			e.editedCh <- fmt.Sprintf("%s\n%s", data, e.formatTweet(tweet, el.Content))
 		}
 	}
-
-	e.editedCh <- strings.Trim(data, "\n")
 
 	return nil
 }

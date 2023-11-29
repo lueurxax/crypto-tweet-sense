@@ -17,10 +17,17 @@ type Builder interface {
 	EditingTweets() []byte
 	TelegramSessionStorage() []byte
 	TwitterAccount(login string) []byte
+	Cookie(login string) []byte
 }
 
 type builder struct {
 	prefixesCache map[string][]byte
+}
+
+func (b builder) Cookie(login string) []byte {
+	prefix := b.getPrefix(twitterAccountsCookie)
+
+	return append(prefix, []byte(login)...)
 }
 
 func (b builder) TwitterAccount(login string) []byte {
