@@ -232,7 +232,8 @@ func (p *pool) init(ctx context.Context) error {
 }
 
 func (p *pool) reinit() {
-	for range time.After(time.Minute) {
+	ticker := time.NewTicker(time.Minute)
+	for range ticker.C {
 		if err := p.init(context.Background()); err != nil {
 			p.log.WithError(err).Error("error while reinit pool")
 		}
