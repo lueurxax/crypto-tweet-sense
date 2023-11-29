@@ -18,6 +18,10 @@ type metricMiddleware struct {
 	findRequestsHistogramSeconds    *prometheus.HistogramVec
 }
 
+func (m *metricMiddleware) Init(context.Context) error {
+	return nil
+}
+
 func (m *metricMiddleware) FindAll(ctx context.Context, start, end *time.Time, search string) ([]common.TweetSnapshot, error) {
 	st := time.Now()
 
