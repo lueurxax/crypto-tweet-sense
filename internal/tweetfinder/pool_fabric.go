@@ -2,14 +2,12 @@ package tweetfinder
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
-	"os"
-	"strings"
+	"errors"
 	"time"
 
 	twitterscraper "github.com/n0madic/twitter-scraper"
 
+	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 	fdb "github.com/lueurxax/crypto-tweet-sense/internal/repo"
 	"github.com/lueurxax/crypto-tweet-sense/internal/tweetfinder/windowlimiter"
@@ -21,59 +19,43 @@ const (
 )
 
 func NewPoolFabric(ctx context.Context, config ConfigPool, pkgKey string, repo fdb.DB, logger log.Logger) (Finder, error) {
-	finders := make([]Finder, 0, len(config.XCreds))
+	finders := make([]Finder, 0, len(config.XLogins))
 	delayManagerLogger := logger.WithField(pkgKey, "delay_manager")
 	limiterLogger := logger.WithField(pkgKey, "window_limiter")
 	finderLogger := logger.WithField(pkgKey, "finder")
 	poolLogger := logger.WithField(pkgKey, "finder_pool")
 
-	i := 0
-
 	var delayManager Manager
 
-	for login, password := range config.XCreds {
-		filename := strings.Join([]string{login, config.CookiesFilename}, "_")
+	for i, login := range config.XLogins {
 		scraper := twitterscraper.New().WithDelay(startDelay).SetSearchMode(twitterscraper.SearchLatest)
 
-		var cookies []*http.Cookie
-
-		data, err := os.ReadFile(filename)
+		creds, err := repo.GetAccount(ctx, login)
 		if err != nil {
-			logger.Error(err)
+			return nil, err
+		}
 
-			if err = scrapperLogin(scraper, config.XConfirmation[len(finders)], login, password); err != nil {
+		cookies, err := repo.GetCookie(ctx, login)
+		if err != nil {
+			if errors.Is(err, fdb.ErrCookieNotFound) {
+				if err = scrapperLogin(scraper, creds); err != nil {
+					return nil, err
+				}
+			}
+			return nil, err
+		}
+
+		scraper.SetCookies(cookies)
+
+		if !scraper.IsLoggedIn() {
+			if err = scrapperLogin(scraper, creds); err != nil {
 				return nil, err
-			}
-		}
-
-		if data != nil {
-			if err = json.Unmarshal(data, &cookies); err != nil {
-				logger.Error(err)
-
-				if err = scrapperLogin(scraper, config.XConfirmation[len(finders)], login, password); err != nil {
-					return nil, err
-				}
-			}
-		}
-
-		if cookies != nil {
-			scraper.SetCookies(cookies)
-
-			if !scraper.IsLoggedIn() {
-				if err = scrapperLogin(scraper, config.XConfirmation[len(finders)], login, password); err != nil {
-					return nil, err
-				}
 			}
 		}
 
 		cookies = scraper.GetCookies()
 
-		data, err = json.Marshal(cookies)
-		if err != nil {
-			return nil, err
-		}
-
-		if err = os.WriteFile(filename, data, 0600); err != nil {
+		if err = repo.SaveCookie(ctx, login, cookies); err != nil {
 			return nil, err
 		}
 
@@ -129,10 +111,10 @@ func NewPoolFabric(ctx context.Context, config ConfigPool, pkgKey string, repo f
 	return NewPool(finders, poolLogger), nil
 }
 
-func scrapperLogin(scraper *twitterscraper.Scraper, confirmation string, login string, password string) error {
-	if confirmation == "X" {
-		return scraper.Login(login, password)
+func scrapperLogin(scraper *twitterscraper.Scraper, account common.TwitterAccount) error {
+	if account.Confirmation == "" {
+		return scraper.Login(account.Login, account.AccessToken)
 	}
 
-	return scraper.Login(login, password, confirmation)
+	return scraper.Login(account.Login, account.AccessToken, account.Confirmation)
 }

@@ -12,8 +12,8 @@ import (
 type twitterAccountsRepo interface {
 	GetAccount(ctx context.Context, login string) (common.TwitterAccount, error)
 	SaveAccount(ctx context.Context, account common.TwitterAccount) error
-	SaveCookie(ctx context.Context, login string, cookie []http.Cookie) error
-	GetCookie(ctx context.Context, login string) ([]http.Cookie, error)
+	SaveCookie(ctx context.Context, login string, cookie []*http.Cookie) error
+	GetCookie(ctx context.Context, login string) ([]*http.Cookie, error)
 }
 
 func (d *db) GetAccount(ctx context.Context, login string) (common.TwitterAccount, error) {
@@ -60,7 +60,7 @@ func (d *db) SaveAccount(ctx context.Context, account common.TwitterAccount) err
 	return tx.Commit()
 }
 
-func (d *db) SaveCookie(ctx context.Context, login string, cookie []http.Cookie) error {
+func (d *db) SaveCookie(ctx context.Context, login string, cookie []*http.Cookie) error {
 	tx, err := d.db.NewTransaction(ctx)
 	if err != nil {
 		return err
@@ -76,7 +76,7 @@ func (d *db) SaveCookie(ctx context.Context, login string, cookie []http.Cookie)
 	return tx.Commit()
 }
 
-func (d *db) GetCookie(ctx context.Context, login string) ([]http.Cookie, error) {
+func (d *db) GetCookie(ctx context.Context, login string) ([]*http.Cookie, error) {
 	tx, err := d.db.NewTransaction(ctx)
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func (d *db) GetCookie(ctx context.Context, login string) ([]http.Cookie, error)
 		return nil, ErrCookieNotFound
 	}
 
-	cookie := make([]http.Cookie, 0)
+	cookie := make([]*http.Cookie, 0)
 
 	if err = jsoniter.Unmarshal(data, &cookie); err != nil {
 		return nil, err
