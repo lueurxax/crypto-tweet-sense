@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	jsoniter "github.com/json-iterator/go"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
@@ -14,6 +15,42 @@ type twitterAccountsRepo interface {
 	SaveAccount(ctx context.Context, account common.TwitterAccount) error
 	SaveCookie(ctx context.Context, login string, cookie []*http.Cookie) error
 	GetCookie(ctx context.Context, login string) ([]*http.Cookie, error)
+	GetAccounts(ctx context.Context) ([]common.TwitterAccount, error)
+}
+
+func (d *db) GetAccounts(ctx context.Context) ([]common.TwitterAccount, error) {
+	tx, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	pr, err := fdb.PrefixRange(d.keyBuilder.TwitterAccounts())
+	if err != nil {
+		return nil, err
+	}
+
+	kvs, err := tx.GetRange(pr)
+	if err != nil {
+		return nil, err
+	}
+
+	accounts := make([]common.TwitterAccount, 0, len(kvs))
+
+	for _, kv := range kvs {
+		account := common.TwitterAccount{}
+
+		if err = jsoniter.Unmarshal(kv.Value, &account); err != nil {
+			return nil, err
+		}
+
+		accounts = append(accounts, account)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return accounts, nil
 }
 
 func (d *db) GetAccount(ctx context.Context, login string) (common.TwitterAccount, error) {

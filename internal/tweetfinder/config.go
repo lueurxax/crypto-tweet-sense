@@ -3,7 +3,6 @@ package tweetfinder
 import "github.com/kelseyhightower/envconfig"
 
 type ConfigPool struct {
-	XLogins []string `envconfig:"X_LOGINS" required:"true"`
 	Proxies []string `envconfig:"PROXIES"`
 }
 

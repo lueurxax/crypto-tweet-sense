@@ -27,6 +27,7 @@ type Finder interface {
 	FindAll(ctx context.Context, start, end *time.Time, search string) ([]common.TweetSnapshot, error)
 	Find(ctx context.Context, id string) (*common.TweetSnapshot, error)
 	CurrentDelay() int64
+	Init(ctx context.Context) error
 }
 
 type delayManager interface {
@@ -41,6 +42,10 @@ type finder struct {
 	delayManager
 
 	log log.Logger
+}
+
+func (f *finder) Init(context.Context) error {
+	return nil
 }
 
 func (f *finder) Find(ctx context.Context, id string) (*common.TweetSnapshot, error) {

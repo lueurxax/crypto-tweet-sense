@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.elastic.co/ecslogrus"
 
+	"github.com/lueurxax/crypto-tweet-sense/internal/account_manager"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 	ratingCollector "github.com/lueurxax/crypto-tweet-sense/internal/ratingcollector"
 	fdb "github.com/lueurxax/crypto-tweet-sense/internal/repo"
@@ -79,8 +80,10 @@ func main() {
 
 	xConfig := tweetFinder.GetConfigPool()
 
-	finder, err := tweetFinder.NewPoolFabric(ctx, xConfig, pkgKey, st, logger)
-	if err != nil {
+	accountManager := account_manager.NewManager(st)
+
+	finder := tweetFinder.NewPool(xConfig, accountManager, st, logger.WithField(pkgKey, "tweet_finder_pool"))
+	if err = finder.Init(ctx); err != nil {
 		panic(err)
 	}
 

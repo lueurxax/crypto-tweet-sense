@@ -5,18 +5,48 @@ import (
 	"sync"
 	"time"
 
+	twitterscraper "github.com/n0madic/twitter-scraper"
+
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
+	"github.com/lueurxax/crypto-tweet-sense/internal/tweetfinder/windowlimiter"
 )
 
+type accountManager interface {
+	AuthScrapper(ctx context.Context, account common.TwitterAccount, scraper *twitterscraper.Scraper) error
+	SearchUnAuthAccounts(ctx context.Context) ([]common.TwitterAccount, error)
+}
+
+type repo interface {
+	AddCounter(ctx context.Context, id string, window time.Duration, counterTime time.Time) error
+	CleanCounters(ctx context.Context, id string, window time.Duration) error
+	SetThreshold(ctx context.Context, id string, window time.Duration) error
+	GetRequestLimit(ctx context.Context, id string, window time.Duration) (common.RequestLimitData, error)
+	CheckIfExist(ctx context.Context, id string, window time.Duration) (bool, error)
+	Create(ctx context.Context, id string, window time.Duration, threshold uint64) error
+	IncreaseThresholdTo(ctx context.Context, id string, duration time.Duration, threshold uint64) error
+}
+
 type pool struct {
+	config        ConfigPool
 	finders       []Finder
 	releaseSignal chan struct{}
+
+	manager accountManager
+	repo    repo
 
 	mu           sync.RWMutex
 	finderDelays []int64
 
 	log log.Logger
+}
+
+func (p *pool) Init(ctx context.Context) error {
+	if err := p.init(ctx); err != nil {
+		return err
+	}
+	go p.reinit()
+	return nil
 }
 
 func (p *pool) CurrentDelay() int64 {
@@ -113,15 +143,104 @@ func (p *pool) releaseFinder(i int) {
 	}
 }
 
-func NewPool(finders []Finder, logger log.Logger) Finder {
-	delays := make([]int64, len(finders))
-	for i, f := range finders {
-		delays[i] = f.CurrentDelay()
+func (p *pool) init(ctx context.Context) error {
+	delayManagerLogger := p.log.WithField(pkgKey, "delay_manager")
+	limiterLogger := p.log.WithField(pkgKey, "window_limiter")
+	finderLogger := p.log.WithField(pkgKey, "finder")
+
+	var delayManager Manager
+
+	accounts, err := p.manager.SearchUnAuthAccounts(ctx)
+	if err != nil {
+		return err
 	}
 
+	for i, account := range accounts {
+		scraper := twitterscraper.New().WithDelay(startDelay).SetSearchMode(twitterscraper.SearchLatest)
+
+		if err = p.manager.AuthScrapper(ctx, account, scraper); err != nil {
+			return err
+		}
+
+		if len(p.config.Proxies) > i {
+			if err = scraper.SetProxy(p.config.Proxies[i]); err != nil {
+				return err
+			}
+		}
+
+		limiterIntervals := []time.Duration{
+			time.Minute,
+			time.Hour,
+			time.Hour * 24,
+			time.Hour * 24 * 30,
+		}
+
+		windowLimiters := make([]WindowLimiter, len(limiterIntervals))
+
+		for j := len(limiterIntervals) - 1; j >= 0; j-- {
+			resetInterval := limiterIntervals[j]
+			if j != len(limiterIntervals)-1 {
+				resetInterval = limiterIntervals[j+1]
+			}
+
+			windowLimiters[j] = windowlimiter.NewLimiter(
+				limiterIntervals[j],
+				resetInterval,
+				account.Login,
+				p.repo,
+				limiterLogger.WithField(finderLogin, account),
+			)
+
+			if j != len(limiterIntervals)-1 {
+				windowLimiters[j].SetResetLimiter(windowLimiters[j+1])
+			}
+		}
+
+		delayManager = NewDelayManagerV2(
+			func(seconds int64) { scraper.WithDelay(seconds) },
+			windowLimiters,
+			startDelay,
+			delayManagerLogger.WithField(finderLogin, account),
+		)
+
+		if err = delayManager.Start(ctx); err != nil {
+			return err
+		}
+
+		f := NewFinder(scraper, delayManager, finderLogger.WithField(finderLogin, account))
+
+		p.mu.Lock()
+		p.finders = append(p.finders, f)
+		p.finderDelays = append(p.finderDelays, f.CurrentDelay())
+		p.mu.Unlock()
+
+		select {
+		case p.releaseSignal <- struct{}{}:
+		default:
+		}
+	}
+
+	return nil
+}
+
+func (p *pool) reinit() {
+	for {
+		select {
+		case <-time.After(time.Second):
+			if err := p.init(context.Background()); err != nil {
+				p.log.WithError(err).Error("error while reinit pool")
+			}
+		}
+	}
+}
+
+func NewPool(config ConfigPool, manager accountManager, db repo, logger log.Logger) Finder {
 	return &pool{
-		finders:      finders,
-		finderDelays: delays,
+		config:       config,
+		finders:      make([]Finder, 0),
+		manager:      manager,
+		repo:         db,
+		finderDelays: make([]int64, 0),
 		log:          logger,
 	}
 }
