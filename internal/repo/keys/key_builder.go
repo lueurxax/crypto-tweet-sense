@@ -88,5 +88,5 @@ func (b builder) getPrefix(key string) []byte {
 }
 
 func NewBuilder() Builder {
-	return &builder{}
+	return &builder{prefixesCache: make(map[string][]byte)}
 }
