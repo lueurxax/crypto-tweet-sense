@@ -77,7 +77,7 @@ func (d *db) GetRating(ctx context.Context, username string) (common.Rating, err
 		return common.Rating{}, err
 	}
 
-	data, err := tx.Get(d.keyBuilder.Tweet(username))
+	data, err := tx.Get(d.keyBuilder.TweetUsernameRatingKey(username))
 	if err != nil {
 		return common.Rating{}, err
 	}

@@ -14,7 +14,8 @@ const (
 	tweetKey        = "tweet"
 	timeout         = time.Minute * 5
 	oldFastInterval = time.Second * 30
-	searchInterval  = time.Minute * 15
+	oldestInterval  = time.Second * 10
+	searchInterval  = time.Minute * 5
 )
 
 type Watcher interface {
@@ -219,7 +220,7 @@ func (w *watcher) updateTweet(ctx context.Context, id string) error {
 }
 
 func (w *watcher) updateOldest() {
-	tick := time.NewTicker(time.Second)
+	tick := time.NewTicker(oldestInterval)
 	for range tick.C {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 
