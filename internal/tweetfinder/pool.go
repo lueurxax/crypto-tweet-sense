@@ -215,7 +215,10 @@ func (p *pool) init(ctx context.Context) error {
 			return err
 		}
 
-		f := NewFinder(scraper, delayManager, finderLogger.WithField(finderLogin, account.Login))
+		f := NewMetricMiddleware(
+			account.Login,
+			NewFinder(scraper, delayManager, finderLogger.WithField(finderLogin, account.Login)),
+		)
 
 		p.mu.Lock()
 		p.finders = append(p.finders, f)

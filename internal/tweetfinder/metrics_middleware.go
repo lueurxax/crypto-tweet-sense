@@ -50,18 +50,19 @@ func NewMetricMiddleware(login string, next Finder) Finder {
 	all := prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "crypto_tweet_sense",
 		Subsystem: "finder",
-		Name:      "find_all_requests_histogram_seconds",
+		Name:      "find_all_requests_seconds",
 		Help:      "Find all requests histogram in seconds",
 	}, []string{"login", "search", "error"})
 
 	one := prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "crypto_tweet_sense",
 		Subsystem: "finder",
-		Name:      "find_requests_histogram_seconds",
+		Name:      "find_requests_seconds",
 		Help:      "Find requests histogram in seconds",
 	}, []string{"login", "error"})
 
 	prometheus.MustRegister(all, one)
+
 	return &metricMiddleware{
 		login:                           login,
 		next:                            next,

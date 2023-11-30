@@ -96,7 +96,7 @@ func (l *limiter) TooFast(ctx context.Context) (uint64, error) {
 	l.log.WithField("threshold", rl.Threshold).
 		WithField("counter", rl.RequestsCount).
 		WithField(durationKey, l.duration).
-		Debug("checking if too fast")
+		Trace("checking if too fast")
 
 	return uint64(l.duration.Seconds()) / rl.Threshold, nil
 }

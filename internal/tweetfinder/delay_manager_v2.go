@@ -8,6 +8,21 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/internal/tweetfinder/windowlimiter"
 )
 
+const (
+	delayKey         = "delay"
+	loopInterval     = time.Second * 10
+	recalculateError = "error while recalculate"
+)
+
+type Manager interface {
+	TooManyRequests(ctx context.Context)
+	AfterRequest()
+	ProcessedQuery()
+	SetSetterFn(func(seconds int64))
+	CurrentDelay() int64
+	Start(ctx context.Context) error
+}
+
 type WindowLimiter interface {
 	Inc()
 	TrySetThreshold(ctx context.Context, startTime time.Time) error
@@ -71,7 +86,7 @@ func (m *managerV2) Start(ctx context.Context) error {
 }
 
 func (m *managerV2) loop(ctx context.Context) {
-	ticker := time.NewTicker(time.Second * 10)
+	ticker := time.NewTicker(loopInterval)
 
 	for {
 		select {
@@ -79,11 +94,11 @@ func (m *managerV2) loop(ctx context.Context) {
 			return
 		case <-m.forceRecalculate:
 			if err := m.recalculate(ctx, 2); err != nil {
-				m.log.WithError(err).Error("error while recalculate")
+				m.log.WithError(err).Error(recalculateError)
 			}
 		case <-ticker.C:
 			if err := m.recalculate(ctx, 1); err != nil {
-				m.log.WithError(err).Error("error while recalculate")
+				m.log.WithError(err).Error(recalculateError)
 			}
 		}
 	}
@@ -114,7 +129,7 @@ func (m *managerV2) recalculate(ctx context.Context, factor int) error {
 			m.log.
 				WithField("limiter_duration", limiter.Duration()).
 				WithField(delayKey, m.delay).
-				Debug("delay increased")
+				Trace("delay increased")
 
 			break
 		}
