@@ -46,22 +46,7 @@ func (m *metricMiddleware) CurrentDelay() int64 {
 	return m.next.CurrentDelay()
 }
 
-func NewMetricMiddleware(login string, next Finder) Finder {
-	all := prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: "crypto_tweet_sense",
-		Subsystem: "finder",
-		Name:      "find_all_requests_seconds",
-		Help:      "Find all requests histogram in seconds",
-	}, []string{"login", "search", "error"})
-
-	one := prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: "crypto_tweet_sense",
-		Subsystem: "finder",
-		Name:      "find_requests_seconds",
-		Help:      "Find requests histogram in seconds",
-	}, []string{"login", "error"})
-
-	prometheus.MustRegister(all, one)
+func NewMetricMiddleware(all, one *prometheus.HistogramVec, login string, next Finder) Finder {
 
 	return &metricMiddleware{
 		login:                           login,

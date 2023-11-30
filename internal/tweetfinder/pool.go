@@ -6,6 +6,7 @@ import (
 	"time"
 
 	twitterscraper "github.com/n0madic/twitter-scraper"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
@@ -45,6 +46,9 @@ type pool struct {
 	finderDelays []int64
 
 	log log.Logger
+
+	metricsAll *prometheus.HistogramVec
+	metricsOne *prometheus.HistogramVec
 }
 
 func (p *pool) Init(ctx context.Context) error {
@@ -216,6 +220,7 @@ func (p *pool) init(ctx context.Context) error {
 		}
 
 		f := NewMetricMiddleware(
+			p.metricsAll, p.metricsOne,
 			account.Login,
 			NewFinder(scraper, delayManager, finderLogger.WithField(finderLogin, account.Login)),
 		)
@@ -243,7 +248,7 @@ func (p *pool) reinit() {
 	}
 }
 
-func NewPool(config ConfigPool, manager accountManager, db repo, logger log.Logger) Finder {
+func NewPool(metricsAll, metricsOne *prometheus.HistogramVec, config ConfigPool, manager accountManager, db repo, logger log.Logger) Finder {
 	return &pool{
 		config:       config,
 		finders:      make([]Finder, 0),
@@ -251,5 +256,7 @@ func NewPool(config ConfigPool, manager accountManager, db repo, logger log.Logg
 		repo:         db,
 		finderDelays: make([]int64, 0),
 		log:          logger,
+		metricsAll:   metricsAll,
+		metricsOne:   metricsOne,
 	}
 }

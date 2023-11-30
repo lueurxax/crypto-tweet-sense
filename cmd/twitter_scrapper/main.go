@@ -13,6 +13,7 @@ import (
 	foundeationDB "github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/buaazp/fasthttprouter"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
@@ -90,7 +91,23 @@ func main() {
 
 	accountManager := account_manager.NewManager(st, logger.WithField(pkgKey, "account_manager"))
 
-	finder := tweetFinder.NewPool(xConfig, accountManager, st, logger.WithField(pkgKey, "tweet_finder_pool"))
+	all := prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "crypto_tweet_sense",
+		Subsystem: "finder",
+		Name:      "find_all_requests_seconds",
+		Help:      "Find all requests histogram in seconds",
+	}, []string{"login", "search", "error"})
+
+	one := prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "crypto_tweet_sense",
+		Subsystem: "finder",
+		Name:      "find_requests_seconds",
+		Help:      "Find requests histogram in seconds",
+	}, []string{"login", "error"})
+
+	prometheus.MustRegister(all, one)
+
+	finder := tweetFinder.NewPool(all, one, xConfig, accountManager, st, logger.WithField(pkgKey, "tweet_finder_pool"))
 	if err = finder.Init(ctx); err != nil {
 		panic(err)
 	}
