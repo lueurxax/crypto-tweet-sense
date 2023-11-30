@@ -219,7 +219,7 @@ func (w *watcher) updateTweet(ctx context.Context, id string) error {
 }
 
 func (w *watcher) updateOldest() {
-	tick := time.NewTicker(time.Minute)
+	tick := time.NewTicker(time.Second)
 	for range tick.C {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 

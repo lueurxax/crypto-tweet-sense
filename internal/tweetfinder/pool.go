@@ -196,7 +196,7 @@ func (p *pool) init(ctx context.Context) error {
 				resetInterval,
 				account.Login,
 				p.repo,
-				limiterLogger.WithField(finderLogin, account),
+				limiterLogger.WithField(finderLogin, account.Login),
 			)
 
 			if j != len(limiterIntervals)-1 {
@@ -208,14 +208,14 @@ func (p *pool) init(ctx context.Context) error {
 			func(seconds int64) { scraper.WithDelay(seconds) },
 			windowLimiters,
 			startDelay,
-			delayManagerLogger.WithField(finderLogin, account),
+			delayManagerLogger.WithField(finderLogin, account.Login),
 		)
 
 		if err = delayManager.Start(ctx); err != nil {
 			return err
 		}
 
-		f := NewFinder(scraper, delayManager, finderLogger.WithField(finderLogin, account))
+		f := NewFinder(scraper, delayManager, finderLogger.WithField(finderLogin, account.Login))
 
 		p.mu.Lock()
 		p.finders = append(p.finders, f)
