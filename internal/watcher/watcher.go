@@ -272,7 +272,7 @@ func (w *watcher) cleanTooOldTweets(ctx context.Context) error {
 }
 
 func NewWatcher(finder finder, repo repo, checker ratingChecker, logger log.Logger) Watcher {
-	start := time.Now().AddDate(0, 0, -1)
+	start := time.Now().Add(-time.Hour)
 
 	return &watcher{
 		queries: map[string]time.Time{
