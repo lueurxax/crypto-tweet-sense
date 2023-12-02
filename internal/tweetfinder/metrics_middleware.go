@@ -47,7 +47,6 @@ func (m *metricMiddleware) CurrentDelay() int64 {
 }
 
 func NewMetricMiddleware(all, one *prometheus.HistogramVec, login string, next Finder) Finder {
-
 	return &metricMiddleware{
 		login:                           login,
 		next:                            next,

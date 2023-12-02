@@ -33,6 +33,7 @@ var version = "dev"
 const (
 	foundationDBVersion = 710
 	pkgKey              = "pkg"
+	GetMethod           = "GET"
 )
 
 type config struct {
@@ -96,6 +97,7 @@ func main() {
 		Subsystem: "finder",
 		Name:      "find_all_requests_seconds",
 		Help:      "Find all requests histogram in seconds",
+		Buckets:   []float64{1, 10, 100, 200, 300, 400, 500, 1000, 2000, 3000, 4000},
 	}, []string{"login", "search", "error"})
 
 	one := prometheus.NewHistogramVec(prometheus.HistogramOpts{
@@ -103,6 +105,7 @@ func main() {
 		Subsystem: "finder",
 		Name:      "find_requests_seconds",
 		Help:      "Find requests histogram in seconds",
+		Buckets:   []float64{.005, .05, .1, .5, 1, 2.5, 5, 10, 25, 50, 100},
 	}, []string{"login", "error"})
 
 	prometheus.MustRegister(all, one)
@@ -117,17 +120,17 @@ func main() {
 	watch.Watch()
 
 	diagAPIRouter := fasthttprouter.New()
-	diagAPIRouter.Handle("GET", "/debug/pprof/", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Index))
-	diagAPIRouter.Handle("GET", "/debug/pprof/profile", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Profile))
-	diagAPIRouter.Handle("GET", "/debug/pprof/trace", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Trace))
-	diagAPIRouter.Handle("GET", "/debug/pprof/symbol", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Symbol))
-	diagAPIRouter.Handle("GET", "/debug/pprof/cmdline", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Cmdline))
-	diagAPIRouter.Handle("GET", "/debug/pprof/goroutine", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Handler("goroutine").ServeHTTP))
-	diagAPIRouter.Handle("GET", "/debug/pprof/heap", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Handler("heap").ServeHTTP))
-	diagAPIRouter.Handle("GET", "/debug/pprof/allocs", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Handler("allocs").ServeHTTP))
-	diagAPIRouter.Handle("GET", "/debug/pprof/block", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Handler("block").ServeHTTP))
-	diagAPIRouter.Handle("GET", "/debug/pprof/mutex", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Handler("mutex").ServeHTTP))
-	diagAPIRouter.Handle("GET", "/metrics", fasthttpadaptor.NewFastHTTPHandlerFunc(promhttp.Handler().ServeHTTP))
+	diagAPIRouter.Handle(GetMethod, "/debug/pprof/", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Index))
+	diagAPIRouter.Handle(GetMethod, "/debug/pprof/profile", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Profile))
+	diagAPIRouter.Handle(GetMethod, "/debug/pprof/trace", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Trace))
+	diagAPIRouter.Handle(GetMethod, "/debug/pprof/symbol", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Symbol))
+	diagAPIRouter.Handle(GetMethod, "/debug/pprof/cmdline", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Cmdline))
+	diagAPIRouter.Handle(GetMethod, "/debug/pprof/goroutine", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Handler("goroutine").ServeHTTP))
+	diagAPIRouter.Handle(GetMethod, "/debug/pprof/heap", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Handler("heap").ServeHTTP))
+	diagAPIRouter.Handle(GetMethod, "/debug/pprof/allocs", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Handler("allocs").ServeHTTP))
+	diagAPIRouter.Handle(GetMethod, "/debug/pprof/block", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Handler("block").ServeHTTP))
+	diagAPIRouter.Handle(GetMethod, "/debug/pprof/mutex", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Handler("mutex").ServeHTTP))
+	diagAPIRouter.Handle(GetMethod, "/metrics", fasthttpadaptor.NewFastHTTPHandlerFunc(promhttp.Handler().ServeHTTP))
 	diagAPIServer := &fasthttp.Server{
 		Handler: diagAPIRouter.Handler,
 	}
