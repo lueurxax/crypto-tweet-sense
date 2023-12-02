@@ -15,7 +15,7 @@ const (
 	timeout         = time.Minute * 5
 	oldFastInterval = time.Second * 30
 	oldestInterval  = time.Second * 10
-	searchInterval  = time.Minute * 5
+	searchInterval  = time.Second * 30
 )
 
 type Watcher interface {
