@@ -15,7 +15,7 @@ const (
 	timeout         = time.Minute * 5
 	oldFastInterval = time.Second * 30
 	oldestInterval  = time.Second * 10
-	searchInterval  = time.Second * 30
+	searchInterval  = time.Minute
 )
 
 type Watcher interface {
@@ -272,7 +272,7 @@ func (w *watcher) cleanTooOldTweets(ctx context.Context) error {
 }
 
 func NewWatcher(finder finder, repo repo, checker ratingChecker, logger log.Logger) Watcher {
-	start := time.Now().Add(-time.Hour)
+	start := time.Now().Add(-time.Minute)
 
 	return &watcher{
 		queries: map[string]time.Time{
