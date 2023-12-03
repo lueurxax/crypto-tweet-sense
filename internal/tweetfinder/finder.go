@@ -101,7 +101,7 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 		query = fmt.Sprintf("%s until:%s", query, end.Format(format))
 	}
 
-	f.log.WithField("query", query).Debug("searching")
+	f.log.WithField("query", query).WithField("start", start).Debug("searching")
 	tweetsCh := f.scraper.SearchTweets(ctx, query, limit)
 
 	response := make([]common.TweetSnapshot, 0)
@@ -131,11 +131,6 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 			f.delayManager.AfterRequest()
 		}
 
-		if start != nil && tweet.TimeParsed.Sub(*start).Seconds() < 0 {
-			cancel()
-			break
-		}
-
 		counter++
 		likesMap[tweet.Likes]++
 		retweetsMap[tweet.Retweets]++
@@ -162,6 +157,11 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 		})
 
 		lastTweetTime = tweet.TimeParsed
+
+		if start != nil && tweet.TimeParsed.Sub(*start).Seconds() < 0 {
+			cancel()
+			break
+		}
 	}
 
 	f.delayManager.ProcessedQuery()
