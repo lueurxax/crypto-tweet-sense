@@ -276,10 +276,11 @@ func NewWatcher(finder finder, repo repo, checker ratingChecker, logger log.Logg
 
 	return &watcher{
 		queries: map[string]time.Time{
-			"bitcoin":        start,
-			"crypto":         start,
-			"cryptocurrency": start,
-			"BTC":            start,
+			"bitcoin":       start,
+			"crypto":        start,
+			"cryptocurrenc": start,
+			"altcoin":       start,
+			"BTC":           start,
 		},
 		finder:        finder,
 		repo:          repo,
