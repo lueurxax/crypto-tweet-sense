@@ -100,10 +100,10 @@ func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.
 		return
 	}
 
-	lastTweet := start
+	lastTweet := w.queries[query]
 
 	for i := range tweets {
-		lastTweet, tweets[i].RatingGrowSpeed = w.processTweet(ctx, &tweets[i], lastTweet)
+		lastTweet, tweets[i].RatingGrowSpeed = w.processTweet(ctx, &tweets[i], w.queries[query])
 	}
 
 	if err = w.repo.Save(ctx, tweets); err != nil {
