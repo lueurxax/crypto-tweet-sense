@@ -79,7 +79,7 @@ func (w *watcher) searchAll(query string) {
 }
 
 func (w *watcher) search(ctx context.Context, query string) {
-	w.searchWithQuery(ctx, query, w.queries[query])
+	w.searchWithQuery(ctx, query, time.Now().Add(-time.Minute))
 	w.logger.WithField("query", query).Debug("watcher checked news")
 }
 
