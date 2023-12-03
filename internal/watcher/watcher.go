@@ -103,14 +103,16 @@ func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.
 	lastTweet := w.queries[query]
 
 	for i := range tweets {
-		lastTweet, tweets[i].RatingGrowSpeed = w.processTweet(ctx, &tweets[i], w.queries[query])
+		lastTweet, tweets[i].RatingGrowSpeed = w.processTweet(ctx, &tweets[i], lastTweet)
 	}
 
 	if err = w.repo.Save(ctx, tweets); err != nil {
 		w.logger.WithError(err).Error("save tweets")
 	}
 
-	w.queries[query] = lastTweet
+	if w.queries[query].Before(lastTweet) {
+		w.queries[query] = lastTweet
+	}
 }
 
 func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot, lastTweet time.Time) (time.Time, float64) {
