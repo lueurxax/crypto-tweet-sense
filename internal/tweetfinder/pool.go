@@ -15,6 +15,7 @@ import (
 
 const (
 	startDelay  = 15
+	maxDelay    = 600
 	finderLogin = "finder_login"
 	pkgKey      = "pkg"
 )
@@ -122,7 +123,7 @@ func (p *pool) getFinderIndex() (int, bool) {
 	index := 0
 
 	for i, d := range p.finderDelays {
-		if d == 0 {
+		if d == 0 || d > maxDelay {
 			continue
 		}
 
@@ -251,7 +252,9 @@ func (p *pool) reinit() {
 	}
 }
 
-func NewPool(metricsAll, metricsOne *prometheus.HistogramVec, metricsDelay *prometheus.GaugeVec, config ConfigPool, manager accountManager, db repo, logger log.Logger) Finder {
+func NewPool(
+	metricsAll, metricsOne *prometheus.HistogramVec, metricsDelay *prometheus.GaugeVec,
+	config ConfigPool, manager accountManager, db repo, logger log.Logger) Finder {
 	return &pool{
 		config:       config,
 		finders:      make([]Finder, 0),
