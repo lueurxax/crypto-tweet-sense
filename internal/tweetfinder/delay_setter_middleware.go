@@ -12,7 +12,7 @@ type delaySetter struct {
 
 func (d *delaySetter) Set(seconds int64) {
 	d.setter(seconds)
-	d.metric.WithLabelValues("login", d.login).Set(float64(seconds))
+	d.metric.WithLabelValues(d.login).Set(float64(seconds))
 }
 
 func newDelaySetter(setter func(seconds int64), metric *prometheus.GaugeVec, login string) *delaySetter {
