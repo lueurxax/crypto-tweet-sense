@@ -18,7 +18,6 @@ type Manager interface {
 	TooManyRequests(ctx context.Context)
 	AfterRequest()
 	ProcessedQuery()
-	SetSetterFn(func(seconds int64))
 	CurrentDelay() int64
 	Start(ctx context.Context) error
 }
@@ -64,10 +63,6 @@ func (m *managerV2) AfterRequest() {
 }
 
 func (m *managerV2) ProcessedQuery() {}
-
-func (m *managerV2) SetSetterFn(f func(seconds int64)) {
-	m.setter = f
-}
 
 func (m *managerV2) CurrentDelay() int64 {
 	return m.delay

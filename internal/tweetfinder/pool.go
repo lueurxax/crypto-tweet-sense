@@ -47,8 +47,9 @@ type pool struct {
 
 	log log.Logger
 
-	metricsAll *prometheus.HistogramVec
-	metricsOne *prometheus.HistogramVec
+	metricsAll   *prometheus.HistogramVec
+	metricsOne   *prometheus.HistogramVec
+	metricsDelay *prometheus.GaugeVec
 }
 
 func (p *pool) Init(ctx context.Context) error {
@@ -208,8 +209,10 @@ func (p *pool) init(ctx context.Context) error {
 			}
 		}
 
+		ds := newDelaySetter(func(seconds int64) { scraper.WithDelay(seconds) }, p.metricsDelay, account.Login)
+
 		delayManager = NewDelayManagerV2(
-			func(seconds int64) { scraper.WithDelay(seconds) },
+			ds.Set,
 			windowLimiters,
 			startDelay,
 			delayManagerLogger.WithField(finderLogin, account.Login),
@@ -248,7 +251,7 @@ func (p *pool) reinit() {
 	}
 }
 
-func NewPool(metricsAll, metricsOne *prometheus.HistogramVec, config ConfigPool, manager accountManager, db repo, logger log.Logger) Finder {
+func NewPool(metricsAll, metricsOne *prometheus.HistogramVec, metricsDelay *prometheus.GaugeVec, config ConfigPool, manager accountManager, db repo, logger log.Logger) Finder {
 	return &pool{
 		config:       config,
 		finders:      make([]Finder, 0),
@@ -258,5 +261,6 @@ func NewPool(metricsAll, metricsOne *prometheus.HistogramVec, config ConfigPool,
 		log:          logger,
 		metricsAll:   metricsAll,
 		metricsOne:   metricsOne,
+		metricsDelay: metricsDelay,
 	}
 }

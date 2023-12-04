@@ -108,9 +108,16 @@ func main() {
 		Buckets:   []float64{.005, .05, .1, .5, 1, 2.5, 5, 10, 25, 50, 100},
 	}, []string{"login", "error"})
 
-	prometheus.MustRegister(all, one)
+	delay := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "crypto_tweet_sense",
+		Subsystem: "finder",
+		Name:      "delay_seconds",
+		Help:      "Requests delay in seconds",
+	}, []string{"login"})
 
-	finder := tweetFinder.NewPool(all, one, xConfig, accountManager, st, logger.WithField(pkgKey, "tweet_finder_pool"))
+	prometheus.MustRegister(all, one, delay)
+
+	finder := tweetFinder.NewPool(all, one, delay, xConfig, accountManager, st, logger.WithField(pkgKey, "tweet_finder_pool"))
 	if err = finder.Init(ctx); err != nil {
 		panic(err)
 	}
