@@ -36,7 +36,7 @@ type repo interface {
 }
 
 type pool struct {
-	config        ConfigPool
+	config        ConfigProxies
 	finders       []Finder
 	releaseSignal chan struct{}
 
@@ -169,11 +169,13 @@ func (p *pool) init(ctx context.Context) error {
 		return err
 	}
 
+	proxies := p.config.GetProxies()
+
 	for i, account := range accounts {
 		scraper := twitterscraper.New().WithDelay(startDelay).SetSearchMode(twitterscraper.SearchLatest)
 
-		if len(p.config.Proxies) > len(p.finders)+i {
-			if err = scraper.SetProxy(p.config.Proxies[len(p.finders)+i]); err != nil {
+		if len(proxies) > len(p.finders)+i {
+			if err = scraper.SetProxy(proxies[len(p.finders)+i]); err != nil {
 				return err
 			}
 		}
@@ -254,7 +256,7 @@ func (p *pool) reinit() {
 
 func NewPool(
 	metricsAll, metricsOne *prometheus.HistogramVec, metricsDelay *prometheus.GaugeVec,
-	config ConfigPool, manager accountManager, db repo, logger log.Logger) Finder {
+	config ConfigProxies, manager accountManager, db repo, logger log.Logger) Finder {
 	return &pool{
 		config:       config,
 		finders:      make([]Finder, 0),
