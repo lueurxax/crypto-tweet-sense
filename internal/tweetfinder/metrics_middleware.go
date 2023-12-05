@@ -15,22 +15,11 @@ type metricMiddleware struct {
 	next  Finder
 
 	findNextRequestsHistogramSeconds *prometheus.HistogramVec
-	findAllRequestsHistogramSeconds  *prometheus.HistogramVec
 	findRequestsHistogramSeconds     *prometheus.HistogramVec
 }
 
 func (m *metricMiddleware) Init(context.Context) error {
 	return nil
-}
-
-func (m *metricMiddleware) FindAll(ctx context.Context, start, end *time.Time, search string) ([]common.TweetSnapshot, error) {
-	st := time.Now()
-
-	data, err := m.next.FindAll(ctx, start, end, search)
-
-	m.findAllRequestsHistogramSeconds.WithLabelValues(m.login, search, strconv.FormatBool(err != nil)).Observe(time.Since(st).Seconds())
-
-	return data, err
 }
 
 func (m *metricMiddleware) FindNext(ctx context.Context, start, end *time.Time, search, cursor string) ([]common.TweetSnapshot, string, error) {
@@ -57,12 +46,11 @@ func (m *metricMiddleware) CurrentDelay() int64 {
 	return m.next.CurrentDelay()
 }
 
-func NewMetricMiddleware(all, one, nextHist *prometheus.HistogramVec, login string, next Finder) Finder {
+func NewMetricMiddleware(one, nextHist *prometheus.HistogramVec, login string, next Finder) Finder {
 	return &metricMiddleware{
 		login:                            login,
 		next:                             next,
 		findNextRequestsHistogramSeconds: nextHist,
-		findAllRequestsHistogramSeconds:  all,
 		findRequestsHistogramSeconds:     one,
 	}
 }

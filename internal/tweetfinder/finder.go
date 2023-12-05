@@ -17,14 +17,9 @@ const (
 	format          = "2006-01-02"
 	tooManyRequests = "429 Too Many Requests"
 	notFound        = "not found"
-	createdKey      = "created"
-	countKey        = "count"
-	mapKey          = "map"
-	batchInterval   = 50
 )
 
 type Finder interface {
-	FindAll(ctx context.Context, start, end *time.Time, search string) ([]common.TweetSnapshot, error)
 	FindNext(ctx context.Context, start, end *time.Time, search, cursor string) ([]common.TweetSnapshot, string, error)
 	Find(ctx context.Context, id string) (*common.TweetSnapshot, error)
 	CurrentDelay() int64
@@ -108,20 +103,9 @@ func (f *finder) FindNext(ctx context.Context, start, end *time.Time, search, cu
 	}
 
 	response := make([]common.TweetSnapshot, 0)
-	counter := 0
 
 	for _, tweet := range tweets {
 		syncTime := time.Now()
-
-		if counter%batchInterval == 0 {
-			f.log.
-				WithField(createdKey, tweet.TimeParsed).
-				WithField(countKey, counter).
-				Debug("processed tweets")
-			f.delayManager.AfterRequest()
-		}
-
-		counter++
 
 		response = append(response, common.TweetSnapshot{
 			Tweet: &common.Tweet{
@@ -142,100 +126,11 @@ func (f *finder) FindNext(ctx context.Context, start, end *time.Time, search, cu
 			},
 			CheckedAt: syncTime,
 		})
-
 	}
 
 	f.delayManager.AfterRequest()
 
 	return response, nextCursor, nil
-}
-
-//nolint:funlen
-func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search string) ([]common.TweetSnapshot, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	query := fmt.Sprintf("%s -filter:retweets", search)
-	if start != nil {
-		query = fmt.Sprintf("%s since:%s", search, start.Format(format))
-	}
-
-	if end != nil {
-		query = fmt.Sprintf("%s until:%s", query, end.Format(format))
-	}
-
-	f.log.WithField("query", query).WithField("start", start).Debug("searching")
-	tweetsCh := f.scraper.SearchTweets(ctx, query, limit)
-
-	response := make([]common.TweetSnapshot, 0)
-	counter := 0
-	likesMap := map[int]int{}
-	retweetsMap := map[int]int{}
-	replyMap := map[int]int{}
-	lastTweetTime := time.Now()
-
-	for tweet := range tweetsCh {
-		if tweet.Error != nil {
-			if strings.Contains(tweet.Error.Error(), tooManyRequests) {
-				f.delayManager.TooManyRequests(ctx)
-				return response, nil
-			}
-
-			return nil, tweet.Error
-		}
-
-		syncTime := time.Now()
-
-		if counter%batchInterval == 0 {
-			f.log.
-				WithField(createdKey, tweet.TimeParsed).
-				WithField(countKey, counter).
-				Debug("processed tweets")
-			f.delayManager.AfterRequest()
-		}
-
-		counter++
-		likesMap[tweet.Likes]++
-		retweetsMap[tweet.Retweets]++
-		replyMap[tweet.Retweets]++
-
-		response = append(response, common.TweetSnapshot{
-			Tweet: &common.Tweet{
-				ID:           tweet.ID,
-				Likes:        tweet.Likes,
-				Name:         tweet.Name,
-				PermanentURL: tweet.PermanentURL,
-				Replies:      tweet.Replies,
-				Retweets:     tweet.Retweets,
-				Text:         tweet.Text,
-				TimeParsed:   tweet.TimeParsed,
-				Timestamp:    tweet.Timestamp,
-				UserID:       tweet.UserID,
-				Username:     tweet.Username,
-				Views:        tweet.Views,
-				Photos:       scrapperPhotosToCommon(tweet.Photos),
-				Videos:       scrapperVideosToCommon(tweet.Videos),
-			},
-			CheckedAt: syncTime,
-		})
-
-		lastTweetTime = tweet.TimeParsed
-
-		if start != nil && tweet.TimeParsed.Sub(*start).Seconds() < 0 {
-			cancel()
-			break
-		}
-	}
-
-	f.delayManager.AfterRequest()
-
-	f.log.WithField(createdKey, lastTweetTime).Debug("last tweet")
-	f.log.WithField(countKey, counter).Debug("tweets found")
-	f.log.WithField(mapKey, likesMap).Debug("likes count")
-	f.log.WithField(mapKey, retweetsMap).Debug("retweet count")
-	f.log.WithField(mapKey, replyMap).Debug("reply count")
-
-	return response, nil
 }
 
 func scrapperPhotosToCommon(photos []twitterscraper.Photo) []common.Photo {

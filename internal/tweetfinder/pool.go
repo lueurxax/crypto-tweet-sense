@@ -48,7 +48,6 @@ type pool struct {
 
 	log log.Logger
 
-	metricsAll   *prometheus.HistogramVec
 	metricsOne   *prometheus.HistogramVec
 	metricsNext  *prometheus.HistogramVec
 	metricsDelay *prometheus.GaugeVec
@@ -85,17 +84,6 @@ func (p *pool) CurrentDelay() int64 {
 	p.mu.RUnlock()
 
 	return sum / int64(len(p.finderDelays))
-}
-
-func (p *pool) FindAll(ctx context.Context, start, end *time.Time, search string) ([]common.TweetSnapshot, error) {
-	f, index, err := p.getFinder(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	defer p.releaseFinder(index)
-
-	return f.FindAll(ctx, start, end, search)
 }
 
 func (p *pool) Find(ctx context.Context, id string) (*common.TweetSnapshot, error) {
@@ -238,7 +226,7 @@ func (p *pool) init(ctx context.Context) error {
 		}
 
 		f := NewMetricMiddleware(
-			p.metricsAll, p.metricsOne, p.metricsNext,
+			p.metricsOne, p.metricsNext,
 			account.Login,
 			NewFinder(scraper, delayManager, finderLogger.WithField(finderLogin, account.Login)),
 		)
@@ -266,8 +254,7 @@ func (p *pool) reinit() {
 	}
 }
 
-func NewPool(
-	metricsAll, metricsOne, metricsNext *prometheus.HistogramVec, metricsDelay *prometheus.GaugeVec,
+func NewPool(metricsOne, metricsNext *prometheus.HistogramVec, metricsDelay *prometheus.GaugeVec,
 	config ConfigProxies, manager accountManager, db repo, logger log.Logger) Finder {
 	return &pool{
 		config:       config,
@@ -277,7 +264,6 @@ func NewPool(
 		mu:           sync.RWMutex{},
 		finderDelays: make([]int64, 0),
 		log:          logger,
-		metricsAll:   metricsAll,
 		metricsOne:   metricsOne,
 		metricsNext:  metricsNext,
 		metricsDelay: metricsDelay,
