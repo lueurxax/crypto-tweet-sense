@@ -23,7 +23,7 @@ type Watcher interface {
 }
 
 type finder interface {
-	FindAll(ctx context.Context, start, end *time.Time, search string) ([]common.TweetSnapshot, error)
+	FindNext(ctx context.Context, start, end *time.Time, search, cursor string) ([]common.TweetSnapshot, string, error)
 	Find(ctx context.Context, id string) (*common.TweetSnapshot, error)
 }
 
@@ -84,58 +84,67 @@ func (w *watcher) search(ctx context.Context, query string) {
 }
 
 func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.Time) {
-	tweets, err := w.finder.FindAll(
-		ctx,
-		&start,
-		nil,
-		query,
-	)
-	if err != nil {
-		if errors.Is(err, tweetfinder.ErrNoTops) {
-			return
+	cursor := ""
+	firstTweet := time.Now().UTC()
+
+	for start.Before(firstTweet) {
+		tweets, nextCursor, err := w.finder.FindNext(
+			ctx,
+			&start,
+			nil,
+			query,
+			cursor,
+		)
+		if err != nil {
+			if errors.Is(err, tweetfinder.ErrNoTops) {
+				return
+			}
+
+			w.logger.WithError(err).Error("find tweets")
+
+			continue
 		}
 
-		w.logger.WithError(err).Error("find tweets")
+		tmpTweet := firstTweet
 
-		return
-	}
+		for i := range tweets {
+			if tweets[i].TimeParsed.Before(tmpTweet) {
+				tmpTweet = tweets[i].TimeParsed
+			}
+			tweets[i].RatingGrowSpeed = w.processTweet(ctx, &tweets[i])
+		}
 
-	lastTweet := w.queries[query]
+		if err = w.repo.Save(ctx, tweets); err != nil {
+			w.logger.WithError(err).Error("save tweets")
+			continue
+		}
 
-	for i := range tweets {
-		lastTweet, tweets[i].RatingGrowSpeed = w.processTweet(ctx, &tweets[i], lastTweet)
-	}
-
-	if err = w.repo.Save(ctx, tweets); err != nil {
-		w.logger.WithError(err).Error("save tweets")
-	}
-
-	if w.queries[query].Before(lastTweet) {
-		w.queries[query] = lastTweet
+		firstTweet = tmpTweet
+		cursor = nextCursor
 	}
 }
 
-func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot, lastTweet time.Time) (time.Time, float64) {
+func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot) float64 {
 	isExist, err := w.repo.CheckIfSentTweetExist(ctx, tweet.PermanentURL)
 	if err != nil {
 		w.logger.WithError(err).Error("check tweet if sent")
-		return lastTweet, 0
+		return 0
 	}
 
 	if isExist {
-		return lastTweet, 0
+		return 0
 	}
 
 	ok, ratingSpeed, err := w.ratingChecker.Check(ctx, tweet)
 	if err != nil {
 		w.logger.WithError(err).Error("check tweet")
-		return lastTweet, 0
+		return 0
 	}
 
 	if ok {
 		if err = w.repo.SaveTweetForEdit(ctx, tweet.Tweet); err != nil {
 			w.logger.WithError(err).Error("save tweet for edit")
-			return time.Now().AddDate(0, 0, -1), ratingSpeed
+			return ratingSpeed
 		}
 
 		w.logger.
@@ -148,11 +157,7 @@ func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot,
 		}
 	}
 
-	if lastTweet.Before(tweet.TimeParsed) {
-		lastTweet = tweet.TimeParsed
-	}
-
-	return lastTweet, ratingSpeed
+	return ratingSpeed
 }
 
 func (w *watcher) updateTop() {
@@ -213,7 +218,7 @@ func (w *watcher) updateTweet(ctx context.Context, id string) error {
 		return err
 	}
 
-	_, tweet.RatingGrowSpeed = w.processTweet(ctx, tweet, time.Now())
+	tweet.RatingGrowSpeed = w.processTweet(ctx, tweet)
 	if tweet.RatingGrowSpeed != 0 {
 		return w.repo.Save(ctx, []common.TweetSnapshot{*tweet})
 	}

@@ -25,6 +25,7 @@ const (
 
 type Finder interface {
 	FindAll(ctx context.Context, start, end *time.Time, search string) ([]common.TweetSnapshot, error)
+	FindNext(ctx context.Context, start, end *time.Time, search, cursor string) ([]common.TweetSnapshot, string, error)
 	Find(ctx context.Context, id string) (*common.TweetSnapshot, error)
 	CurrentDelay() int64
 	Init(ctx context.Context) error
@@ -85,6 +86,86 @@ func (f *finder) Find(ctx context.Context, id string) (*common.TweetSnapshot, er
 		},
 		CheckedAt: time.Now(),
 	}, nil
+}
+
+//nolint:funlen
+func (f *finder) FindNext(ctx context.Context, start, end *time.Time, search, cursor string) ([]common.TweetSnapshot, string, error) {
+	query := fmt.Sprintf("%s -filter:retweets", search)
+	if start != nil {
+		query = fmt.Sprintf("%s since:%s", search, start.Format(format))
+	}
+
+	if end != nil {
+		query = fmt.Sprintf("%s until:%s", query, end.Format(format))
+	}
+
+	f.log.WithField("cursor", cursor).WithField("query", query).WithField("start", start).Debug("searching")
+	tweets, nextCursor, err := f.scraper.FetchSearchTweets(query, limit, cursor)
+	if err != nil {
+		if strings.Contains(err.Error(), tooManyRequests) {
+			f.delayManager.TooManyRequests(ctx)
+			return nil, "", nil
+		}
+
+		return nil, "", err
+	}
+
+	response := make([]common.TweetSnapshot, 0)
+	counter := 0
+	likesMap := map[int]int{}
+	retweetsMap := map[int]int{}
+	replyMap := map[int]int{}
+	lastTweetTime := time.Now()
+
+	for _, tweet := range tweets {
+		syncTime := time.Now()
+
+		if counter%batchInterval == 0 {
+			f.log.
+				WithField(createdKey, tweet.TimeParsed).
+				WithField(countKey, counter).
+				Debug("processed tweets")
+			f.delayManager.AfterRequest()
+		}
+
+		counter++
+		likesMap[tweet.Likes]++
+		retweetsMap[tweet.Retweets]++
+		replyMap[tweet.Retweets]++
+
+		response = append(response, common.TweetSnapshot{
+			Tweet: &common.Tweet{
+				ID:           tweet.ID,
+				Likes:        tweet.Likes,
+				Name:         tweet.Name,
+				PermanentURL: tweet.PermanentURL,
+				Replies:      tweet.Replies,
+				Retweets:     tweet.Retweets,
+				Text:         tweet.Text,
+				TimeParsed:   tweet.TimeParsed,
+				Timestamp:    tweet.Timestamp,
+				UserID:       tweet.UserID,
+				Username:     tweet.Username,
+				Views:        tweet.Views,
+				Photos:       scrapperPhotosToCommon(tweet.Photos),
+				Videos:       scrapperVideosToCommon(tweet.Videos),
+			},
+			CheckedAt: syncTime,
+		})
+
+		lastTweetTime = tweet.TimeParsed
+
+	}
+
+	f.delayManager.ProcessedQuery()
+
+	f.log.WithField(createdKey, lastTweetTime).Debug("last tweet")
+	f.log.WithField(countKey, counter).Debug("tweets found")
+	f.log.WithField(mapKey, likesMap).Debug("likes count")
+	f.log.WithField(mapKey, retweetsMap).Debug("retweet count")
+	f.log.WithField(mapKey, replyMap).Debug("reply count")
+
+	return response, nextCursor, nil
 }
 
 //nolint:funlen

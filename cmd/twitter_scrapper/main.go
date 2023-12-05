@@ -100,6 +100,14 @@ func main() {
 		Buckets:   []float64{1, 10, 100, 200, 300, 400, 500, 1000, 2000, 3000, 4000},
 	}, []string{"login", "search", "error"})
 
+	next := prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "crypto_tweet_sense",
+		Subsystem: "finder",
+		Name:      "find_next_requests_seconds",
+		Help:      "Find next requests histogram in seconds",
+		Buckets:   []float64{.005, .05, .1, .5, 1, 2.5, 5, 10, 25, 50, 100},
+	}, []string{"login", "search", "error"})
+
 	one := prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: "crypto_tweet_sense",
 		Subsystem: "finder",
@@ -117,7 +125,7 @@ func main() {
 
 	prometheus.MustRegister(all, one, delay)
 
-	finder := tweetFinder.NewPool(all, one, delay, xConfig, accountManager, st, logger.WithField(pkgKey, "tweet_finder_pool"))
+	finder := tweetFinder.NewPool(all, one, next, delay, xConfig, accountManager, st, logger.WithField(pkgKey, "tweet_finder_pool"))
 	if err = finder.Init(ctx); err != nil {
 		panic(err)
 	}
