@@ -34,6 +34,8 @@ const (
 	foundationDBVersion = 710
 	pkgKey              = "pkg"
 	GetMethod           = "GET"
+	namespace           = "crypto_tweet_sense"
+	subsystem           = "finder"
 )
 
 type config struct {
@@ -93,37 +95,37 @@ func main() {
 	accountManager := account_manager.NewManager(st, logger.WithField(pkgKey, "account_manager"))
 
 	all := prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: "crypto_tweet_sense",
-		Subsystem: "finder",
+		Namespace: namespace,
+		Subsystem: subsystem,
 		Name:      "find_all_requests_seconds",
 		Help:      "Find all requests histogram in seconds",
 		Buckets:   []float64{1, 10, 100, 200, 300, 400, 500, 1000, 2000, 3000, 4000},
 	}, []string{"login", "search", "error"})
 
 	next := prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: "crypto_tweet_sense",
-		Subsystem: "finder",
+		Namespace: namespace,
+		Subsystem: subsystem,
 		Name:      "find_next_requests_seconds",
 		Help:      "Find next requests histogram in seconds",
 		Buckets:   []float64{.005, .05, .1, .5, 1, 2.5, 5, 10, 25, 50, 100},
 	}, []string{"login", "search", "error"})
 
 	one := prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: "crypto_tweet_sense",
-		Subsystem: "finder",
+		Namespace: namespace,
+		Subsystem: subsystem,
 		Name:      "find_requests_seconds",
 		Help:      "Find requests histogram in seconds",
 		Buckets:   []float64{.005, .05, .1, .5, 1, 2.5, 5, 10, 25, 50, 100},
 	}, []string{"login", "error"})
 
 	delay := prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "crypto_tweet_sense",
-		Subsystem: "finder",
+		Namespace: namespace,
+		Subsystem: subsystem,
 		Name:      "delay_seconds",
 		Help:      "Requests delay in seconds",
 	}, []string{"login"})
 
-	prometheus.MustRegister(all, one, delay)
+	prometheus.MustRegister(all, one, next, delay)
 
 	finder := tweetFinder.NewPool(all, one, next, delay, xConfig, accountManager, st, logger.WithField(pkgKey, "tweet_finder_pool"))
 	if err = finder.Init(ctx); err != nil {

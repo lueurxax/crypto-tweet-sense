@@ -111,6 +111,7 @@ func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.
 			if tweets[i].TimeParsed.Before(tmpTweet) {
 				tmpTweet = tweets[i].TimeParsed
 			}
+
 			tweets[i].RatingGrowSpeed = w.processTweet(ctx, &tweets[i])
 		}
 
