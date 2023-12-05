@@ -99,7 +99,7 @@ func main() {
 		Subsystem: subsystem,
 		Name:      "find_next_requests_seconds",
 		Help:      "Find next requests histogram in seconds",
-		Buckets:   []float64{.005, .05, .1, .5, 1, 2.5, 5, 10, 25, 50, 100},
+		Buckets:   []float64{.005, .05, .1, .5, 1, 2.5, 5, 10, 25, 50, 100, 1000, 3600},
 	}, []string{"login", "search", "error"})
 
 	one := prometheus.NewHistogramVec(prometheus.HistogramOpts{
@@ -107,7 +107,7 @@ func main() {
 		Subsystem: subsystem,
 		Name:      "find_requests_seconds",
 		Help:      "Find requests histogram in seconds",
-		Buckets:   []float64{.005, .05, .1, .5, 1, 2.5, 5, 10, 25, 50, 100},
+		Buckets:   []float64{.005, .05, .1, .5, 1, 2.5, 5, 10, 25, 50, 100, 1000, 3600},
 	}, []string{"login", "error"})
 
 	delay := prometheus.NewGaugeVec(prometheus.GaugeOpts{
