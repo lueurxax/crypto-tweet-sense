@@ -84,6 +84,8 @@ func (w *watcher) search(ctx context.Context, query string) {
 }
 
 func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.Time) {
+	w.logger.WithField("query", query).WithField("start", start).Debug("searching")
+
 	cursor := ""
 	firstTweet := time.Now().UTC()
 

@@ -34,7 +34,6 @@ type Finder interface {
 type delayManager interface {
 	TooManyRequests(ctx context.Context)
 	AfterRequest()
-	ProcessedQuery()
 	CurrentDelay() int64
 }
 
@@ -88,7 +87,6 @@ func (f *finder) Find(ctx context.Context, id string) (*common.TweetSnapshot, er
 	}, nil
 }
 
-//nolint:funlen
 func (f *finder) FindNext(ctx context.Context, start, end *time.Time, search, cursor string) ([]common.TweetSnapshot, string, error) {
 	query := fmt.Sprintf("%s -filter:retweets", search)
 	if start != nil {
@@ -99,7 +97,6 @@ func (f *finder) FindNext(ctx context.Context, start, end *time.Time, search, cu
 		query = fmt.Sprintf("%s until:%s", query, end.Format(format))
 	}
 
-	f.log.WithField("cursor", cursor).WithField("query", query).WithField("start", start).Debug("searching")
 	tweets, nextCursor, err := f.scraper.FetchSearchTweets(query, limit, cursor)
 	if err != nil {
 		if strings.Contains(err.Error(), tooManyRequests) {
@@ -112,10 +109,6 @@ func (f *finder) FindNext(ctx context.Context, start, end *time.Time, search, cu
 
 	response := make([]common.TweetSnapshot, 0)
 	counter := 0
-	likesMap := map[int]int{}
-	retweetsMap := map[int]int{}
-	replyMap := map[int]int{}
-	lastTweetTime := time.Now()
 
 	for _, tweet := range tweets {
 		syncTime := time.Now()
@@ -129,9 +122,6 @@ func (f *finder) FindNext(ctx context.Context, start, end *time.Time, search, cu
 		}
 
 		counter++
-		likesMap[tweet.Likes]++
-		retweetsMap[tweet.Retweets]++
-		replyMap[tweet.Retweets]++
 
 		response = append(response, common.TweetSnapshot{
 			Tweet: &common.Tweet{
@@ -153,17 +143,9 @@ func (f *finder) FindNext(ctx context.Context, start, end *time.Time, search, cu
 			CheckedAt: syncTime,
 		})
 
-		lastTweetTime = tweet.TimeParsed
-
 	}
 
-	f.delayManager.ProcessedQuery()
-
-	f.log.WithField(createdKey, lastTweetTime).Debug("last tweet")
-	f.log.WithField(countKey, counter).Debug("tweets found")
-	f.log.WithField(mapKey, likesMap).Debug("likes count")
-	f.log.WithField(mapKey, retweetsMap).Debug("retweet count")
-	f.log.WithField(mapKey, replyMap).Debug("reply count")
+	f.delayManager.AfterRequest()
 
 	return response, nextCursor, nil
 }
@@ -245,7 +227,7 @@ func (f *finder) FindAll(ctx context.Context, start, end *time.Time, search stri
 		}
 	}
 
-	f.delayManager.ProcessedQuery()
+	f.delayManager.AfterRequest()
 
 	f.log.WithField(createdKey, lastTweetTime).Debug("last tweet")
 	f.log.WithField(countKey, counter).Debug("tweets found")

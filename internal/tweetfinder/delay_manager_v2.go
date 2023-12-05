@@ -17,7 +17,6 @@ const (
 type Manager interface {
 	TooManyRequests(ctx context.Context)
 	AfterRequest()
-	ProcessedQuery()
 	CurrentDelay() int64
 	Start(ctx context.Context) error
 }
@@ -61,8 +60,6 @@ func (m *managerV2) AfterRequest() {
 	}
 	m.forceRecalculate <- struct{}{}
 }
-
-func (m *managerV2) ProcessedQuery() {}
 
 func (m *managerV2) CurrentDelay() int64 {
 	return m.delay
