@@ -13,8 +13,8 @@ import (
 const (
 	tweetKey        = "tweet"
 	timeout         = time.Minute * 5
-	oldFastInterval = time.Second * 30
-	oldestInterval  = time.Second * 10
+	oldFastInterval = time.Second * 5
+	oldestInterval  = time.Second * 30
 	searchInterval  = time.Minute
 )
 
@@ -185,7 +185,7 @@ func (w *watcher) updateOldestFast() {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 
 		if err := w.updateOldestFastTweet(ctx); err != nil {
-			w.logger.WithError(err).Error()
+			w.logger.WithError(err).Error("update oldest fast tweet")
 		}
 
 		cancel()
@@ -227,7 +227,7 @@ func (w *watcher) updateOldest() {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 
 		if err := w.updateOldestTweet(ctx); err != nil {
-			w.logger.WithError(err).Error()
+			w.logger.WithError(err).Error("update oldest tweet")
 		}
 
 		cancel()
