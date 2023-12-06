@@ -18,6 +18,10 @@ type metricMiddleware struct {
 	findRequestsHistogramSeconds     *prometheus.HistogramVec
 }
 
+func (m *metricMiddleware) CurrentTemp(ctx context.Context) float64 {
+	return m.next.CurrentTemp(ctx)
+}
+
 func (m *metricMiddleware) Init(context.Context) error {
 	return nil
 }

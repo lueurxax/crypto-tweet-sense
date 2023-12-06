@@ -18,6 +18,7 @@ type Manager interface {
 	TooManyRequests(ctx context.Context)
 	AfterRequest()
 	CurrentDelay() int64
+	CurrentTemp(ctx context.Context) float64
 	Start(ctx context.Context) error
 }
 
@@ -28,6 +29,7 @@ type WindowLimiter interface {
 	TooFast(ctx context.Context) (uint64, error)
 	SetResetLimiter(resetLimiter windowlimiter.ResetLimiter)
 	Threshold(ctx context.Context) uint64
+	Temp(ctx context.Context) float64
 	Start(ctx context.Context, delay int64) error
 }
 
@@ -63,6 +65,19 @@ func (m *managerV2) AfterRequest() {
 
 func (m *managerV2) CurrentDelay() int64 {
 	return m.delay
+}
+
+func (m *managerV2) CurrentTemp(ctx context.Context) float64 {
+	var temp float64
+	for _, limiter := range m.windowLimiters {
+		tr := limiter.Temp(ctx)
+
+		if tr > temp {
+			temp = tr
+		}
+	}
+
+	return temp
 }
 
 func (m *managerV2) Start(ctx context.Context) error {

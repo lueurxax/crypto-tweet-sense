@@ -23,12 +23,14 @@ type Finder interface {
 	FindNext(ctx context.Context, start, end *time.Time, search, cursor string) ([]common.TweetSnapshot, string, error)
 	Find(ctx context.Context, id string) (*common.TweetSnapshot, error)
 	CurrentDelay() int64
+	CurrentTemp(ctx context.Context) float64
 	Init(ctx context.Context) error
 }
 
 type delayManager interface {
 	TooManyRequests(ctx context.Context)
 	AfterRequest()
+	CurrentTemp(ctx context.Context) float64
 	CurrentDelay() int64
 }
 
@@ -37,6 +39,10 @@ type finder struct {
 	delayManager
 
 	log log.Logger
+}
+
+func (f *finder) CurrentTemp(ctx context.Context) float64 {
+	return f.delayManager.CurrentTemp(ctx)
 }
 
 func (f *finder) Init(context.Context) error {

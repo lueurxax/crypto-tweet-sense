@@ -15,7 +15,6 @@ import (
 
 const (
 	startDelay  = 15
-	maxDelay    = 600
 	finderLogin = "finder_login"
 	pkgKey      = "pkg"
 )
@@ -45,12 +44,25 @@ type pool struct {
 
 	mu           sync.RWMutex
 	finderDelays []int64
+	finderTemp   []float64
 
 	log log.Logger
 
 	metricsOne   *prometheus.HistogramVec
 	metricsNext  *prometheus.HistogramVec
 	metricsDelay *prometheus.GaugeVec
+}
+
+func (p *pool) CurrentTemp(context.Context) float64 {
+	sum := 0.0
+
+	p.mu.RLock()
+	for _, d := range p.finderTemp {
+		sum += d
+	}
+	p.mu.RUnlock()
+
+	return sum / float64(len(p.finderTemp))
 }
 
 func (p *pool) FindNext(ctx context.Context, start, end *time.Time, search, cursor string) ([]common.TweetSnapshot, string, error) {
@@ -119,11 +131,11 @@ func (p *pool) getFinder(ctx context.Context) (Finder, int, error) {
 
 func (p *pool) getFinderIndex() (int, bool) {
 	p.mu.Lock()
-	minimal := int64(0)
+	minimal := 0.0
 	index := 0
 
-	for i, d := range p.finderDelays {
-		if d == 0 || d > maxDelay {
+	for i, d := range p.finderTemp {
+		if d == 0 {
 			continue
 		}
 
@@ -135,6 +147,7 @@ func (p *pool) getFinderIndex() (int, bool) {
 
 	if minimal != 0 {
 		p.finderDelays[index] = 0
+		p.finderTemp[index] = 0
 	}
 
 	p.mu.Unlock()
@@ -144,9 +157,10 @@ func (p *pool) getFinderIndex() (int, bool) {
 
 func (p *pool) releaseFinder(i int) {
 	p.mu.Lock()
-	for index := range p.finderDelays {
-		if index == i || p.finderDelays[index] != 0 {
+	for index := range p.finderTemp {
+		if index == i || p.finderTemp[index] != 0 {
 			p.finderDelays[index] = p.finders[index].CurrentDelay()
+			p.finderTemp[index] = p.finders[index].CurrentTemp(context.Background())
 		}
 	}
 	p.mu.Unlock()
@@ -185,7 +199,7 @@ func (p *pool) init(ctx context.Context) error {
 		}
 
 		limiterIntervals := []time.Duration{
-			time.Minute,
+			time.Minute * 10,
 			time.Hour,
 			time.Hour * 24,
 			time.Hour * 24 * 30,
@@ -234,6 +248,7 @@ func (p *pool) init(ctx context.Context) error {
 		p.mu.Lock()
 		p.finders = append(p.finders, f)
 		p.finderDelays = append(p.finderDelays, f.CurrentDelay())
+		p.finderTemp = append(p.finderTemp, f.CurrentTemp(ctx))
 		p.mu.Unlock()
 
 		select {
@@ -263,6 +278,7 @@ func NewPool(metricsOne, metricsNext *prometheus.HistogramVec, metricsDelay *pro
 		repo:         db,
 		mu:           sync.RWMutex{},
 		finderDelays: make([]int64, 0),
+		finderTemp:   make([]float64, 0),
 		log:          logger,
 		metricsOne:   metricsOne,
 		metricsNext:  metricsNext,

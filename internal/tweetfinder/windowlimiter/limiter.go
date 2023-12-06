@@ -20,6 +20,7 @@ type WindowLimiter interface {
 	Duration() time.Duration
 	TooFast(ctx context.Context) (uint64, error)
 	Threshold(ctx context.Context) uint64
+	Temp(ctx context.Context) float64
 	SetResetLimiter(resetLimiter ResetLimiter)
 }
 
@@ -61,6 +62,16 @@ func (l *limiter) Threshold(ctx context.Context) uint64 {
 	return rl.Threshold
 }
 
+func (l *limiter) Temp(ctx context.Context) float64 {
+	rl, err := l.repo.GetRequestLimit(ctx, l.id, l.duration)
+	if err != nil {
+		l.log.WithError(err).Error("error while getting threshold")
+		return 0
+	}
+
+	return float64(rl.RequestsCount) / float64(rl.Threshold)
+}
+
 func (l *limiter) TrySetThreshold(ctx context.Context, startTime time.Time) error {
 	l.resetTicker.Reset(l.resetDuration)
 
@@ -87,7 +98,7 @@ func (l *limiter) TooFast(ctx context.Context) (uint64, error) {
 		return 0, nil
 	}
 
-	isFast := rl.Threshold-1 <= rl.RequestsCount
+	isFast := rl.Threshold <= rl.RequestsCount
 
 	if !isFast {
 		return 0, nil
@@ -98,7 +109,7 @@ func (l *limiter) TooFast(ctx context.Context) (uint64, error) {
 		WithField(durationKey, l.duration).
 		Trace("checking if too fast")
 
-	return uint64(l.duration.Seconds()) / rl.Threshold, nil
+	return uint64(l.duration.Seconds()) * 5 / rl.Threshold, nil
 }
 
 func (l *limiter) Start(ctx context.Context, delay int64) error {
