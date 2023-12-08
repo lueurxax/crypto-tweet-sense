@@ -109,7 +109,7 @@ func (l *limiter) TooFast(ctx context.Context) (uint64, error) {
 		WithField(durationKey, l.duration).
 		Trace("checking if too fast")
 
-	return uint64(l.duration.Seconds()) * 5 / rl.Threshold, nil
+	return uint64(l.duration.Seconds()) / 2 / rl.Threshold, nil
 }
 
 func (l *limiter) Start(ctx context.Context, delay int64) error {
