@@ -23,8 +23,9 @@ const (
 )
 
 type Tweet struct {
-	Content string `json:"telegram_message"`
-	Link    string `json:"link"`
+	Content              string `json:"telegram_message"`
+	Link                 string `json:"link"`
+	NewUsefulInformation bool   `json:"new_useful_information"`
 }
 
 type repo interface {
@@ -145,8 +146,7 @@ func (e *editor) edit(ctx context.Context, tweets []common.Tweet) error {
 	e.log.WithField("response", resp).Debug("summary generation result")
 
 	res := struct {
-		Tweets               []Tweet `json:"tweets"`
-		NewUsefulInformation bool    `json:"new_useful_information"`
+		Tweets []Tweet `json:"tweets"`
 	}{}
 
 	if err = jsoniter.UnmarshalFromString(resp.Choices[0].Message.Content, &res); err != nil {
@@ -157,23 +157,27 @@ func (e *editor) edit(ctx context.Context, tweets []common.Tweet) error {
 		return nil
 	}
 
-	if !res.NewUsefulInformation {
-		e.log.Info("skip edit, no new useful information")
-		return nil
-	}
-
-	e.existMessages = append(e.existMessages, requestMessage, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleAssistant,
-		Content: resp.Choices[0].Message.Content,
-	})
-
-	data := ""
+	usefulInformation := false
 
 	for _, el := range res.Tweets {
 		tweet, ok := tweetsMap[el.Link]
 		if ok {
-			e.editedCh <- fmt.Sprintf("%s\n%s", data, e.formatTweet(tweet, el.Content))
+			if !el.NewUsefulInformation {
+				e.log.WithField("tweet", el.Link).Debug("skip tweet, no new useful information")
+				continue
+			}
+
+			usefulInformation = true
+
+			e.editedCh <- e.formatTweet(tweet, el.Content)
 		}
+	}
+
+	if usefulInformation {
+		e.existMessages = append(e.existMessages, requestMessage, openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleAssistant,
+			Content: resp.Choices[0].Message.Content,
+		})
 	}
 
 	return nil
