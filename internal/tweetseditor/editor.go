@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	prompt     = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip information such as airdrops or giveaway, if they are not useful for investing. I will parse your answer by code like json `{\"tweets\":[{\"telegram_message\":\"summarized message by tweet\", \"link\":\"link to tweet\"}], \"new_useful_information\":true}`, then can you prepare messages in json with prepared telegram message? \nTweets: %s." //nolint:lll
+	prompt     = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip information such as airdrops or giveaway, if they are not useful for investing. I will parse your answer by code like json `{\"tweets\":[{\"telegram_message\":\"summarized message by tweet\", \"link\":\"link to tweet\", \"new_useful_information\":true}]}`, then can you prepare messages in json with prepared telegram message? \nTweets: %s." //nolint:lll
 	nextPrompt = "Additional tweets, create new message only for new information: %s."                                                                                                                                                                                                                                                                                                                                                                                                                                       //nolint:lll
 	queueLen   = 10
 )
