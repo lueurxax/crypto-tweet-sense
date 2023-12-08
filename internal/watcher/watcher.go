@@ -15,7 +15,7 @@ const (
 	timeout         = time.Minute * 5
 	oldFastInterval = time.Second * 5
 	oldestInterval  = time.Second * 30
-	searchInterval  = time.Minute
+	queryKey        = "query"
 )
 
 type Watcher interface {
@@ -52,6 +52,7 @@ type watcher struct {
 	ratingChecker
 
 	logger log.Logger
+	config *Config
 }
 
 func (w *watcher) Watch() {
@@ -72,19 +73,19 @@ func (w *watcher) searchAll(query string) {
 
 	cancel()
 
-	tick := time.NewTicker(searchInterval)
+	tick := time.NewTicker(w.config.SearchInterval)
 	for range tick.C {
 		go w.search(context.Background(), query)
 	}
 }
 
 func (w *watcher) search(ctx context.Context, query string) {
-	w.searchWithQuery(ctx, query, time.Now().Add(-time.Minute))
-	w.logger.WithField("query", query).Debug("watcher checked news")
+	w.searchWithQuery(ctx, query, time.Now().Add(-w.config.SearchInterval))
+	w.logger.WithField(queryKey, query).Debug("watcher checked news")
 }
 
 func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.Time) {
-	w.logger.WithField("query", query).WithField("start", start).Debug("searching")
+	w.logger.WithField(queryKey, query).WithField("start", start).Debug("searching")
 
 	cursor := ""
 	firstTweet := time.Now().UTC()
@@ -254,7 +255,7 @@ func (w *watcher) updateOldestTweet(ctx context.Context) error {
 }
 
 func (w *watcher) cleanTooOld() {
-	tick := time.NewTicker(time.Hour)
+	tick := time.NewTicker(w.config.CleanInterval)
 	for range tick.C {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 
@@ -267,7 +268,7 @@ func (w *watcher) cleanTooOld() {
 }
 
 func (w *watcher) cleanTooOldTweets(ctx context.Context) error {
-	tweets, err := w.repo.GetTweetsOlderThen(ctx, time.Now().AddDate(0, 0, -1))
+	tweets, err := w.repo.GetTweetsOlderThen(ctx, time.Now().Add(-w.config.TooOld))
 	if err != nil {
 		return err
 	}
@@ -281,17 +282,17 @@ func (w *watcher) cleanTooOldTweets(ctx context.Context) error {
 	return nil
 }
 
-func NewWatcher(finder finder, repo repo, checker ratingChecker, logger log.Logger) Watcher {
-	start := time.Now().Add(-time.Minute)
+func NewWatcher(config *Config, finder finder, repo repo, checker ratingChecker, logger log.Logger) Watcher {
+	start := time.Now().Add(config.SearchInterval)
+
+	queries := make(map[string]time.Time, len(config.Queries))
+	for _, query := range config.Queries {
+		queries[query] = start
+	}
 
 	return &watcher{
-		queries: map[string]time.Time{
-			"bitcoin":       start,
-			"crypto":        start,
-			"cryptocurrenc": start,
-			"altcoin":       start,
-			"BTC":           start,
-		},
+		config:        config,
+		queries:       queries,
 		finder:        finder,
 		repo:          repo,
 		ratingChecker: checker,

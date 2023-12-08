@@ -126,7 +126,7 @@ func main() {
 
 	finderWithMetrics := tweetFinder.NewMetricMiddleware(one, next, "pool", finder)
 
-	watch := watcher.NewWatcher(finderWithMetrics, st, checker, logger.WithField(pkgKey, "watcher"))
+	watch := watcher.NewWatcher(watcher.GetConfig(), finderWithMetrics, st, checker, logger.WithField(pkgKey, "watcher"))
 
 	watch.Watch()
 
