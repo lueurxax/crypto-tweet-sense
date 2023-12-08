@@ -69,7 +69,7 @@ func (l *limiter) Temp(ctx context.Context) float64 {
 		return 0
 	}
 
-	return float64(rl.RequestsCount) / float64(rl.Threshold)
+	return (float64(rl.RequestsCount) + 0.1) / float64(rl.Threshold)
 }
 
 func (l *limiter) TrySetThreshold(ctx context.Context, startTime time.Time) error {
