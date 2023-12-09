@@ -72,7 +72,7 @@ func (b builder) RequestLimitsOld(id string, window time.Duration) []byte {
 }
 
 func (b builder) RequestLimits(id string, window time.Duration) []byte {
-	slice := append(b.getPrefix(twitterAccounts), []byte(id)...)
+	slice := append(b.getPrefix(requestLimit), []byte(id)...)
 	return binary.LittleEndian.AppendUint16(slice, uint16(window.Seconds()))
 }
 
