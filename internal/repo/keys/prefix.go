@@ -4,7 +4,6 @@ const (
 	version                   = 'v'
 	tweet                     = 't'
 	sentTweet                 = 's'
-	requestLimitOld           = 'r'
 	tweetRating               = 'a'
 	editingTweet              = 'e'
 	telegramSessionStorageOld = "telegramSessionStorage"

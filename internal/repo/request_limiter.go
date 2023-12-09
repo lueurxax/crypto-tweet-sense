@@ -52,7 +52,10 @@ func (d *db) AddCounter(ctx context.Context, id string, window time.Duration, co
 		return err
 	}
 
-	value := int32(counterTime.Sub(el.Requests.Start).Seconds()) - el.Requests.Data[len(el.Requests.Data)-1]
+	value := int32(counterTime.Sub(el.Requests.Start).Seconds())
+	if len(el.Requests.Data) > 0 {
+		value -= el.Requests.Data[len(el.Requests.Data)-1]
+	}
 
 	el.Requests.Data = append(el.Requests.Data, value)
 
@@ -74,7 +77,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		return err
 	}
 
-	el, err := d.getRateLimitOld(tx, id, window)
+	el, err := d.getRateLimit(tx, id, window)
 	if err != nil {
 		return err
 	}
@@ -87,8 +90,10 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 	newStart := time.Now().Add(-window)
 
 	counter := int32(0)
+
 	for _, key := range el.Requests.Data {
 		tt := el.Requests.Start.Add(time.Duration(key) * time.Second)
+
 		if time.Since(tt) < window {
 			value := int32(tt.Sub(newStart).Seconds()) - counter
 			counter += value
@@ -178,7 +183,7 @@ func (d *db) CheckIfExist(ctx context.Context, id string, window time.Duration) 
 		return false, err
 	}
 
-	key := d.keyBuilder.RequestLimitsOld(id, window)
+	key := d.keyBuilder.RequestLimits(id, window)
 
 	data, err := tx.Get(key)
 	if err != nil {
@@ -223,26 +228,6 @@ func (d *db) Create(ctx context.Context, id string, window time.Duration, thresh
 	tx.Set(key, data)
 
 	return tx.Commit()
-}
-
-func (d *db) getRateLimitOld(tx fdbclient.Transaction, id string, window time.Duration) (*common.RequestLimits, error) {
-	key := d.keyBuilder.RequestLimitsOld(id, window)
-
-	data, err := tx.Get(key)
-	if err != nil {
-		return nil, err
-	}
-
-	if data == nil {
-		return nil, ErrRequestLimitsNotFound
-	}
-
-	el := new(common.RequestLimits)
-	if err = jsoniter.Unmarshal(data, el); err != nil {
-		return nil, err
-	}
-
-	return el, nil
 }
 
 func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Duration) (*common.RequestLimits, error) {
