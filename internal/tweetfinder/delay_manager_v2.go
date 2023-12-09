@@ -53,7 +53,9 @@ func (m *managerV2) TooManyRequests(ctx context.Context) {
 			m.log.WithError(err).Error("error while setting threshold")
 			return
 		}
+		limiter.Inc()
 	}
+	m.forceRecalculate <- struct{}{}
 }
 
 func (m *managerV2) AfterRequest() {
