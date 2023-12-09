@@ -5,8 +5,6 @@ import (
 	"errors"
 	"time"
 
-	jsoniter "github.com/json-iterator/go"
-
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/repo/model"
 	"github.com/lueurxax/crypto-tweet-sense/pkg/fdbclient"
@@ -76,12 +74,9 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		return err
 	}
 
-	el, err := d.getRateLimitOld(tx, id, window)
+	el, err := d.getRateLimit(tx, id, window)
 	if err != nil {
-		el, err = d.getRateLimit(tx, id, window)
-		if err != nil {
-			return errors.Join(err, ErrRequestLimitsUnmarshallingError)
-		}
+		return errors.Join(err, ErrRequestLimitsUnmarshallingError)
 	}
 
 	if el.Requests == nil {
@@ -246,33 +241,6 @@ func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Durat
 
 	el := new(model.RequestLimits)
 	if err = el.Unmarshal(data); err != nil {
-		d.log.WithField("key", key).WithField(dataKey, string(data)).Error(err)
-		return nil, err
-	}
-
-	counter := int32(0)
-	for i, v := range el.Requests.Data {
-		counter += v
-		el.Requests.Data[i] = counter
-	}
-
-	return el, nil
-}
-
-func (d *db) getRateLimitOld(tx fdbclient.Transaction, id string, window time.Duration) (*model.RequestLimits, error) {
-	key := d.keyBuilder.RequestLimits(id, window)
-
-	data, err := tx.Get(key)
-	if err != nil {
-		return nil, err
-	}
-
-	if data == nil {
-		return nil, ErrRequestLimitsNotFound
-	}
-
-	el := new(model.RequestLimits)
-	if err = jsoniter.Unmarshal(data, el); err != nil {
 		d.log.WithField("key", key).WithField(dataKey, string(data)).Error(err)
 		return nil, err
 	}

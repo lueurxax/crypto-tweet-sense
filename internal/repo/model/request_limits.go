@@ -11,6 +11,9 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 )
 
+// 10000/sizeofint32 = 2500
+const maxRequestsInBatch = 2500
+
 type RequestLimits struct {
 	WindowSeconds uint64
 	Requests      *Requests `json:"requests_v2,omitempty"`
@@ -83,4 +86,23 @@ type RequestLimitsV2 struct {
 type RequestsV2 struct {
 	Data  []uint32  `json:"data"`
 	Start time.Time `json:"start"`
+}
+
+func (r *RequestLimits) ToV2() RequestLimitsV2 {
+	requests := make([]Requests, 0)
+
+	for i := 0; i < len(r.Requests.Data); i += maxRequestsInBatch {
+
+		requests = append(requests, Requests{
+			Data:  r.Requests.Data[i : i+maxRequestsInBatch],
+			Start: r.Requests.Start,
+		})
+	}
+
+	return RequestLimitsV2{
+		WindowSeconds: r.WindowSeconds,
+		RequestsCount: uint32(len(r.Requests.Data)),
+		Requests:      requests,
+		Threshold:     r.Threshold,
+	}
 }
