@@ -61,7 +61,7 @@ func (d *db) AddCounter(ctx context.Context, id string, window time.Duration, co
 
 	d.log.WithField("request_limits", el).Trace("add counter")
 
-	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
+	tx.Set(d.keyBuilder.RequestLimitsOld(id, window), data)
 
 	return tx.Commit()
 }
@@ -103,7 +103,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		return err
 	}
 
-	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
+	tx.Set(d.keyBuilder.RequestLimitsOld(id, window), data)
 
 	return tx.Commit()
 }
@@ -130,7 +130,7 @@ func (d *db) SetThreshold(ctx context.Context, id string, window time.Duration) 
 		return err
 	}
 
-	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
+	tx.Set(d.keyBuilder.RequestLimitsOld(id, window), data)
 
 	return tx.Commit()
 }
@@ -164,7 +164,7 @@ func (d *db) IncreaseThresholdTo(ctx context.Context, id string, window time.Dur
 		return err
 	}
 
-	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
+	tx.Set(d.keyBuilder.RequestLimitsOld(id, window), data)
 
 	return tx.Commit()
 }
@@ -175,7 +175,7 @@ func (d *db) CheckIfExist(ctx context.Context, id string, window time.Duration) 
 		return false, err
 	}
 
-	key := d.keyBuilder.RequestLimits(id, window)
+	key := d.keyBuilder.RequestLimitsOld(id, window)
 
 	data, err := tx.Get(key)
 	if err != nil {
@@ -195,7 +195,7 @@ func (d *db) Create(ctx context.Context, id string, window time.Duration, thresh
 		return err
 	}
 
-	key := d.keyBuilder.RequestLimits(id, window)
+	key := d.keyBuilder.RequestLimitsOld(id, window)
 
 	data, err := tx.Get(key)
 	if err != nil {
@@ -223,7 +223,7 @@ func (d *db) Create(ctx context.Context, id string, window time.Duration, thresh
 }
 
 func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Duration) (*common.RequestLimits, error) {
-	key := d.keyBuilder.RequestLimits(id, window)
+	key := d.keyBuilder.RequestLimitsOld(id, window)
 
 	data, err := tx.Get(key)
 	if err != nil {

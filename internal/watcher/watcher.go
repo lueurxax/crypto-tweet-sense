@@ -56,6 +56,8 @@ type watcher struct {
 }
 
 func (w *watcher) Watch() {
+	w.cleanTooOld()
+
 	for query := range w.queries {
 		go w.searchAll(query)
 	}
