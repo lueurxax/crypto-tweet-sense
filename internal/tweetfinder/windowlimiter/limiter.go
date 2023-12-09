@@ -81,6 +81,14 @@ func (l *limiter) TrySetThreshold(ctx context.Context, startTime time.Time) erro
 		}
 	}
 
+	rl, err := l.repo.GetRequestLimit(ctx, l.id, l.duration)
+	if err == nil {
+		l.log.WithField(durationKey, l.duration).
+			WithField("threshold", rl.Threshold).
+			WithField("current", rl.RequestsCount).
+			Debug("set threshold")
+	}
+
 	return nil
 }
 
