@@ -243,6 +243,7 @@ func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Durat
 
 	el := new(common.RequestLimits)
 	if err = el.Unmarshal(data); err != nil {
+		d.log.WithField("data", data).Error(err)
 		return nil, err
 	}
 
@@ -269,6 +270,7 @@ func (d *db) getRateLimitOld(tx fdbclient.Transaction, id string, window time.Du
 
 	el := new(common.RequestLimits)
 	if err = jsoniter.Unmarshal(data, el); err != nil {
+		d.log.WithField("data", data).Error(err)
 		return nil, err
 	}
 
