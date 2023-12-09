@@ -72,7 +72,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		return err
 	}
 
-	el, err := d.getRateLimit(tx, id, window)
+	el, err := d.getRateLimitOld(tx, id, window)
 	if err != nil {
 		return err
 	}
