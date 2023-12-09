@@ -87,15 +87,18 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 	newStart := time.Now().Add(-window)
 
 	counter := int32(0)
+	newCounter := int32(0)
 
 	for _, key := range el.Requests.Data {
 		tt := el.Requests.Start.Add(time.Duration(key+counter) * time.Second)
 
 		if time.Since(tt) < window {
-			value := int32(tt.Sub(newStart).Seconds()) - counter
-			counter += value
+			value := int32(tt.Sub(newStart).Seconds()) - newCounter
 			requestData = append(requestData, value)
+			newCounter += value
 		}
+
+		counter += key
 	}
 
 	el.Requests = &model.Requests{

@@ -77,10 +77,10 @@ func (r *RequestLimits) ToCommon() common.RequestLimitData {
 }
 
 type RequestLimitsV2 struct {
-	WindowSeconds uint64
-	RequestsCount uint32
-	Requests      []Requests `json:"-"`
-	Threshold     uint64
+	WindowSeconds uint64       `json:"window_seconds"`
+	RequestsCount uint32       `json:"requests_count"`
+	Requests      []RequestsV2 `json:"-"`
+	Threshold     uint64       `json:"threshold"`
 }
 
 type RequestsV2 struct {
@@ -89,13 +89,20 @@ type RequestsV2 struct {
 }
 
 func (r *RequestLimits) ToV2() RequestLimitsV2 {
-	requests := make([]Requests, 0)
+	requests := make([]RequestsV2, 0)
 
 	for i := 0; i < len(r.Requests.Data); i += maxRequestsInBatch {
+		start := r.Requests.Start.Add(time.Duration(r.Requests.Data[i]) * time.Second)
 
-		requests = append(requests, Requests{
-			Data:  r.Requests.Data[i : i+maxRequestsInBatch],
-			Start: r.Requests.Start,
+		nextLen := min(i+maxRequestsInBatch, len(r.Requests.Data)) - i
+		data := make([]uint32, 0, nextLen)
+		for _, v := range r.Requests.Data[i : i+nextLen] {
+			data = append(data, uint32(v+r.Requests.Data[i]))
+		}
+
+		requests = append(requests, RequestsV2{
+			Data:  data,
+			Start: start,
 		})
 	}
 

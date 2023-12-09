@@ -25,3 +25,16 @@ func TestRequestLimits_Marshal(t *testing.T) {
 		assert.EqualValues(t, testStruct, got2)
 	})
 }
+
+func TestRequestLimits_ToV2(t *testing.T) {
+	testStruct := new(RequestLimits)
+
+	require.NoError(t, jsoniter.UnmarshalFromString(testData, testStruct))
+
+	t.Run("real data", func(t *testing.T) {
+		data := testStruct.ToV2()
+
+		assert.Equal(t, len(testStruct.Requests.Data), int(data.RequestsCount))
+		assert.Equal(t, len(testStruct.Requests.Data)/maxRequestsInBatch+1, len(data.Requests))
+	})
+}
