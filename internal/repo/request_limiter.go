@@ -52,14 +52,9 @@ func (d *db) AddCounter(ctx context.Context, id string, window time.Duration, co
 		return err
 	}
 
-	value := int32(counterTime.Sub(el.Requests.Start).Seconds())
-	if len(el.Requests.Data) > 0 {
-		value -= el.Requests.Data[len(el.Requests.Data)-1]
-	}
+	el.AddCounter(counterTime)
 
-	el.Requests.Data = append(el.Requests.Data, value)
-
-	data, err := jsoniter.Marshal(el)
+	data, err := el.Marshal()
 	if err != nil {
 		return err
 	}
@@ -83,19 +78,19 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 	}
 
 	if el.Requests == nil {
-		el.Requests = &common.Requests{Data: make([]int32, 0)}
+		el.Requests = &common.Requests{Data: make([]uint32, 0)}
 	}
 
-	requestData := make([]int32, 0, len(el.Requests.Data))
+	requestData := make([]uint32, 0, len(el.Requests.Data))
 	newStart := time.Now().Add(-window)
 
-	counter := int32(0)
+	counter := uint32(0)
 
 	for _, key := range el.Requests.Data {
 		tt := el.Requests.Start.Add(time.Duration(key) * time.Second)
 
 		if time.Since(tt) < window {
-			value := int32(tt.Sub(newStart).Seconds()) - counter
+			value := uint32(tt.Sub(newStart).Seconds()) - counter
 			counter += value
 			requestData = append(requestData, value)
 		}
@@ -106,7 +101,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		Start: newStart,
 	}
 
-	data, err := jsoniter.Marshal(el)
+	data, err := el.Marshal()
 	if err != nil {
 		return err
 	}
@@ -133,7 +128,7 @@ func (d *db) SetThreshold(ctx context.Context, id string, window time.Duration) 
 
 	el.Threshold = uint64(len(el.Requests.Data))
 
-	data, err := jsoniter.Marshal(el)
+	data, err := el.Marshal()
 	if err != nil {
 		return err
 	}
@@ -167,7 +162,7 @@ func (d *db) IncreaseThresholdTo(ctx context.Context, id string, window time.Dur
 
 	el.Threshold = threshold
 
-	data, err := jsoniter.Marshal(el)
+	data, err := el.Marshal()
 	if err != nil {
 		return err
 	}
@@ -216,11 +211,11 @@ func (d *db) Create(ctx context.Context, id string, window time.Duration, thresh
 
 	el := &common.RequestLimits{
 		WindowSeconds: uint64(window.Seconds()),
-		Requests:      &common.Requests{Data: make([]int32, 0), Start: time.Now().Add(-window)},
+		Requests:      &common.Requests{Data: make([]uint32, 0), Start: time.Now().Add(-window)},
 		Threshold:     threshold,
 	}
 
-	data, err = jsoniter.Marshal(el)
+	data, err = el.Marshal()
 	if err != nil {
 		return err
 	}
@@ -243,11 +238,37 @@ func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Durat
 	}
 
 	el := new(common.RequestLimits)
+	if err = el.Unmarshal(data); err != nil {
+		return nil, err
+	}
+
+	counter := uint32(0)
+	for i, v := range el.Requests.Data {
+		counter += v
+		el.Requests.Data[i] = counter
+	}
+
+	return el, nil
+}
+
+func (d *db) getRateLimitOld(tx fdbclient.Transaction, id string, window time.Duration) (*common.RequestLimits, error) {
+	key := d.keyBuilder.RequestLimits(id, window)
+
+	data, err := tx.Get(key)
+	if err != nil {
+		return nil, err
+	}
+
+	if data == nil {
+		return nil, ErrRequestLimitsNotFound
+	}
+
+	el := new(common.RequestLimits)
 	if err = jsoniter.Unmarshal(data, el); err != nil {
 		return nil, err
 	}
 
-	counter := int32(0)
+	counter := uint32(0)
 	for i, v := range el.Requests.Data {
 		counter += v
 		el.Requests.Data[i] = counter
