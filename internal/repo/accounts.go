@@ -40,6 +40,10 @@ func (d *db) GetAccounts(ctx context.Context) ([]common.TwitterAccount, error) {
 		account := common.TwitterAccount{}
 
 		if err = jsoniter.Unmarshal(kv.Value, &account); err != nil {
+			tx.Clear(kv.Key)
+			if clearErr := tx.Commit(); err != nil {
+				return nil, clearErr
+			}
 			return nil, err
 		}
 
