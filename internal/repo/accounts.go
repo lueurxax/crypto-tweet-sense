@@ -41,10 +41,22 @@ func (d *db) GetAccounts(ctx context.Context) ([]common.TwitterAccount, error) {
 
 		if err = jsoniter.Unmarshal(kv.Value, &account); err != nil {
 			tx.Clear(kv.Key)
+
 			if clearErr := tx.Commit(); err != nil {
 				return nil, clearErr
 			}
+
 			return nil, err
+		}
+
+		if account.Login == "" {
+			tx.Clear(kv.Key)
+
+			if clearErr := tx.Commit(); err != nil {
+				return nil, clearErr
+			}
+
+			continue
 		}
 
 		accounts = append(accounts, account)
