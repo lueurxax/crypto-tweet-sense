@@ -8,8 +8,11 @@ import (
 	jsoniter "github.com/json-iterator/go"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
+	"github.com/lueurxax/crypto-tweet-sense/internal/repo/model"
 	"github.com/lueurxax/crypto-tweet-sense/pkg/fdbclient"
 )
+
+const dataKey = "data"
 
 type requestLimiter interface {
 	AddCounter(ctx context.Context, id string, window time.Duration, counterTime time.Time) error
@@ -82,7 +85,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 	}
 
 	if el.Requests == nil {
-		el.Requests = &common.Requests{Data: make([]uint32, 0)}
+		el.Requests = &model.Requests{Data: make([]uint32, 0)}
 	}
 
 	requestData := make([]uint32, 0, len(el.Requests.Data))
@@ -100,7 +103,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		}
 	}
 
-	el.Requests = &common.Requests{
+	el.Requests = &model.Requests{
 		Data:  requestData,
 		Start: newStart,
 	}
@@ -213,9 +216,9 @@ func (d *db) Create(ctx context.Context, id string, window time.Duration, thresh
 		return ErrAlreadyExists
 	}
 
-	el := &common.RequestLimits{
+	el := &model.RequestLimits{
 		WindowSeconds: uint64(window.Seconds()),
-		Requests:      &common.Requests{Data: make([]uint32, 0), Start: time.Now().Add(-window)},
+		Requests:      &model.Requests{Data: make([]uint32, 0), Start: time.Now().Add(-window)},
 		Threshold:     threshold,
 	}
 
@@ -229,7 +232,7 @@ func (d *db) Create(ctx context.Context, id string, window time.Duration, thresh
 	return tx.Commit()
 }
 
-func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Duration) (*common.RequestLimits, error) {
+func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Duration) (*model.RequestLimits, error) {
 	key := d.keyBuilder.RequestLimits(id, window)
 
 	data, err := tx.Get(key)
@@ -241,9 +244,9 @@ func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Durat
 		return nil, ErrRequestLimitsNotFound
 	}
 
-	el := new(common.RequestLimits)
+	el := new(model.RequestLimits)
 	if err = el.Unmarshal(data); err != nil {
-		d.log.WithField("data", data).Error(err)
+		d.log.WithField("key", key).WithField(dataKey, string(data)).Error(err)
 		return nil, err
 	}
 
@@ -256,7 +259,7 @@ func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Durat
 	return el, nil
 }
 
-func (d *db) getRateLimitOld(tx fdbclient.Transaction, id string, window time.Duration) (*common.RequestLimits, error) {
+func (d *db) getRateLimitOld(tx fdbclient.Transaction, id string, window time.Duration) (*model.RequestLimits, error) {
 	key := d.keyBuilder.RequestLimits(id, window)
 
 	data, err := tx.Get(key)
@@ -268,9 +271,9 @@ func (d *db) getRateLimitOld(tx fdbclient.Transaction, id string, window time.Du
 		return nil, ErrRequestLimitsNotFound
 	}
 
-	el := new(common.RequestLimits)
+	el := new(model.RequestLimits)
 	if err = jsoniter.Unmarshal(data, el); err != nil {
-		d.log.WithField("data", data).Error(err)
+		d.log.WithField("key", key).WithField(dataKey, string(data)).Error(err)
 		return nil, err
 	}
 
