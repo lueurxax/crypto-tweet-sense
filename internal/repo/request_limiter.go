@@ -99,12 +99,25 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
 
 	// V2 write
-	dataV2, err := el.ToV2().Marshal()
+	v2 := el.ToV2()
+
+	dataV2, err := v2.Marshal()
 	if err != nil {
 		return err
 	}
 
 	tx.Set(d.keyBuilder.RequestLimitsV2(id, window), dataV2)
+
+	tx.ClearRange(d.keyBuilder.RequestsByRequestLimits(id, window))
+
+	for _, v := range v2.Requests {
+		data, err = v.Marshal()
+		if err != nil {
+			return err
+		}
+
+		tx.Set(d.keyBuilder.Requests(id, window, v.Start), data)
+	}
 
 	return tx.Commit()
 }

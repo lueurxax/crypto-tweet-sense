@@ -12,6 +12,7 @@ type Builder interface {
 	RequestLimits(id string, window time.Duration) []byte
 	RequestLimitsV2(id string, window time.Duration) []byte
 	Requests(id string, window time.Duration, start time.Time) []byte
+	RequestsByRequestLimits(id string, window time.Duration) []byte
 	TweetUsernameRatingKey(username string) []byte
 	TweetRatings() []byte
 	SentTweet(link string) []byte
@@ -83,6 +84,11 @@ func (b builder) Requests(id string, window time.Duration, start time.Time) []by
 		binary.LittleEndian.AppendUint16(slice, uint16(window.Seconds())),
 		uint64(start.Unix()),
 	)
+}
+
+func (b builder) RequestsByRequestLimits(id string, window time.Duration) []byte {
+	slice := append(b.getPrefix(requests), []byte(id)...)
+	return binary.LittleEndian.AppendUint16(slice, uint16(window.Seconds()))
 }
 
 func (b builder) Version() []byte {

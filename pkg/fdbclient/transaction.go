@@ -11,6 +11,7 @@ type Transaction interface {
 	Get(key []byte) (value []byte, err error)
 	Set(key []byte, value []byte)
 	Clear(key []byte)
+	ClearRange(key []byte)
 	Commit() (err error)
 	GetRange(pr fdb.KeyRange, opts ...*RangeOptions) ([]fdb.KeyValue, error)
 	GetIterator(pr fdb.KeyRange, opts ...*RangeOptions) *fdb.RangeIterator
@@ -35,6 +36,12 @@ func (t *transaction) GetIterator(pr fdb.KeyRange, opts ...*RangeOptions) *fdb.R
 func (t *transaction) Clear(key []byte) {
 	t.calls = append(t.calls, func() {
 		t.tr.Clear(fdb.Key(key))
+	})
+}
+
+func (t *transaction) ClearRange(key []byte) {
+	t.calls = append(t.calls, func() {
+		t.tr.ClearRange(fdb.KeyRange{Begin: fdb.Key(key), End: fdb.Key(append(key, 0xff))})
 	})
 }
 
