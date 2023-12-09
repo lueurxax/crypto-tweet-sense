@@ -20,7 +20,6 @@ const (
 
 type Watcher interface {
 	Watch(ctx context.Context)
-	Clean(ctx context.Context) error
 }
 
 type finder interface {
@@ -54,10 +53,6 @@ type watcher struct {
 
 	logger log.Logger
 	config *Config
-}
-
-func (w *watcher) Clean(ctx context.Context) error {
-	return w.cleanTooOldTweets(ctx)
 }
 
 func (w *watcher) Watch(ctx context.Context) {

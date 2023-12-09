@@ -120,18 +120,13 @@ func main() {
 	prometheus.MustRegister(one, next, delay)
 
 	finder := tweetFinder.NewPool(one, next, delay, xConfig, accountManager, st, logger.WithField(pkgKey, "tweet_finder_pool"))
+	if err = finder.Init(ctx); err != nil {
+		panic(err)
+	}
 
 	finderWithMetrics := tweetFinder.NewMetricMiddleware(one, next, "pool", finder)
 
 	watch := watcher.NewWatcher(watcher.GetConfig(), finderWithMetrics, st, checker, logger.WithField(pkgKey, "watcher"))
-
-	if err = watch.Clean(ctx); err != nil {
-		panic(err)
-	}
-
-	if err = finder.Init(ctx); err != nil {
-		panic(err)
-	}
 
 	watch.Watch(ctx)
 
