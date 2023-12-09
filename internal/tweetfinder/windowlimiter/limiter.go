@@ -121,9 +121,6 @@ func (l *limiter) TooFast(ctx context.Context) (uint64, error) {
 }
 
 func (l *limiter) Start(ctx context.Context, delay int64) error {
-	if err := l.repo.CleanCounters(ctx, l.id, l.duration); err != nil {
-		return err
-	}
 	go l.loop(ctx)
 
 	isExist, err := l.repo.CheckIfExist(ctx, l.id, l.duration)

@@ -89,7 +89,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 	counter := int32(0)
 
 	for _, key := range el.Requests.Data {
-		tt := el.Requests.Start.Add(time.Duration(key) * time.Second)
+		tt := el.Requests.Start.Add(time.Duration(key+counter) * time.Second)
 
 		if time.Since(tt) < window {
 			value := int32(tt.Sub(newStart).Seconds()) - counter
