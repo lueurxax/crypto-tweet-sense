@@ -74,7 +74,10 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 
 	el, err := d.getRateLimitOld(tx, id, window)
 	if err != nil {
-		return err
+		el, err = d.getRateLimit(tx, id, window)
+		if err != nil {
+			return err
+		}
 	}
 
 	if el.Requests == nil {
