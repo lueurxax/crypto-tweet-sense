@@ -102,7 +102,6 @@ func (f *finder) FindNext(ctx context.Context, start, end *time.Time, search, cu
 	if err != nil {
 		if strings.Contains(err.Error(), tooManyRequests) {
 			f.delayManager.TooManyRequests(ctx)
-			return nil, "", nil
 		}
 
 		return nil, "", err
