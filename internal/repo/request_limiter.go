@@ -26,7 +26,7 @@ func (d *db) GetRequestLimit(ctx context.Context, id string, window time.Duratio
 		return common.RequestLimitData{}, err
 	}
 
-	el, err := d.getRateLimitOld(tx, id, window)
+	el, err := d.getRateLimit(tx, id, window)
 	if err != nil {
 		return common.RequestLimitData{}, err
 	}
