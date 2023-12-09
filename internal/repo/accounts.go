@@ -52,10 +52,6 @@ func (d *db) GetAccounts(ctx context.Context) ([]common.TwitterAccount, error) {
 		if account.Login == "" {
 			tx.Clear(kv.Key)
 
-			if clearErr := tx.Commit(); err != nil {
-				return nil, clearErr
-			}
-
 			continue
 		}
 
