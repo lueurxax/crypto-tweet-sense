@@ -1,14 +1,12 @@
 package common
 
 import (
-	"encoding/json"
 	"time"
 )
 
 type RequestLimits struct {
 	WindowSeconds uint64
-	RequestsOld   json.RawMessage `json:"requests,omitempty"`
-	Requests      *Requests       `json:"requests_v2,omitempty"`
+	Requests      *Requests `json:"requests_v2,omitempty"`
 	Threshold     uint64
 }
 

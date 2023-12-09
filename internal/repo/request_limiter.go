@@ -52,7 +52,9 @@ func (d *db) AddCounter(ctx context.Context, id string, window time.Duration, co
 		return err
 	}
 
-	el.Requests.Data = append(el.Requests.Data, int32(counterTime.Sub(el.Requests.Start).Seconds()))
+	value := int32(counterTime.Sub(el.Requests.Start).Seconds()) - el.Requests.Data[len(el.Requests.Data)-1]
+
+	el.Requests.Data = append(el.Requests.Data, value)
 
 	data, err := jsoniter.Marshal(el)
 	if err != nil {
@@ -61,7 +63,7 @@ func (d *db) AddCounter(ctx context.Context, id string, window time.Duration, co
 
 	d.log.WithField("request_limits", el).Trace("add counter")
 
-	tx.Set(d.keyBuilder.RequestLimitsOld(id, window), data)
+	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
 
 	return tx.Commit()
 }
@@ -72,7 +74,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		return err
 	}
 
-	el, err := d.getRateLimit(tx, id, window)
+	el, err := d.getRateLimitOld(tx, id, window)
 	if err != nil {
 		return err
 	}
@@ -84,14 +86,15 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 	requestData := make([]int32, 0, len(el.Requests.Data))
 	newStart := time.Now().Add(-window)
 
+	counter := int32(0)
 	for _, key := range el.Requests.Data {
 		tt := el.Requests.Start.Add(time.Duration(key) * time.Second)
 		if time.Since(tt) < window {
-			requestData = append(requestData, int32(tt.Sub(newStart).Seconds()))
+			value := int32(tt.Sub(newStart).Seconds()) - counter
+			counter += value
+			requestData = append(requestData, value)
 		}
 	}
-
-	el.RequestsOld = nil
 
 	el.Requests = &common.Requests{
 		Data:  requestData,
@@ -103,7 +106,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		return err
 	}
 
-	tx.Set(d.keyBuilder.RequestLimitsOld(id, window), data)
+	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
 
 	return tx.Commit()
 }
@@ -130,7 +133,7 @@ func (d *db) SetThreshold(ctx context.Context, id string, window time.Duration) 
 		return err
 	}
 
-	tx.Set(d.keyBuilder.RequestLimitsOld(id, window), data)
+	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
 
 	return tx.Commit()
 }
@@ -164,7 +167,7 @@ func (d *db) IncreaseThresholdTo(ctx context.Context, id string, window time.Dur
 		return err
 	}
 
-	tx.Set(d.keyBuilder.RequestLimitsOld(id, window), data)
+	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
 
 	return tx.Commit()
 }
@@ -195,7 +198,7 @@ func (d *db) Create(ctx context.Context, id string, window time.Duration, thresh
 		return err
 	}
 
-	key := d.keyBuilder.RequestLimitsOld(id, window)
+	key := d.keyBuilder.RequestLimits(id, window)
 
 	data, err := tx.Get(key)
 	if err != nil {
@@ -222,7 +225,7 @@ func (d *db) Create(ctx context.Context, id string, window time.Duration, thresh
 	return tx.Commit()
 }
 
-func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Duration) (*common.RequestLimits, error) {
+func (d *db) getRateLimitOld(tx fdbclient.Transaction, id string, window time.Duration) (*common.RequestLimits, error) {
 	key := d.keyBuilder.RequestLimitsOld(id, window)
 
 	data, err := tx.Get(key)
@@ -237,6 +240,32 @@ func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Durat
 	el := new(common.RequestLimits)
 	if err = jsoniter.Unmarshal(data, el); err != nil {
 		return nil, err
+	}
+
+	return el, nil
+}
+
+func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Duration) (*common.RequestLimits, error) {
+	key := d.keyBuilder.RequestLimits(id, window)
+
+	data, err := tx.Get(key)
+	if err != nil {
+		return nil, err
+	}
+
+	if data == nil {
+		return nil, ErrRequestLimitsNotFound
+	}
+
+	el := new(common.RequestLimits)
+	if err = jsoniter.Unmarshal(data, el); err != nil {
+		return nil, err
+	}
+
+	counter := int32(0)
+	for i, v := range el.Requests.Data {
+		counter += v
+		el.Requests.Data[i] = counter
 	}
 
 	return el, nil
