@@ -19,7 +19,7 @@ const (
 )
 
 type Watcher interface {
-	Watch()
+	Watch(ctx context.Context)
 }
 
 type finder interface {
@@ -55,8 +55,10 @@ type watcher struct {
 	config *Config
 }
 
-func (w *watcher) Watch() {
-	w.cleanTooOld()
+func (w *watcher) Watch(ctx context.Context) {
+	if err := w.cleanTooOldTweets(ctx); err != nil {
+		w.logger.WithError(err).Error()
+	}
 
 	for query := range w.queries {
 		go w.searchAll(query)

@@ -128,7 +128,7 @@ func main() {
 
 	watch := watcher.NewWatcher(watcher.GetConfig(), finderWithMetrics, st, checker, logger.WithField(pkgKey, "watcher"))
 
-	watch.Watch()
+	watch.Watch(ctx)
 
 	diagAPIRouter := fasthttprouter.New()
 	diagAPIRouter.Handle(GetMethod, "/debug/pprof/", fasthttpadaptor.NewFastHTTPHandlerFunc(pprof.Index))
