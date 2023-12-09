@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	twitterscraper "github.com/n0madic/twitter-scraper"
+	twitterscraper "github.com/lueurxax/twitter-scraper"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
@@ -50,7 +50,7 @@ func (f *finder) Init(context.Context) error {
 }
 
 func (f *finder) Find(ctx context.Context, id string) (*common.TweetSnapshot, error) {
-	tweet, err := f.scraper.GetTweet(id)
+	tweet, err := f.scraper.GetTweet(ctx, id)
 	if err != nil {
 		if strings.Contains(err.Error(), tooManyRequests) {
 			f.delayManager.TooManyRequests(ctx)
@@ -98,7 +98,7 @@ func (f *finder) FindNext(ctx context.Context, start, end *time.Time, search, cu
 		query = fmt.Sprintf("%s until:%s", query, end.Format(format))
 	}
 
-	tweets, nextCursor, err := f.scraper.FetchSearchTweets(query, limit, cursor)
+	tweets, nextCursor, err := f.scraper.FetchSearchTweets(ctx, query, limit, cursor)
 	if err != nil {
 		if strings.Contains(err.Error(), tooManyRequests) {
 			f.delayManager.TooManyRequests(ctx)

@@ -7,7 +7,7 @@ import (
 	"os"
 
 	jsoniter "github.com/json-iterator/go"
-	twitterscraper "github.com/n0madic/twitter-scraper"
+	twitterscraper "github.com/lueurxax/twitter-scraper"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
@@ -60,7 +60,7 @@ func (m *manager) AuthScrapper(ctx context.Context, account common.TwitterAccoun
 			return err
 		}
 
-		if err = scrapperLogin(scraper, account); err != nil {
+		if err = scrapperLogin(ctx, scraper, account); err != nil {
 			m.log.WithError(err).WithField("login", account.Login).Error("error while login")
 			return err
 		}
@@ -68,8 +68,8 @@ func (m *manager) AuthScrapper(ctx context.Context, account common.TwitterAccoun
 
 	scraper.SetCookies(cookies)
 
-	if !scraper.IsLoggedIn() {
-		if err = scrapperLogin(scraper, account); err != nil {
+	if !scraper.IsLoggedIn(ctx) {
+		if err = scrapperLogin(ctx, scraper, account); err != nil {
 			m.log.WithError(err).WithField("login", account.Login).Error("error while login")
 			return err
 		}
@@ -118,12 +118,12 @@ func (m *manager) AddAccount(ctx context.Context, config Config) error {
 	return m.repo.SaveCookie(ctx, config.Login, cookies)
 }
 
-func scrapperLogin(scraper *twitterscraper.Scraper, account common.TwitterAccount) error {
+func scrapperLogin(ctx context.Context, scraper *twitterscraper.Scraper, account common.TwitterAccount) error {
 	if account.Confirmation == "" {
-		return scraper.Login(account.Login, account.AccessToken)
+		return scraper.Login(ctx, account.Login, account.AccessToken)
 	}
 
-	return scraper.Login(account.Login, account.AccessToken, account.Confirmation)
+	return scraper.Login(ctx, account.Login, account.AccessToken, account.Confirmation)
 }
 
 func NewManager(repo repo, logger log.Logger) Manager {

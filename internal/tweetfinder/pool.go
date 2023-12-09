@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	twitterscraper "github.com/n0madic/twitter-scraper"
+	twitterscraper "github.com/lueurxax/twitter-scraper"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
