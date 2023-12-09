@@ -18,12 +18,12 @@ type RequestLimits struct {
 }
 
 type Requests struct {
-	Data  []uint32  `json:"data"`
+	Data  []int32   `json:"data"`
 	Start time.Time `json:"start"`
 }
 
 func (r *RequestLimits) AddCounter(counterTime time.Time) {
-	value := uint32(counterTime.Sub(r.Requests.Start).Seconds())
+	value := int32(counterTime.Sub(r.Requests.Start).Seconds())
 	if len(r.Requests.Data) > 0 {
 		value -= r.Requests.Data[len(r.Requests.Data)-1]
 	}
@@ -75,7 +75,8 @@ func (r *RequestLimits) ToCommon() common.RequestLimitData {
 
 type RequestLimitsV2 struct {
 	WindowSeconds uint64
-	Requests      *Requests
+	RequestsCount uint32
+	Requests      []Requests `json:"-"`
 	Threshold     uint64
 }
 

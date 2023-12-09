@@ -85,19 +85,19 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 	}
 
 	if el.Requests == nil {
-		el.Requests = &model.Requests{Data: make([]uint32, 0)}
+		el.Requests = &model.Requests{Data: make([]int32, 0)}
 	}
 
-	requestData := make([]uint32, 0, len(el.Requests.Data))
+	requestData := make([]int32, 0, len(el.Requests.Data))
 	newStart := time.Now().Add(-window)
 
-	counter := uint32(0)
+	counter := int32(0)
 
 	for _, key := range el.Requests.Data {
 		tt := el.Requests.Start.Add(time.Duration(key) * time.Second)
 
 		if time.Since(tt) < window {
-			value := uint32(tt.Sub(newStart).Seconds()) - counter
+			value := int32(tt.Sub(newStart).Seconds()) - counter
 			counter += value
 			requestData = append(requestData, value)
 		}
@@ -218,7 +218,7 @@ func (d *db) Create(ctx context.Context, id string, window time.Duration, thresh
 
 	el := &model.RequestLimits{
 		WindowSeconds: uint64(window.Seconds()),
-		Requests:      &model.Requests{Data: make([]uint32, 0), Start: time.Now().Add(-window)},
+		Requests:      &model.Requests{Data: make([]int32, 0), Start: time.Now().Add(-window)},
 		Threshold:     threshold,
 	}
 
@@ -250,7 +250,7 @@ func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Durat
 		return nil, err
 	}
 
-	counter := uint32(0)
+	counter := int32(0)
 	for i, v := range el.Requests.Data {
 		counter += v
 		el.Requests.Data[i] = counter
@@ -277,7 +277,7 @@ func (d *db) getRateLimitOld(tx fdbclient.Transaction, id string, window time.Du
 		return nil, err
 	}
 
-	counter := uint32(0)
+	counter := int32(0)
 	for i, v := range el.Requests.Data {
 		counter += v
 		el.Requests.Data[i] = counter
