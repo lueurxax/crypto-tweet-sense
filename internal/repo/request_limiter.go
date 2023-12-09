@@ -33,6 +33,12 @@ func (d *db) GetRequestLimit(ctx context.Context, id string, window time.Duratio
 		return common.RequestLimitData{}, err
 	}
 
+	counter := int32(0)
+	for i, v := range el.Requests.Data {
+		counter += v
+		el.Requests.Data[i] = counter
+	}
+
 	if err = tx.Commit(); err != nil {
 		return common.RequestLimitData{}, err
 	}
@@ -83,28 +89,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		el.Requests = &model.Requests{Data: make([]int32, 0)}
 	}
 
-	requestData := make([]int32, 0, len(el.Requests.Data))
-	newStart := time.Now().Add(-window)
-
-	counter := int32(0)
-	newCounter := int32(0)
-
-	for _, key := range el.Requests.Data {
-		tt := el.Requests.Start.Add(time.Duration(key+counter) * time.Second)
-
-		if time.Since(tt) < window {
-			value := int32(tt.Sub(newStart).Seconds()) - newCounter
-			requestData = append(requestData, value)
-			newCounter += value
-		}
-
-		counter += key
-	}
-
-	el.Requests = &model.Requests{
-		Data:  requestData,
-		Start: newStart,
-	}
+	el.Requests = el.CleanCounters()
 
 	data, err := el.Marshal()
 	if err != nil {
@@ -112,6 +97,14 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 	}
 
 	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
+
+	// V2 write
+	dataV2, err := el.ToV2().Marshal()
+	if err != nil {
+		return err
+	}
+
+	tx.Set(d.keyBuilder.RequestLimitsV2(id, window), dataV2)
 
 	return tx.Commit()
 }
@@ -248,11 +241,5 @@ func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Durat
 		return nil, err
 	}
 
-	counter := int32(0)
-	for i, v := range el.Requests.Data {
-		counter += v
-		el.Requests.Data[i] = counter
-	}
-
-	return el, nil
+	return el, err
 }

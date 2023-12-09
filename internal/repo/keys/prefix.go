@@ -12,4 +12,5 @@ const (
 	twitterAccountsCookie     = "_cookiesTwitterAccount"
 	requestLimit              = "_requestLimit"
 	requestLimitV2            = "_v2requestLimit"
+	requests                  = "_requests"
 )

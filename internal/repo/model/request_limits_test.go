@@ -38,3 +38,18 @@ func TestRequestLimits_ToV2(t *testing.T) {
 		assert.Equal(t, len(testStruct.Requests.Data)/maxRequestsInBatch+1, len(data.Requests))
 	})
 }
+
+func TestRequestLimits_CleanCounters(t *testing.T) {
+	testStruct := new(RequestLimits)
+
+	require.NoError(t, jsoniter.UnmarshalFromString(testData, testStruct))
+	t.Run("empty", func(t *testing.T) {
+		got := testStruct.CleanCounters()
+		assert.Equalf(t, len(testStruct.Requests.Data), len(got.Data), "CleanCounters()")
+		diff := got.Start.Sub(testStruct.Requests.Start).Seconds()
+		assert.Equal(t, int32(float64(testStruct.Requests.Data[0])-diff), got.Data[0])
+		for i := range testStruct.Requests.Data[1:len(testStruct.Requests.Data)] {
+			assert.Equalf(t, testStruct.Requests.Data[i+1], got.Data[i+1], "different elements %d", i)
+		}
+	})
+}
