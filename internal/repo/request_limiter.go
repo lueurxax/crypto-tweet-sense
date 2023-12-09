@@ -2,6 +2,7 @@ package fdb
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
@@ -76,7 +77,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 	if err != nil {
 		el, err = d.getRateLimit(tx, id, window)
 		if err != nil {
-			return err
+			return errors.Join(err, ErrRequestLimitsUnmarshallingError)
 		}
 	}
 
