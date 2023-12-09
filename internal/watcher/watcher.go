@@ -20,6 +20,7 @@ const (
 
 type Watcher interface {
 	Watch(ctx context.Context)
+	Clean(ctx context.Context) error
 }
 
 type finder interface {
@@ -55,13 +56,13 @@ type watcher struct {
 	config *Config
 }
 
-func (w *watcher) Watch(ctx context.Context) {
-	if err := w.cleanTooOldTweets(ctx); err != nil {
-		w.logger.WithError(err).Error()
-	}
+func (w *watcher) Clean(ctx context.Context) error {
+	return w.cleanTooOldTweets(ctx)
+}
 
+func (w *watcher) Watch(ctx context.Context) {
 	for query := range w.queries {
-		go w.searchAll(query)
+		go w.searchAll(ctx, query)
 	}
 
 	go w.updateTop()
@@ -70,7 +71,7 @@ func (w *watcher) Watch(ctx context.Context) {
 	go w.cleanTooOld()
 }
 
-func (w *watcher) searchAll(query string) {
+func (w *watcher) searchAll(liveCtx context.Context, query string) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 
 	w.search(ctx, query)
@@ -79,7 +80,12 @@ func (w *watcher) searchAll(query string) {
 
 	tick := time.NewTicker(w.config.SearchInterval)
 	for range tick.C {
-		go w.search(context.Background(), query)
+		select {
+		case <-liveCtx.Done():
+			return
+		default:
+			go w.search(context.Background(), query)
+		}
 	}
 }
 
