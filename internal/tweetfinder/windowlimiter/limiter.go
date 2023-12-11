@@ -18,7 +18,7 @@ type WindowLimiter interface {
 	Inc()
 	TrySetThreshold(ctx context.Context, startTime time.Time) error
 	Duration() time.Duration
-	TooFast(ctx context.Context) (uint64, error)
+	RecommendedDelay(ctx context.Context) (uint64, error)
 	Threshold(ctx context.Context) uint64
 	Temp(ctx context.Context) float64
 	SetResetLimiter(resetLimiter ResetLimiter)
@@ -42,7 +42,7 @@ type limiter struct {
 	id       string
 	duration time.Duration
 
-	fire             bool
+	fire             uint
 	putOutFireTicker *time.Ticker
 
 	resetLimiter  ResetLimiter
@@ -74,8 +74,8 @@ func (l *limiter) Temp(ctx context.Context) float64 {
 
 	temp := (float64(rl.RequestsCount) + 0.1) / float64(rl.Threshold)
 
-	if l.fire {
-		temp += 1
+	if l.fire > 0 {
+		temp += float64(l.fire)
 	}
 
 	return temp
@@ -99,7 +99,7 @@ func (l *limiter) TrySetThreshold(ctx context.Context, startTime time.Time) erro
 	}
 
 	l.putOutFireTicker.Reset(l.duration / 10)
-	l.fire = true
+	l.fire++
 
 	return nil
 }
@@ -108,7 +108,7 @@ func (l *limiter) Duration() time.Duration {
 	return l.duration
 }
 
-func (l *limiter) TooFast(ctx context.Context) (uint64, error) {
+func (l *limiter) RecommendedDelay(ctx context.Context) (uint64, error) {
 	rl, err := l.repo.GetRequestLimit(ctx, l.id, l.duration)
 	if err != nil {
 		return 0, err
@@ -181,7 +181,7 @@ func (l *limiter) loop(ctx context.Context) {
 				panic(err)
 			}
 		case <-l.putOutFireTicker.C:
-			l.fire = false
+			l.fire = 0
 		case <-ticker.C:
 			l.log.WithField(durationKey, l.duration).Trace("clean counters")
 

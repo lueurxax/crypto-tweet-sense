@@ -26,7 +26,7 @@ type WindowLimiter interface {
 	Inc()
 	TrySetThreshold(ctx context.Context, startTime time.Time) error
 	Duration() time.Duration
-	TooFast(ctx context.Context) (uint64, error)
+	RecommendedDelay(ctx context.Context) (uint64, error)
 	SetResetLimiter(resetLimiter windowlimiter.ResetLimiter)
 	Threshold(ctx context.Context) uint64
 	Temp(ctx context.Context) float64
@@ -122,7 +122,7 @@ func (m *managerV2) recalculate(ctx context.Context, factor int) error {
 	shouldDecrease := true
 
 	for _, limiter := range m.windowLimiters {
-		recommendedDelay, err = limiter.TooFast(ctx)
+		recommendedDelay, err = limiter.RecommendedDelay(ctx)
 		if err != nil {
 			return err
 		}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	foundeationDB "github.com/apple/foundationdb/bindings/go/src/fdb"
@@ -26,6 +27,7 @@ import (
 	fdb "github.com/lueurxax/crypto-tweet-sense/internal/repo"
 	tweetFinder "github.com/lueurxax/crypto-tweet-sense/internal/tweetfinder"
 	"github.com/lueurxax/crypto-tweet-sense/internal/watcher"
+	"github.com/lueurxax/crypto-tweet-sense/internal/watcher/doubledelayer"
 )
 
 var version = "dev"
@@ -126,7 +128,14 @@ func main() {
 
 	finderWithMetrics := tweetFinder.NewMetricMiddleware(one, next, "pool", finder)
 
-	watch := watcher.NewWatcher(watcher.GetConfig(), finderWithMetrics, st, checker, logger.WithField(pkgKey, "watcher"))
+	watch := watcher.NewWatcher(
+		watcher.GetConfig(),
+		finderWithMetrics,
+		st,
+		checker,
+		doubledelayer.NewDelayer(time.Minute, time.Second),
+		logger.WithField(pkgKey, "watcher"),
+	)
 
 	watch.Watch(ctx)
 

@@ -44,12 +44,17 @@ type ratingChecker interface {
 	CurrentTop() float64
 }
 
+type doubleDelayer interface {
+	Duration(id string) time.Duration
+}
+
 type watcher struct {
 	queries map[string]time.Time
 
 	finder
 	repo
 	ratingChecker
+	doubleDelayer
 
 	logger log.Logger
 	config *Config
@@ -198,23 +203,26 @@ func (w *watcher) updateOldestFast() {
 	for range tick.C {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 
-		if err := w.updateOldestFastTweet(ctx); err != nil {
+		id, err := w.updateOldestFastTweet(ctx)
+		if err != nil {
 			w.logger.WithError(err).Error("update oldest fast tweet")
 		}
 
 		cancel()
+
+		tick.Reset(w.doubleDelayer.Duration(id))
 	}
 }
 
-func (w *watcher) updateOldestFastTweet(ctx context.Context) error {
+func (w *watcher) updateOldestFastTweet(ctx context.Context) (string, error) {
 	tweet, err := w.repo.GetOldestTopReachableTweet(ctx, w.ratingChecker.CurrentTop())
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	w.logger.WithField(tweetKey, tweet).Debug("oldest fast tweet")
 
-	return w.updateTweet(ctx, tweet.ID)
+	return tweet.ID, w.updateTweet(ctx, tweet.ID)
 }
 
 func (w *watcher) updateTweet(ctx context.Context, id string) error {
@@ -287,7 +295,7 @@ func (w *watcher) cleanTooOldTweets(ctx context.Context) error {
 	return nil
 }
 
-func NewWatcher(config *Config, finder finder, repo repo, checker ratingChecker, logger log.Logger) Watcher {
+func NewWatcher(config *Config, finder finder, repo repo, checker ratingChecker, doubleDelayer doubleDelayer, logger log.Logger) Watcher {
 	start := time.Now().Add(config.SearchInterval)
 
 	queries := make(map[string]time.Time, len(config.Queries))
@@ -297,6 +305,7 @@ func NewWatcher(config *Config, finder finder, repo repo, checker ratingChecker,
 
 	return &watcher{
 		config:        config,
+		doubleDelayer: doubleDelayer,
 		queries:       queries,
 		finder:        finder,
 		repo:          repo,
