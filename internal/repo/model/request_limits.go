@@ -27,8 +27,8 @@ type Requests struct {
 
 func (r *RequestLimits) AddCounter(counterTime time.Time) {
 	value := int32(counterTime.Sub(r.Requests.Start).Seconds())
-	if len(r.Requests.Data) > 0 {
-		value -= r.Requests.Data[len(r.Requests.Data)-1]
+	for _, el := range r.Requests.Data {
+		value -= el
 	}
 
 	r.Requests.Data = append(r.Requests.Data, value)
