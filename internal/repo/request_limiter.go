@@ -20,6 +20,7 @@ type requestLimiter interface {
 	CheckIfExist(ctx context.Context, id string, window time.Duration) (bool, error)
 	Create(ctx context.Context, id string, window time.Duration, threshold uint64) error
 	GetRequestLimit(ctx context.Context, id string, window time.Duration) (common.RequestLimitData, error)
+	GetRequestLimitDebug(ctx context.Context, id string, window time.Duration) (model.RequestLimits, error)
 }
 
 func (d *db) GetRequestLimit(ctx context.Context, id string, window time.Duration) (common.RequestLimitData, error) {
@@ -255,4 +256,23 @@ func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Durat
 	}
 
 	return el, err
+}
+
+func (d *db) GetRequestLimitDebug(ctx context.Context, id string, window time.Duration) (model.RequestLimits, error) {
+	tx, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		return model.RequestLimits{}, err
+	}
+
+	el, err := d.getRateLimit(tx, id, window)
+	if err != nil {
+		return model.RequestLimits{}, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return model.RequestLimits{}, err
+	}
+
+	return *el, nil
+
 }
