@@ -8,6 +8,7 @@ import (
 
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	foundeationDB "github.com/apple/foundationdb/bindings/go/src/fdb"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sirupsen/logrus"
 	"go.elastic.co/ecslogrus"
@@ -66,7 +67,12 @@ func main() {
 
 	st := fdb.NewDB(db, logrusLogger.WithField(pkgKey, "fdb"))
 
-	data, err := st.GetRequestLimitDebug(context.Background(), cfg.Login, cfg.Window)
+	limits, err := st.GetRequestLimitDebug(context.Background(), cfg.Login, cfg.Window)
+	if err != nil {
+		panic(err)
+	}
+
+	data, err := jsoniter.Marshal(limits)
 	if err != nil {
 		panic(err)
 	}
