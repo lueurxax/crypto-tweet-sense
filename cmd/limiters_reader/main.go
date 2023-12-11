@@ -72,7 +72,7 @@ func main() {
 		panic(err)
 	}
 
-	data, err := jsoniter.Marshal(limits)
+	data, err := jsoniter.MarshalToString(limits)
 	if err != nil {
 		panic(err)
 	}
