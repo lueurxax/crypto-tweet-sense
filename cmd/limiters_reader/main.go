@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"time"
 
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	foundeationDB "github.com/apple/foundationdb/bindings/go/src/fdb"
@@ -22,11 +23,11 @@ const (
 )
 
 type config struct {
-	LoggerLevel  logrus.Level `envconfig:"LOG_LEVEL" default:"info"`
-	LogToEcs     bool         `envconfig:"LOG_TO_ECS" default:"false"`
-	DatabasePath string       `default:"/usr/local/etc/foundationdb/fdb.cluster"`
-	Login        string       `envconfig:"LOGIN" required:"true"`
-	Window       int64        `envconfig:"WINDOW" required:"true"`
+	LoggerLevel  logrus.Level  `envconfig:"LOG_LEVEL" default:"info"`
+	LogToEcs     bool          `envconfig:"LOG_TO_ECS" default:"false"`
+	DatabasePath string        `default:"/usr/local/etc/foundationdb/fdb.cluster"`
+	Login        string        `envconfig:"LOGIN" required:"true"`
+	Window       time.Duration `envconfig:"WINDOW" required:"true"`
 }
 
 func main() {
@@ -65,7 +66,7 @@ func main() {
 
 	st := fdb.NewDB(db, logrusLogger.WithField(pkgKey, "fdb"))
 
-	data, err := st.GetRequestLimitDebug(context.Background(), "test", 1)
+	data, err := st.GetRequestLimitDebug(context.Background(), cfg.Login, cfg.Window)
 	if err != nil {
 		panic(err)
 	}
