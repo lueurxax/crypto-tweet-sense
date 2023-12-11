@@ -42,6 +42,9 @@ type limiter struct {
 	id       string
 	duration time.Duration
 
+	fire             bool
+	putOutFireTicker *time.Ticker
+
 	resetLimiter  ResetLimiter
 	resetDuration time.Duration
 	resetTicker   *time.Ticker
@@ -65,11 +68,17 @@ func (l *limiter) Threshold(ctx context.Context) uint64 {
 func (l *limiter) Temp(ctx context.Context) float64 {
 	rl, err := l.repo.GetRequestLimit(ctx, l.id, l.duration)
 	if err != nil {
-		l.log.WithError(err).Error("error while getting threshold")
+		l.log.WithError(err).Error("error while getting temp")
 		return 0
 	}
 
-	return (float64(rl.RequestsCount) + 0.1) / float64(rl.Threshold)
+	temp := (float64(rl.RequestsCount) + 0.1) / float64(rl.Threshold)
+
+	if l.fire {
+		temp += 1
+	}
+
+	return temp
 }
 
 func (l *limiter) TrySetThreshold(ctx context.Context, startTime time.Time) error {
@@ -88,6 +97,9 @@ func (l *limiter) TrySetThreshold(ctx context.Context, startTime time.Time) erro
 			WithField("current", rl.RequestsCount).
 			Debug("set threshold")
 	}
+
+	l.putOutFireTicker.Reset(l.duration / 10)
+	l.fire = true
 
 	return nil
 }
@@ -168,6 +180,8 @@ func (l *limiter) loop(ctx context.Context) {
 			if err := l.repo.AddCounter(requestctx, l.id, l.duration, t); err != nil {
 				panic(err)
 			}
+		case <-l.putOutFireTicker.C:
+			l.fire = false
 		case <-ticker.C:
 			l.log.WithField(durationKey, l.duration).Trace("clean counters")
 
@@ -200,11 +214,12 @@ func (l *limiter) SetResetLimiter(resetLimiter ResetLimiter) {
 
 func NewLimiter(duration, resetDuration time.Duration, id string, repo repo, logger log.Logger) WindowLimiter {
 	return &limiter{
-		duration:      duration,
-		count:         make(chan time.Time, queueLen),
-		id:            id,
-		resetDuration: resetDuration,
-		repo:          repo,
-		log:           logger,
+		putOutFireTicker: time.NewTicker(duration),
+		duration:         duration,
+		count:            make(chan time.Time, queueLen),
+		id:               id,
+		resetDuration:    resetDuration,
+		repo:             repo,
+		log:              logger,
 	}
 }
