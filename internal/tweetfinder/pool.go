@@ -139,7 +139,7 @@ func (p *pool) getFinderIndex() (int, bool) {
 			continue
 		}
 
-		if (d < minimal || minimal == 0) && d < 2 {
+		if d < minimal || minimal == 0 {
 			minimal = d
 			index = i
 		}

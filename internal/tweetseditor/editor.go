@@ -17,15 +17,16 @@ import (
 )
 
 const (
-	prompt     = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip information such as airdrops or giveaway, if they are not useful for investing. I will parse your answer by code like json `{\"tweets\":[{\"telegram_message\":\"summarized message by tweet\", \"link\":\"link to tweet\", \"new_useful_information\":true}]}`, then can you prepare messages in json with prepared telegram message? \nTweets: %s." //nolint:lll
-	nextPrompt = "Additional tweets, create new message only for new information: %s."                                                                                                                                                                                                                                                                                                                                                                                                                                       //nolint:lll
+	prompt     = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip information such as airdrops or giveaway, if they are not useful for investing. I will parse your answer by code like json `{\"tweets\":[{\"telegram_message\":\"summarized message by tweet\", \"link\":\"link to tweet\", \"useful_information\":true, \"duplicate_information\": false}]}`, then can you prepare messages in json with prepared telegram message? \nTweets: %s." //nolint:lll
+	nextPrompt = "Additional tweets, create new message only for new information: %s."                                                                                                                                                                                                                                                                                                                                                                                                                                                                     //nolint:lll
 	queueLen   = 10
 )
 
 type Tweet struct {
-	Content              string `json:"telegram_message"`
-	Link                 string `json:"link"`
-	NewUsefulInformation bool   `json:"new_useful_information"`
+	Content   string `json:"telegram_message"`
+	Link      string `json:"link"`
+	Useful    bool   `json:"useful_information"`
+	Duplicate bool   `json:"duplicate_information"`
 }
 
 type repo interface {
@@ -162,8 +163,13 @@ func (e *editor) edit(ctx context.Context, tweets []common.Tweet) error {
 	for _, el := range res.Tweets {
 		tweet, ok := tweetsMap[el.Link]
 		if ok {
-			if !el.NewUsefulInformation {
+			if !el.Useful {
 				e.log.WithField("tweet", el.Link).Debug("skip tweet, no new useful information")
+				continue
+			}
+
+			if el.Duplicate {
+				e.log.WithField("tweet", el.Link).Debug("skip tweet, duplicate information")
 				continue
 			}
 
