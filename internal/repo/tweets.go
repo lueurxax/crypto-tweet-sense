@@ -106,6 +106,10 @@ func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot,
 		return nil, err
 	}
 
+	if err = tr.Commit(); err != nil {
+		return nil, err
+	}
+
 	if len(kvs) == 0 {
 		return nil, ErrTweetsNotFound
 	}
@@ -148,6 +152,10 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 
 	kvs, err := tr.GetRange(pr)
 	if err != nil {
+		return nil, err
+	}
+
+	if err = tr.Commit(); err != nil {
 		return nil, err
 	}
 
@@ -220,6 +228,10 @@ func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, e
 		return nil, err
 	}
 
+	if err = tr.Commit(); err != nil {
+		return nil, err
+	}
+
 	if len(kvs) == 0 {
 		return nil, ErrTweetsNotFound
 	}
@@ -262,6 +274,10 @@ func (d *db) GetTweetsOlderThen(ctx context.Context, after time.Time) ([]*common
 
 	kvs, err := tr.GetRange(pr)
 	if err != nil {
+		return nil, err
+	}
+
+	if err = tr.Commit(); err != nil {
 		return nil, err
 	}
 
