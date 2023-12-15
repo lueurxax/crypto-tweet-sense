@@ -299,6 +299,8 @@ func (w *watcher) cleanTooOldTweets(ctx context.Context) error {
 		}
 	}
 
+	w.logger.WithField("count", len(tweets)).Debug("clean too old tweets")
+
 	return nil
 }
 
