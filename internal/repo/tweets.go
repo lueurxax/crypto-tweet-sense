@@ -220,67 +220,21 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 }
 
 func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error) {
-	tr, err := d.db.NewTransaction(ctx)
+	ch, err := d.GetTweets(ctx)
 	if err != nil {
-		d.log.WithError(err).Error("error while creating transaction")
 		return nil, err
-	}
-
-	pr, err := fdb.PrefixRange(d.keyBuilder.Tweets())
-	if err != nil {
-		d.log.WithError(err).Error("error while creating prefix range")
-		return nil, err
-	}
-
-	options := &fdbclient.RangeOptions{}
-	options.SetLimit(1000)
-
-	kvs, err := tr.GetRange(pr, options)
-	if err != nil {
-		d.log.WithError(err).Error("error while getting range")
-		return nil, err
-	}
-
-	if len(kvs) == 0 {
-		return nil, ErrTweetsNotFound
 	}
 
 	var result *common.TweetSnapshot
-
-	for len(kvs) > 0 {
-		for _, kv := range kvs {
-			if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
-				continue
-			}
-
-			tweet := new(common.TweetSnapshot)
-			if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
-				d.log.WithError(err).Error("error while unmarshaling tweet")
-				return nil, err
-			}
-
-			if result == nil {
-				result = tweet
-				continue
-			}
-
-			if result.CheckedAt.After(tweet.CheckedAt) {
-				result = tweet
-			}
+	for tweet := range ch {
+		if result == nil {
+			result = tweet
+			continue
 		}
 
-		pr = fdb.KeyRange{Begin: kvs[len(kvs)-1].Key, End: pr.End}
-		kvs, err = tr.GetRange(pr, options)
-		if err != nil {
-			d.log.WithError(err).Error("error while getting range")
-			return nil, err
+		if result.CheckedAt.After(tweet.CheckedAt) {
+			result = tweet
 		}
-	}
-
-	if err = tr.Commit(); err != nil {
-		d.log.WithError(err).Error("error while commiting transaction")
-
-		return nil, err
 	}
 
 	return result, nil
@@ -328,4 +282,72 @@ func (d *db) GetTweetsOlderThen(ctx context.Context, after time.Time) ([]*common
 	}
 
 	return result, nil
+}
+
+func (d *db) GetTweets(ctx context.Context) (<-chan *common.TweetSnapshot, error) {
+	tr, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		d.log.WithError(err).Error("error while creating transaction")
+		return nil, err
+	}
+
+	ch := make(chan *common.TweetSnapshot, 1000)
+
+	go d.getTweets(tr, ch)
+
+	return ch, nil
+}
+
+func (d *db) getTweets(tr fdbclient.Transaction, ch chan *common.TweetSnapshot) {
+	defer close(ch)
+	pr, err := fdb.PrefixRange(d.keyBuilder.Tweets())
+	if err != nil {
+		d.log.WithError(err).Error("error while creating prefix range")
+		return
+	}
+
+	options := new(fdbclient.RangeOptions)
+	options.SetLimit(1000)
+
+	kvs, err := tr.GetRange(pr, options)
+	if err != nil {
+		d.log.WithError(err).Error("error while getting range")
+		return
+	}
+
+	if len(kvs) == 0 {
+		return
+	}
+
+	counter := 0
+
+	for len(kvs) > 0 {
+		for _, kv := range kvs {
+			if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
+				continue
+			}
+
+			tweet := new(common.TweetSnapshot)
+			if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
+				d.log.WithError(err).Error("error while unmarshaling tweet")
+				return
+			}
+			counter++
+
+			ch <- tweet
+		}
+
+		pr = fdb.KeyRange{Begin: kvs[len(kvs)-1].Key, End: pr.End}
+		kvs, err = tr.GetRange(pr, options)
+		if err != nil {
+			d.log.WithField("processed", counter).WithError(err).Error("error while getting range")
+			return
+		}
+	}
+
+	if err = tr.Commit(); err != nil {
+		d.log.WithError(err).Error("error while committing transaction")
+
+		return
+	}
 }
