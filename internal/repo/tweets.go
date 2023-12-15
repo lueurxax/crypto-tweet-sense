@@ -235,6 +235,8 @@ func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, e
 	}
 
 	if err = tr.Commit(); err != nil {
+		d.log.WithError(err).Error("error while commiting transaction")
+
 		return nil, err
 	}
 
