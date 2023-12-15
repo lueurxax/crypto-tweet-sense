@@ -235,7 +235,11 @@ func (d *db) getTweets(tr fdbclient.Transaction, ch chan *common.TweetSnapshot) 
 
 		tweet := new(common.TweetSnapshot)
 		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
-			d.log.WithError(err).Error("error while unmarshaling tweet")
+			d.log.
+				WithField("key", kv.Key).
+				WithField("json", string(kv.Value)).
+				WithError(err).
+				Error("error while unmarshaling tweet")
 			return
 		}
 		counter++
