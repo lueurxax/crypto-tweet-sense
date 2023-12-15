@@ -98,41 +98,13 @@ func (d *db) DeleteTweet(ctx context.Context, id string) error {
 }
 
 func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot, error) {
-	tr, err := d.db.NewTransaction(ctx)
+	ch, err := d.GetTweets(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	pr, err := fdb.PrefixRange(d.keyBuilder.Tweets())
-	if err != nil {
-		return nil, err
-	}
-
-	kvs, err := tr.GetRange(pr)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = tr.Commit(); err != nil {
-		return nil, err
-	}
-
-	if len(kvs) == 0 {
-		return nil, ErrTweetsNotFound
 	}
 
 	var result *common.TweetSnapshot
-
-	for _, kv := range kvs {
-		if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
-			continue
-		}
-
-		tweet := new(common.TweetSnapshot)
-		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
-			return nil, err
-		}
-
+	for tweet := range ch {
 		if result == nil {
 			result = tweet
 			continue
@@ -147,27 +119,9 @@ func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot,
 }
 
 func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, error) {
-	tr, err := d.db.NewTransaction(ctx)
+	ch, err := d.GetTweets(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	pr, err := fdb.PrefixRange(d.keyBuilder.Tweets())
-	if err != nil {
-		return nil, err
-	}
-
-	kvs, err := tr.GetRange(pr)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = tr.Commit(); err != nil {
-		return nil, err
-	}
-
-	if len(kvs) == 0 {
-		return nil, ErrTweetsNotFound
 	}
 
 	var result *common.TweetSnapshot
@@ -176,16 +130,7 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 
 	best := 0.0
 
-	for _, kv := range kvs {
-		if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
-			continue
-		}
-
-		tweet := new(common.TweetSnapshot)
-		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
-			return nil, err
-		}
-
+	for tweet := range ch {
 		predictedRating := tweet.RatingGrowSpeed * time.Since(tweet.TimeParsed).Seconds()
 
 		// skip unreachable top tweets
@@ -241,41 +186,13 @@ func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, e
 }
 
 func (d *db) GetTweetsOlderThen(ctx context.Context, after time.Time) ([]*common.TweetSnapshot, error) {
-	tr, err := d.db.NewTransaction(ctx)
+	ch, err := d.GetTweets(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	pr, err := fdb.PrefixRange(d.keyBuilder.Tweets())
-	if err != nil {
-		return nil, err
-	}
-
-	kvs, err := tr.GetRange(pr)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = tr.Commit(); err != nil {
-		return nil, err
-	}
-
-	if len(kvs) == 0 {
-		return nil, ErrTweetsNotFound
 	}
 
 	var result []*common.TweetSnapshot
-
-	for _, kv := range kvs {
-		if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
-			continue
-		}
-
-		tweet := new(common.TweetSnapshot)
-		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
-			return nil, err
-		}
-
+	for tweet := range ch {
 		if tweet.TimeParsed.Before(after) {
 			result = append(result, tweet)
 		}
