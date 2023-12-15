@@ -256,6 +256,7 @@ func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, e
 
 		tweet := new(common.TweetSnapshot)
 		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
+			d.log.WithError(err).Error("error while unmarshaling tweet")
 			return nil, err
 		}
 
