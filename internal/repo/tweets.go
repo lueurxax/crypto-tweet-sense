@@ -8,6 +8,7 @@ import (
 	jsoniter "github.com/json-iterator/go"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
+	"github.com/lueurxax/crypto-tweet-sense/pkg/fdbclient"
 )
 
 type tweetRepo interface {
@@ -231,15 +232,12 @@ func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, e
 		return nil, err
 	}
 
-	kvs, err := tr.GetRange(pr)
+	options := &fdbclient.RangeOptions{}
+	options.SetLimit(1000)
+
+	kvs, err := tr.GetRange(pr, options)
 	if err != nil {
 		d.log.WithError(err).Error("error while getting range")
-		return nil, err
-	}
-
-	if err = tr.Commit(); err != nil {
-		d.log.WithError(err).Error("error while commiting transaction")
-
 		return nil, err
 	}
 
@@ -249,25 +247,40 @@ func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, e
 
 	var result *common.TweetSnapshot
 
-	for _, kv := range kvs {
-		if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
-			continue
+	for len(kvs) > 0 {
+		for _, kv := range kvs {
+			if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
+				continue
+			}
+
+			tweet := new(common.TweetSnapshot)
+			if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
+				d.log.WithError(err).Error("error while unmarshaling tweet")
+				return nil, err
+			}
+
+			if result == nil {
+				result = tweet
+				continue
+			}
+
+			if result.CheckedAt.After(tweet.CheckedAt) {
+				result = tweet
+			}
 		}
 
-		tweet := new(common.TweetSnapshot)
-		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
-			d.log.WithError(err).Error("error while unmarshaling tweet")
+		pr = fdb.KeyRange{Begin: kvs[len(kvs)-1].Key, End: pr.End}
+		kvs, err = tr.GetRange(pr, options)
+		if err != nil {
+			d.log.WithError(err).Error("error while getting range")
 			return nil, err
 		}
+	}
 
-		if result == nil {
-			result = tweet
-			continue
-		}
+	if err = tr.Commit(); err != nil {
+		d.log.WithError(err).Error("error while commiting transaction")
 
-		if result.CheckedAt.After(tweet.CheckedAt) {
-			result = tweet
-		}
+		return nil, err
 	}
 
 	return result, nil
