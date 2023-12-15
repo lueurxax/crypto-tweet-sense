@@ -225,7 +225,7 @@ func (d *db) getTweets(tr fdbclient.Transaction, ch chan *common.TweetSnapshot) 
 
 	opts := new(fdbclient.RangeOptions)
 
-	opts.SetMode(fdb.StreamingModeWantAll)
+	opts.SetMode(fdb.StreamingModeSerial)
 
 	iter := tr.GetIterator(pr, opts)
 
