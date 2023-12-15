@@ -61,6 +61,10 @@ type watcher struct {
 }
 
 func (w *watcher) Watch(ctx context.Context) {
+	if err := w.cleanTooOldTweets(ctx); err != nil {
+		w.logger.WithError(err).Error("clean too old tweets")
+	}
+
 	for query := range w.queries {
 		go w.searchAll(ctx, query)
 	}
@@ -271,10 +275,6 @@ func (w *watcher) updateOldestTweet(ctx context.Context) error {
 }
 
 func (w *watcher) cleanTooOld() {
-	if err := w.cleanTooOldTweets(context.Background()); err != nil {
-		w.logger.WithError(err).Error("clean too old tweets")
-	}
-
 	tick := time.NewTicker(w.config.CleanInterval)
 	for range tick.C {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
