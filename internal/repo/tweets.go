@@ -61,6 +61,7 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 
 		data, err := tr.Get(key)
 		if err != nil {
+			d.log.WithError(err).WithField("key", key).Error("error while getting tweet")
 			return err
 		}
 
@@ -71,6 +72,7 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 			}
 
 			if oldTweet.CheckedAt.After(tweet.CheckedAt) {
+				d.log.WithField("old", oldTweet).WithField("new", tweet).Debug("skip tweet because it is older then exist")
 				continue
 			}
 		}
