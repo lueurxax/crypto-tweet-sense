@@ -271,6 +271,9 @@ func (w *watcher) updateOldestTweet(ctx context.Context) error {
 }
 
 func (w *watcher) cleanTooOld() {
+	if err := w.cleanTooOldTweets(context.Background()); err != nil {
+		w.logger.WithError(err).Error()
+	}
 	tick := time.NewTicker(w.config.CleanInterval)
 	for range tick.C {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
