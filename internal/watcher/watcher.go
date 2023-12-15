@@ -232,6 +232,8 @@ func (w *watcher) updateTweet(ctx context.Context, id string) error {
 			return w.repo.DeleteTweet(ctx, id)
 		}
 
+		w.logger.WithError(err).Error("find tweet")
+
 		return err
 	}
 
@@ -259,6 +261,7 @@ func (w *watcher) updateOldest() {
 func (w *watcher) updateOldestTweet(ctx context.Context) error {
 	tweet, err := w.repo.GetOldestSyncedTweet(ctx)
 	if err != nil {
+		w.logger.WithError(err).Error("get oldest synced tweet")
 		return err
 	}
 

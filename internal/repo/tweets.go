@@ -85,7 +85,11 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 		tr.Set(key, data)
 	}
 
-	return tr.Commit()
+	if err = tr.Commit(); err != nil {
+		d.log.WithError(err).Error("error while commiting transaction")
+	}
+
+	return err
 }
 
 func (d *db) DeleteTweet(ctx context.Context, id string) error {
