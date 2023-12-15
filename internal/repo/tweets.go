@@ -221,16 +221,19 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error) {
 	tr, err := d.db.NewTransaction(ctx)
 	if err != nil {
+		d.log.WithError(err).Error("error while creating transaction")
 		return nil, err
 	}
 
 	pr, err := fdb.PrefixRange(d.keyBuilder.Tweets())
 	if err != nil {
+		d.log.WithError(err).Error("error while creating prefix range")
 		return nil, err
 	}
 
 	kvs, err := tr.GetRange(pr)
 	if err != nil {
+		d.log.WithError(err).Error("error while getting range")
 		return nil, err
 	}
 
