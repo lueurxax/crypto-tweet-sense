@@ -223,12 +223,20 @@ func (d *db) getTweets(tr fdbclient.Transaction, ch chan *common.TweetSnapshot) 
 		return
 	}
 
-	iter := tr.GetIterator(pr)
+	opts := new(fdbclient.RangeOptions)
+
+	opts.SetMode(fdb.StreamingModeWantAll)
+
+	iter := tr.GetIterator(pr, opts)
 
 	counter := 0
 
 	for iter.Advance() {
 		kv, err := iter.Get()
+		if err != nil {
+			d.log.WithField("processed", counter).WithError(err).Error("error while iterating")
+			return
+		}
 		if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
 			continue
 		}
