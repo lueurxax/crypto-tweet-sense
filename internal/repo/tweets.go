@@ -223,43 +223,24 @@ func (d *db) getTweets(tr fdbclient.Transaction, ch chan *common.TweetSnapshot) 
 		return
 	}
 
-	options := new(fdbclient.RangeOptions)
-	options.SetLimit(1000)
-
-	kvs, err := tr.GetRange(pr, options)
-	if err != nil {
-		d.log.WithError(err).Error("error while getting range")
-		return
-	}
-
-	if len(kvs) == 0 {
-		return
-	}
+	iter := tr.GetIterator(pr)
 
 	counter := 0
 
-	for len(kvs) > 0 {
-		for _, kv := range kvs {
-			if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
-				continue
-			}
-
-			tweet := new(common.TweetSnapshot)
-			if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
-				d.log.WithError(err).Error("error while unmarshaling tweet")
-				return
-			}
-			counter++
-
-			ch <- tweet
+	for iter.Advance() {
+		kv, err := iter.Get()
+		if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
+			continue
 		}
 
-		pr = fdb.KeyRange{Begin: kvs[len(kvs)-1].Key, End: pr.End}
-		kvs, err = tr.GetRange(pr, options)
-		if err != nil {
-			d.log.WithField("processed", counter).WithError(err).Error("error while getting range")
+		tweet := new(common.TweetSnapshot)
+		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
+			d.log.WithError(err).Error("error while unmarshaling tweet")
 			return
 		}
+		counter++
+
+		ch <- tweet
 	}
 
 	if err = tr.Commit(); err != nil {
