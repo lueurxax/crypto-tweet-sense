@@ -36,6 +36,9 @@ func (c *checker) Check(ctx context.Context, tweet *common.TweetSnapshot) (bool,
 	}
 
 	rate := likes * (1.0 + float64(rating.Likes-rating.Dislikes)/10.0)
+	if rate == 0 && rating.Likes > rating.Dislikes {
+		rate = float64(rating.Likes-rating.Dislikes) * 10
+	}
 
 	return rate > float64(c.topCount), rate / liveDuration, nil
 }

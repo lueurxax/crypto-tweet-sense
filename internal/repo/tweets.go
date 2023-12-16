@@ -127,21 +127,27 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 	var result *common.TweetSnapshot
 
 	var fallbackResult *common.TweetSnapshot
+	pretopcounter := 0
+	zerocounter := 0
 
-	best := 0.0
+	best := 0.0000000001
 
 	for tweet := range ch {
 		predictedRating := tweet.RatingGrowSpeed * time.Since(tweet.TimeParsed).Seconds()
+		if predictedRating == 0 {
+			zerocounter++
+		}
+
+		if predictedRating > best {
+			best = predictedRating
+			fallbackResult = tweet
+		}
 
 		// skip unreachable top tweets
 		if predictedRating < top {
-			if predictedRating > best {
-				best = predictedRating
-				fallbackResult = tweet
-			}
-
 			continue
 		}
+		pretopcounter++
 
 		if result == nil {
 			result = tweet
@@ -152,6 +158,10 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 			result = tweet
 		}
 	}
+
+	d.log.WithField("zerocounter", zerocounter).
+		WithField("pretopcounter", pretopcounter).
+		Debug("GetOldestTopReachableTweet")
 
 	if result == nil {
 		if fallbackResult != nil {
@@ -225,7 +235,7 @@ func (d *db) getTweets(tr fdbclient.Transaction, ch chan *common.TweetSnapshot) 
 
 	opts := new(fdbclient.RangeOptions)
 
-	opts.SetMode(fdb.StreamingModeSerial)
+	opts.SetMode(fdb.StreamingModeWantAll)
 
 	iter := tr.GetIterator(pr, opts)
 
