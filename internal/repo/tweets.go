@@ -12,6 +12,8 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/pkg/fdbclient"
 )
 
+const bufferSize = 1000
+
 type tweetRepo interface {
 	Save(ctx context.Context, tweets []common.TweetSnapshot) error
 	DeleteTweet(ctx context.Context, id string) error
@@ -79,12 +81,6 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 			return err
 		}
 
-		tr.Set(key, data)
-
-		if oldTweet != nil {
-			tr.Clear(d.keyBuilder.TweetRatingIndex(oldTweet.RatingGrowSpeed, oldTweet.ID))
-		}
-
 		index := &common.TweetSnapshotIndex{
 			ID:              tweet.ID,
 			RatingGrowSpeed: tweet.RatingGrowSpeed,
@@ -95,6 +91,12 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 		data, err = jsoniter.Marshal(index)
 		if err != nil {
 			return err
+		}
+
+		tr.Set(key, data)
+
+		if oldTweet != nil {
+			tr.Clear(d.keyBuilder.TweetRatingIndex(oldTweet.RatingGrowSpeed, oldTweet.ID))
 		}
 
 		tr.Set(d.keyBuilder.TweetRatingIndex(tweet.RatingGrowSpeed, tweet.ID), data)
@@ -113,6 +115,7 @@ func (d *db) DeleteTweet(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
+
 	data, err := d.getTweetTx(tr, id)
 	if err != nil {
 		return err
@@ -156,6 +159,7 @@ func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot,
 			WithField("json", string(kv.Value)).
 			WithError(err).
 			Error("error while unmarshalling tweet index")
+
 		return nil, err
 	}
 
@@ -265,7 +269,7 @@ func (d *db) GetTweets(ctx context.Context) (<-chan *common.TweetSnapshot, error
 		return nil, err
 	}
 
-	ch := make(chan *common.TweetSnapshot, 1000)
+	ch := make(chan *common.TweetSnapshot, bufferSize)
 
 	go d.getTweets(tr, ch)
 
@@ -279,7 +283,7 @@ func (d *db) GetTweetIndexes(ctx context.Context) (<-chan *common.TweetSnapshotI
 		return nil, err
 	}
 
-	ch := make(chan *common.TweetSnapshotIndex, 1000)
+	ch := make(chan *common.TweetSnapshotIndex, bufferSize)
 
 	go d.getTweetIndexes(tr, ch)
 
@@ -293,7 +297,7 @@ func (d *db) GetTweetPositiveIndexes(ctx context.Context) (<-chan *common.TweetS
 		return nil, err
 	}
 
-	ch := make(chan *common.TweetSnapshotIndex, 1000)
+	ch := make(chan *common.TweetSnapshotIndex, bufferSize)
 
 	go d.getTweetPositiveIndexes(tr, ch)
 
@@ -308,6 +312,7 @@ func (d *db) getTweet(ctx context.Context, id string) (*common.TweetSnapshot, er
 
 	res, err := d.getTweetTx(tr, id)
 	if err != nil {
+		d.log.WithField("id", id).WithError(err).Error("error while getting tweet")
 		return nil, err
 	}
 
@@ -323,7 +328,6 @@ func (d *db) getTweetTx(tr fdbclient.Transaction, id string) (*common.TweetSnaps
 	}
 
 	if data == nil {
-		d.log.WithField("id", id).Debug("key wrong, tweet not found")
 		return nil, ErrTweetsNotFound
 	}
 
@@ -436,7 +440,7 @@ func (d *db) getTweetIndexesByRange(tr fdbclient.Transaction, keyRange fdb.KeyRa
 }
 
 func (d *db) getTweetsUntil(ctx context.Context, after time.Time) {
-	ch := make(chan string, 1000)
+	ch := make(chan string, bufferSize)
 
 	tr, err := d.db.NewTransaction(ctx)
 	if err != nil {
