@@ -161,7 +161,7 @@ func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot,
 }
 
 func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, error) {
-	ch, err := d.GetTweetIndexes(ctx)
+	ch, err := d.GetTweetPositiveIndexes(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -230,6 +230,10 @@ func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, e
 		}
 	}
 
+	if result == nil {
+		return nil, ErrTweetsNotFound
+	}
+
 	return d.getTweet(ctx, result.ID)
 }
 
@@ -264,6 +268,20 @@ func (d *db) GetTweets(ctx context.Context) (<-chan *common.TweetSnapshot, error
 }
 
 func (d *db) GetTweetIndexes(ctx context.Context) (<-chan *common.TweetSnapshotIndex, error) {
+	tr, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		d.log.WithError(err).Error("error while creating transaction")
+		return nil, err
+	}
+
+	ch := make(chan *common.TweetSnapshotIndex, 1000)
+
+	go d.getTweetIndexes(tr, ch)
+
+	return ch, nil
+}
+
+func (d *db) GetTweetPositiveIndexes(ctx context.Context) (<-chan *common.TweetSnapshotIndex, error) {
 	tr, err := d.db.NewTransaction(ctx)
 	if err != nil {
 		d.log.WithError(err).Error("error while creating transaction")
