@@ -282,10 +282,6 @@ func (d *db) getTweetTx(tr fdbclient.Transaction, id string) (*common.TweetSnaps
 		return nil, err
 	}
 
-	if err = tr.Commit(); err != nil {
-		return nil, err
-	}
-
 	if data == nil {
 		return nil, ErrTweetsNotFound
 	}
