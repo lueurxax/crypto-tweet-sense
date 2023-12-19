@@ -304,12 +304,19 @@ func (d *db) getTweet(ctx context.Context, id string) (*common.TweetSnapshot, er
 		return nil, err
 	}
 
-	return d.getTweetTx(tr, id)
+	res, err := d.getTweetTx(tr, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, tr.Commit()
 }
 
 func (d *db) getTweetTx(tr fdbclient.Transaction, id string) (*common.TweetSnapshot, error) {
 	data, err := tr.Get(d.keyBuilder.Tweet(id))
 	if err != nil {
+		d.log.WithField("id", id).WithError(err).Error("error while getting tweet")
+
 		return nil, err
 	}
 
