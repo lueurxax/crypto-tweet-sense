@@ -241,12 +241,14 @@ func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, e
 
 func (d *db) GetTweetsOlderThen(ctx context.Context, after time.Time) ([]string, error) {
 	go d.getTweetsUntil(ctx, after)
+
 	ch, err := d.GetTweets(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	var result []string
+
 	for tweet := range ch {
 		if tweet.TimeParsed.Before(after) {
 			result = append(result, tweet.ID)
@@ -321,6 +323,7 @@ func (d *db) getTweetTx(tr fdbclient.Transaction, id string) (*common.TweetSnaps
 	}
 
 	if data == nil {
+		d.log.WithField("id", id).Debug("key wrong, tweet not found")
 		return nil, ErrTweetsNotFound
 	}
 
