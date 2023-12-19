@@ -41,6 +41,13 @@ type TweetSnapshot struct {
 	CheckedAt       time.Time
 }
 
+type TweetSnapshotIndex struct {
+	ID              string
+	RatingGrowSpeed float64
+	CreatedAt       time.Time
+	CheckedAt       time.Time
+}
+
 func (t TweetSnapshot) String() string {
 	return fmt.Sprintf(
 		"TweetSnapshot{ID: %s, CreatedAt: %s, RatingGrowSpeed: %0.3f, CheckedAt: %s}",

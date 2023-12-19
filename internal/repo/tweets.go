@@ -2,6 +2,7 @@ package fdb
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
@@ -60,41 +61,68 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 	for _, tweet := range tweets {
 		key := d.keyBuilder.Tweet(tweet.ID)
 
-		data, err := tr.Get(key)
-		if err != nil {
+		oldTweet, err := d.getTweetTx(tr, tweet.ID)
+		if err != nil && !errors.Is(err, ErrTweetsNotFound) {
 			d.log.WithError(err).WithField("key", key).Error("error while getting tweet")
 			return err
 		}
 
-		if data != nil {
-			oldTweet := new(common.TweetSnapshot)
-			if err = jsoniter.Unmarshal(data, oldTweet); err != nil {
-				return err
-			}
-
+		if oldTweet != nil {
 			if oldTweet.CheckedAt.After(tweet.CheckedAt) {
 				d.log.WithField("old", oldTweet).WithField("new", tweet).Debug("skip tweet because it is older then exist")
 				continue
 			}
 		}
 
-		data, err = jsoniter.Marshal(tweet)
+		data, err := jsoniter.Marshal(tweet)
 		if err != nil {
 			return err
 		}
 
 		tr.Set(key, data)
+
+		if oldTweet != nil && oldTweet.RatingGrowSpeed > 0 {
+			tr.Clear(d.keyBuilder.TweetRatingIndex(oldTweet.RatingGrowSpeed, oldTweet.ID))
+		}
+
+		if tweet.RatingGrowSpeed > 0 {
+			index := &common.TweetSnapshotIndex{
+				ID:              tweet.ID,
+				RatingGrowSpeed: tweet.RatingGrowSpeed,
+				CreatedAt:       tweet.TimeParsed,
+				CheckedAt:       tweet.CheckedAt,
+			}
+
+			data, err = jsoniter.Marshal(index)
+			if err != nil {
+				return err
+			}
+
+			tr.Set(d.keyBuilder.TweetRatingIndex(tweet.RatingGrowSpeed, tweet.ID), data)
+		}
 	}
 
 	if err = tr.Commit(); err != nil {
-		d.log.WithError(err).Error("error while commiting transaction")
+		d.log.WithError(err).Error("error while committing transaction")
 	}
 
 	return err
 }
 
 func (d *db) DeleteTweet(ctx context.Context, id string) error {
-	return d.db.Clear(ctx, d.keyBuilder.Tweet(id))
+	tr, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		return err
+	}
+	data, err := d.getTweetTx(tr, id)
+	if err != nil {
+		return err
+	}
+
+	tr.Clear(d.keyBuilder.Tweet(id))
+	tr.Clear(d.keyBuilder.TweetRatingIndex(data.RatingGrowSpeed, data.ID))
+
+	return tr.Commit()
 }
 
 func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot, error) {
@@ -119,28 +147,28 @@ func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot,
 }
 
 func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, error) {
-	ch, err := d.GetTweets(ctx)
+	ch, err := d.GetTweetIndexes(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var result *common.TweetSnapshot
+	var result *common.TweetSnapshotIndex
 
-	var fallbackResult *common.TweetSnapshot
+	var fallbackResult *string
 	pretopcounter := 0
 	zerocounter := 0
 
 	best := 0.0000000001
 
-	for tweet := range ch {
-		predictedRating := tweet.RatingGrowSpeed * time.Since(tweet.TimeParsed).Seconds()
+	for snapshotIndex := range ch {
+		predictedRating := snapshotIndex.RatingGrowSpeed * time.Since(snapshotIndex.CreatedAt).Seconds()
 		if predictedRating == 0 {
 			zerocounter++
 		}
 
 		if predictedRating > best {
 			best = predictedRating
-			fallbackResult = tweet
+			fallbackResult = &snapshotIndex.ID
 		}
 
 		// skip unreachable top tweets
@@ -150,12 +178,12 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 		pretopcounter++
 
 		if result == nil {
-			result = tweet
+			result = snapshotIndex
 			continue
 		}
 
-		if result.TimeParsed.After(tweet.TimeParsed) {
-			result = tweet
+		if result.CreatedAt.After(snapshotIndex.CreatedAt) {
+			result = snapshotIndex
 		}
 	}
 
@@ -165,13 +193,13 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 
 	if result == nil {
 		if fallbackResult != nil {
-			return fallbackResult, nil
+			return d.getTweet(ctx, *fallbackResult)
 		}
 
 		return nil, ErrTweetsNotFound
 	}
 
-	return result, nil
+	return d.getTweet(ctx, result.ID)
 }
 
 func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error) {
@@ -225,6 +253,51 @@ func (d *db) GetTweets(ctx context.Context) (<-chan *common.TweetSnapshot, error
 	return ch, nil
 }
 
+func (d *db) GetTweetIndexes(ctx context.Context) (<-chan *common.TweetSnapshotIndex, error) {
+	tr, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		d.log.WithError(err).Error("error while creating transaction")
+		return nil, err
+	}
+
+	ch := make(chan *common.TweetSnapshotIndex, 1000)
+
+	go d.getTweetIndexes(tr, ch)
+
+	return ch, nil
+}
+
+func (d *db) getTweet(ctx context.Context, id string) (*common.TweetSnapshot, error) {
+	tr, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return d.getTweetTx(tr, id)
+}
+
+func (d *db) getTweetTx(tr fdbclient.Transaction, id string) (*common.TweetSnapshot, error) {
+	data, err := tr.Get(d.keyBuilder.Tweet(id))
+	if err != nil {
+		return nil, err
+	}
+
+	if err = tr.Commit(); err != nil {
+		return nil, err
+	}
+
+	if data == nil {
+		return nil, ErrTweetsNotFound
+	}
+
+	tweet := new(common.TweetSnapshot)
+	if err = jsoniter.Unmarshal(data, tweet); err != nil {
+		return nil, err
+	}
+
+	return tweet, nil
+}
+
 func (d *db) getTweets(tr fdbclient.Transaction, ch chan *common.TweetSnapshot) {
 	defer close(ch)
 	pr, err := fdb.PrefixRange(d.keyBuilder.Tweets())
@@ -258,6 +331,50 @@ func (d *db) getTweets(tr fdbclient.Transaction, ch chan *common.TweetSnapshot) 
 				WithField("json", string(kv.Value)).
 				WithError(err).
 				Error("error while unmarshaling tweet")
+			return
+		}
+		counter++
+
+		ch <- tweet
+	}
+
+	if err = tr.Commit(); err != nil {
+		d.log.WithError(err).Error("error while committing transaction")
+
+		return
+	}
+}
+
+func (d *db) getTweetIndexes(tr fdbclient.Transaction, ch chan *common.TweetSnapshotIndex) {
+	defer close(ch)
+	pr, err := fdb.PrefixRange(d.keyBuilder.TweetRatingIndexes())
+	if err != nil {
+		d.log.WithError(err).Error("error while creating prefix range")
+		return
+	}
+
+	opts := new(fdbclient.RangeOptions)
+
+	opts.SetMode(fdb.StreamingModeWantAll)
+
+	iter := tr.GetIterator(pr, opts)
+
+	counter := 0
+
+	for iter.Advance() {
+		kv, err := iter.Get()
+		if err != nil {
+			d.log.WithField("processed", counter).WithError(err).Error("error while iterating indexes")
+			return
+		}
+
+		tweet := new(common.TweetSnapshotIndex)
+		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
+			d.log.
+				WithField("key", kv.Key).
+				WithField("json", string(kv.Value)).
+				WithError(err).
+				Error("error while unmarshalling tweet index")
 			return
 		}
 		counter++

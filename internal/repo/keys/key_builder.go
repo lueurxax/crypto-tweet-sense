@@ -2,6 +2,7 @@ package keys
 
 import (
 	"encoding/binary"
+	"fmt"
 	"time"
 )
 
@@ -9,6 +10,8 @@ type Builder interface {
 	Version() []byte
 	Tweets() []byte
 	Tweet(id string) []byte
+	TweetRatingIndexes() []byte
+	TweetRatingIndex(ratingGrowSpeed float64, id string) []byte
 	RequestLimits(id string, window time.Duration) []byte
 	RequestLimitsV2(id string, window time.Duration) []byte
 	Requests(id string, window time.Duration, start time.Time) []byte
@@ -97,6 +100,14 @@ func (b builder) Version() []byte {
 
 func (b builder) Tweets() []byte {
 	return []byte{tweet}
+}
+
+func (b builder) TweetRatingIndexes() []byte {
+	return b.getPrefix(tweetIndex)
+}
+
+func (b builder) TweetRatingIndex(ratingGrowSpeed float64, id string) []byte {
+	return append(append(b.getPrefix(tweetIndex), []byte(fmt.Sprintf("%.5f", ratingGrowSpeed))...), []byte(id)...)
 }
 
 func (b builder) Tweet(id string) []byte {
