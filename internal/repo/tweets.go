@@ -81,25 +81,23 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 
 		tr.Set(key, data)
 
-		if oldTweet != nil && oldTweet.RatingGrowSpeed > 0 {
+		if oldTweet != nil {
 			tr.Clear(d.keyBuilder.TweetRatingIndex(oldTweet.RatingGrowSpeed, oldTweet.ID))
 		}
 
-		if tweet.RatingGrowSpeed > 0 {
-			index := &common.TweetSnapshotIndex{
-				ID:              tweet.ID,
-				RatingGrowSpeed: tweet.RatingGrowSpeed,
-				CreatedAt:       tweet.TimeParsed,
-				CheckedAt:       tweet.CheckedAt,
-			}
-
-			data, err = jsoniter.Marshal(index)
-			if err != nil {
-				return err
-			}
-
-			tr.Set(d.keyBuilder.TweetRatingIndex(tweet.RatingGrowSpeed, tweet.ID), data)
+		index := &common.TweetSnapshotIndex{
+			ID:              tweet.ID,
+			RatingGrowSpeed: tweet.RatingGrowSpeed,
+			CreatedAt:       tweet.TimeParsed,
+			CheckedAt:       tweet.CheckedAt,
 		}
+
+		data, err = jsoniter.Marshal(index)
+		if err != nil {
+			return err
+		}
+
+		tr.Set(d.keyBuilder.TweetRatingIndex(tweet.RatingGrowSpeed, tweet.ID), data)
 	}
 
 	if err = tr.Commit(); err != nil {
@@ -126,12 +124,12 @@ func (d *db) DeleteTweet(ctx context.Context, id string) error {
 }
 
 func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot, error) {
-	ch, err := d.GetTweets(ctx)
+	ch, err := d.GetTweetIndexes(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var result *common.TweetSnapshot
+	var result *common.TweetSnapshotIndex
 	for tweet := range ch {
 		if result == nil {
 			result = tweet
@@ -143,7 +141,7 @@ func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot,
 		}
 	}
 
-	return result, nil
+	return d.getTweet(ctx, result.ID)
 }
 
 func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, error) {
@@ -156,16 +154,13 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 
 	var fallbackResult *string
 	pretopcounter := 0
-	zerocounter := 0
 
 	best := 0.0000000001
 
 	for snapshotIndex := range ch {
 		predictedRating := snapshotIndex.RatingGrowSpeed * time.Since(snapshotIndex.CreatedAt).Seconds()
-		if predictedRating == 0 {
-			zerocounter++
-		}
 
+		// skip unreachable top tweets
 		if predictedRating > best {
 			best = predictedRating
 			fallbackResult = &snapshotIndex.ID
@@ -187,8 +182,7 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 		}
 	}
 
-	d.log.WithField("zerocounter", zerocounter).
-		WithField("pretopcounter", pretopcounter).
+	d.log.WithField("pretopcounter", pretopcounter).
 		Debug("GetOldestTopReachableTweet")
 
 	if result == nil {
@@ -262,7 +256,7 @@ func (d *db) GetTweetIndexes(ctx context.Context) (<-chan *common.TweetSnapshotI
 
 	ch := make(chan *common.TweetSnapshotIndex, 1000)
 
-	go d.getTweetIndexes(tr, ch)
+	go d.getTweetPositiveIndexes(tr, ch)
 
 	return ch, nil
 }
@@ -341,19 +335,27 @@ func (d *db) getTweets(tr fdbclient.Transaction, ch chan *common.TweetSnapshot) 
 	}
 }
 
+func (d *db) getTweetPositiveIndexes(tr fdbclient.Transaction, ch chan *common.TweetSnapshotIndex) {
+	d.getTweetIndexesByRange(tr, d.keyBuilder.TweetRatingPositiveIndexes(), ch)
+}
+
 func (d *db) getTweetIndexes(tr fdbclient.Transaction, ch chan *common.TweetSnapshotIndex) {
-	defer close(ch)
 	pr, err := fdb.PrefixRange(d.keyBuilder.TweetRatingIndexes())
 	if err != nil {
 		d.log.WithError(err).Error("error while creating prefix range")
 		return
 	}
+	d.getTweetIndexesByRange(tr, pr, ch)
+}
+
+func (d *db) getTweetIndexesByRange(tr fdbclient.Transaction, keyRange fdb.KeyRange, ch chan *common.TweetSnapshotIndex) {
+	defer close(ch)
 
 	opts := new(fdbclient.RangeOptions)
 
 	opts.SetMode(fdb.StreamingModeWantAll)
 
-	iter := tr.GetIterator(pr, opts)
+	iter := tr.GetIterator(keyRange, opts)
 
 	counter := 0
 
@@ -378,9 +380,7 @@ func (d *db) getTweetIndexes(tr fdbclient.Transaction, ch chan *common.TweetSnap
 		ch <- tweet
 	}
 
-	if err = tr.Commit(); err != nil {
+	if err := tr.Commit(); err != nil {
 		d.log.WithError(err).Error("error while committing transaction")
-
-		return
 	}
 }

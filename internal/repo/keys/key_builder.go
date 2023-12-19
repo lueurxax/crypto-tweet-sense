@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"time"
+
+	"github.com/apple/foundationdb/bindings/go/src/fdb"
 )
 
 type Builder interface {
@@ -11,6 +13,7 @@ type Builder interface {
 	Tweets() []byte
 	Tweet(id string) []byte
 	TweetRatingIndexes() []byte
+	TweetRatingPositiveIndexes() fdb.KeyRange
 	TweetRatingIndex(ratingGrowSpeed float64, id string) []byte
 	RequestLimits(id string, window time.Duration) []byte
 	RequestLimitsV2(id string, window time.Duration) []byte
@@ -104,6 +107,14 @@ func (b builder) Tweets() []byte {
 
 func (b builder) TweetRatingIndexes() []byte {
 	return b.getPrefix(tweetIndex)
+}
+
+func (b builder) TweetRatingPositiveIndexes() fdb.KeyRange {
+	// "_tweetRatingIndex0.00001" "_tweetRatingIndex9"
+	return fdb.KeyRange{
+		Begin: fdb.Key(append(b.getPrefix(tweetIndex), []byte("0.00001")...)),
+		End:   fdb.Key(append(b.getPrefix(tweetIndex), []byte("9")...)),
+	}
 }
 
 func (b builder) TweetRatingIndex(ratingGrowSpeed float64, id string) []byte {
