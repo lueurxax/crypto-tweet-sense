@@ -18,7 +18,7 @@ func Test_db_CompareCompression(t *testing.T) {
 	t.Run("gzip", func(t *testing.T) {
 		t.Log("json:", len([]byte(testData)))
 
-		req := new(common.RequestLimits)
+		req := new(common.RequestLimitData)
 		require.NoError(t, jsoniter.Unmarshal([]byte(testData), req))
 
 		buf := new(bytes.Buffer)

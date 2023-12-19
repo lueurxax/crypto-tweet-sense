@@ -177,8 +177,14 @@ func (l *limiter) loop(ctx context.Context) {
 		case t := <-l.count:
 			l.log.WithField("time", t).Trace("inc counter")
 
-			if err := l.repo.AddCounter(requestctx, l.id, l.duration, t); err != nil {
-				panic(err)
+			isError := true
+			for isError {
+				if err := l.repo.AddCounter(requestctx, l.id, l.duration, t); err != nil {
+					l.log.WithError(err).Error("error while add counter")
+					continue
+				}
+
+				isError = false
 			}
 		case <-l.putOutFireTicker.C:
 			l.fire = 0
