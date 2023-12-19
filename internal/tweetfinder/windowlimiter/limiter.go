@@ -186,7 +186,7 @@ func (l *limiter) loop(ctx context.Context) {
 			l.log.WithField(durationKey, l.duration).Trace("clean counters")
 
 			if err := l.repo.CleanCounters(requestctx, l.id, l.duration); err != nil {
-				panic(err)
+				l.log.WithError(err).Error("error while cleaning counters")
 			}
 		case <-l.resetTicker.C:
 			if l.resetLimiter == nil {

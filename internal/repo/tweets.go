@@ -124,24 +124,40 @@ func (d *db) DeleteTweet(ctx context.Context, id string) error {
 }
 
 func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot, error) {
-	ch, err := d.GetTweetIndexes(ctx)
+	tr, err := d.db.NewTransaction(ctx)
 	if err != nil {
+		d.log.WithError(err).Error("error while creating transaction")
 		return nil, err
 	}
 
-	var result *common.TweetSnapshotIndex
-	for tweet := range ch {
-		if result == nil {
-			result = tweet
-			continue
-		}
+	opts := new(fdbclient.RangeOptions)
 
-		if result.RatingGrowSpeed < tweet.RatingGrowSpeed {
-			result = tweet
-		}
+	opts.SetMode(fdb.StreamingModeWantAll)
+	opts.SetReverse()
+
+	iter := tr.GetIterator(d.keyBuilder.TweetRatingPositiveIndexes(), opts)
+
+	if !iter.Advance() {
+		return nil, ErrTweetsNotFound
 	}
 
-	return d.getTweet(ctx, result.ID)
+	kv, err := iter.Get()
+	if err != nil {
+		d.log.WithError(err).Error("error while iterating")
+		return nil, err
+	}
+
+	index := new(common.TweetSnapshotIndex)
+	if err = jsoniter.Unmarshal(kv.Value, index); err != nil {
+		d.log.
+			WithField("key", kv.Key).
+			WithField("json", string(kv.Value)).
+			WithError(err).
+			Error("error while unmarshalling tweet index")
+		return nil, err
+	}
+
+	return d.getTweet(ctx, index.ID)
 }
 
 func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, error) {
