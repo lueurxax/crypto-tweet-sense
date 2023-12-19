@@ -33,7 +33,7 @@ type repo interface {
 	GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot, error)
 	GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, error)
 	GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error)
-	GetTweetsOlderThen(ctx context.Context, after time.Time) ([]*common.TweetSnapshot, error)
+	GetTweetsOlderThen(ctx context.Context, after time.Time) ([]string, error)
 	CheckIfSentTweetExist(ctx context.Context, link string) (bool, error)
 	SaveSentTweet(ctx context.Context, link string) error
 	SaveTweetForEdit(ctx context.Context, tweet *common.Tweet) error
@@ -295,7 +295,7 @@ func (w *watcher) cleanTooOldTweets(ctx context.Context) error {
 	}
 
 	for _, tweet := range tweets {
-		if err = w.repo.DeleteTweet(ctx, tweet.ID); err != nil {
+		if err = w.repo.DeleteTweet(ctx, tweet); err != nil {
 			return err
 		}
 	}

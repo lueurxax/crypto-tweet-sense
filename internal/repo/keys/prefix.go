@@ -14,4 +14,5 @@ const (
 	requestLimitV2            = "_v2requestLimit"
 	requests                  = "_requests"
 	tweetRatingIndex          = "_tweetRatingIndex"
+	tweetCreationIndex        = "_tweetCreationIndex"
 )

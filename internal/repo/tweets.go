@@ -18,7 +18,7 @@ type tweetRepo interface {
 	GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot, error)
 	GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, error)
 	GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error)
-	GetTweetsOlderThen(ctx context.Context, after time.Time) ([]*common.TweetSnapshot, error)
+	GetTweetsOlderThen(ctx context.Context, after time.Time) (string, error)
 	SaveSentTweet(ctx context.Context, link string) error
 	CheckIfSentTweetExist(ctx context.Context, link string) (bool, error)
 }
@@ -98,6 +98,7 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 		}
 
 		tr.Set(d.keyBuilder.TweetRatingIndex(tweet.RatingGrowSpeed, tweet.ID), data)
+		tr.Set(d.keyBuilder.TweetCreationIndex(tweet.TimeParsed), []byte(tweet.ID))
 	}
 
 	if err = tr.Commit(); err != nil {
@@ -119,6 +120,7 @@ func (d *db) DeleteTweet(ctx context.Context, id string) error {
 
 	tr.Clear(d.keyBuilder.Tweet(id))
 	tr.Clear(d.keyBuilder.TweetRatingIndex(data.RatingGrowSpeed, data.ID))
+	tr.Clear(d.keyBuilder.TweetCreationIndex(data.TimeParsed))
 
 	return tr.Commit()
 }
@@ -237,16 +239,17 @@ func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, e
 	return d.getTweet(ctx, result.ID)
 }
 
-func (d *db) GetTweetsOlderThen(ctx context.Context, after time.Time) ([]*common.TweetSnapshot, error) {
+func (d *db) GetTweetsOlderThen(ctx context.Context, after time.Time) ([]string, error) {
+	go d.getTweetsUntil(ctx, after)
 	ch, err := d.GetTweets(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var result []*common.TweetSnapshot
+	var result []string
 	for tweet := range ch {
 		if tweet.TimeParsed.Before(after) {
-			result = append(result, tweet)
+			result = append(result, tweet.ID)
 		}
 	}
 
@@ -412,6 +415,55 @@ func (d *db) getTweetIndexesByRange(tr fdbclient.Transaction, keyRange fdb.KeyRa
 		counter++
 
 		ch <- tweet
+	}
+
+	if err := tr.Commit(); err != nil {
+		d.log.WithError(err).Error("error while committing transaction")
+	}
+
+	d.log.WithField("processed", counter).Debug("getTweetIndexesByRange")
+}
+
+func (d *db) getTweetsUntil(ctx context.Context, after time.Time) {
+	ch := make(chan string, 1000)
+
+	tr, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		d.log.WithError(err).Error("error while creating transaction")
+	}
+
+	go d.getTweetsUntilTx(tr, after, ch)
+
+	counter := 0
+
+	for range ch {
+		counter++
+	}
+
+	d.log.WithField("processed", counter).Debug("getTweetsUntil")
+}
+
+func (d *db) getTweetsUntilTx(tr fdbclient.Transaction, createdAt time.Time, ch chan string) {
+	defer close(ch)
+
+	opts := new(fdbclient.RangeOptions)
+
+	opts.SetMode(fdb.StreamingModeWantAll)
+
+	iter := tr.GetIterator(d.keyBuilder.TweetUntil(createdAt), opts)
+
+	counter := 0
+
+	for iter.Advance() {
+		kv, err := iter.Get()
+		if err != nil {
+			d.log.WithField("processed", counter).WithError(err).Error("error while iterating creation indexes")
+			return
+		}
+
+		counter++
+
+		ch <- string(kv.Value)
 	}
 
 	if err := tr.Commit(); err != nil {

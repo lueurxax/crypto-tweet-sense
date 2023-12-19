@@ -33,6 +33,11 @@ func (t *transaction) GetIterator(pr fdb.KeyRange, opts ...*RangeOptions) *fdb.R
 	return t.tr.GetRange(pr, options).Iterator()
 }
 
+func (t *transaction) GetIterator(pr fdb.KeyRange, opts ...*RangeOptions) *fdb.RangeIterator {
+	options := SplitRangeOptions(opts)
+	return t.tr.GetRange(pr, options).Iterator()
+}
+
 func (t *transaction) Clear(key []byte) {
 	t.calls = append(t.calls, func() {
 		t.tr.Clear(fdb.Key(key))

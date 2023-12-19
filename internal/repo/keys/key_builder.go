@@ -28,6 +28,8 @@ type Builder interface {
 	TwitterAccount(login string) []byte
 	TwitterAccounts() []byte
 	Cookie(login string) []byte
+	TweetCreationIndex(createdAt time.Time) []byte
+	TweetUntil(createdAt time.Time) fdb.KeyRange
 }
 
 type builder struct {
@@ -123,6 +125,20 @@ func (b builder) TweetRatingPositiveIndexes() fdb.KeyRange {
 
 func (b builder) TweetRatingIndex(ratingGrowSpeed float64, id string) []byte {
 	return append(append(b.getPrefix(tweetRatingIndex), []byte(fmt.Sprintf("%.5f", ratingGrowSpeed))...), []byte(id)...)
+}
+
+func (b builder) TweetCreationIndex(createdAt time.Time) []byte {
+	return append(b.getPrefix(tweetCreationIndex), []byte(fmt.Sprintf("%d", createdAt.UTC().Unix()))...)
+}
+
+func (b builder) TweetUntil(createdAt time.Time) fdb.KeyRange {
+	return fdb.KeyRange{
+		Begin: fdb.Key(b.getPrefix(tweetCreationIndex)),
+		End: fdb.Key(append(
+			b.getPrefix(tweetCreationIndex),
+			[]byte(fmt.Sprintf("%d", createdAt.UTC().Unix()))...),
+		),
+	}
 }
 
 func (b builder) Tweet(id string) []byte {
