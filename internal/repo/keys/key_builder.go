@@ -106,19 +106,19 @@ func (b builder) Tweets() []byte {
 }
 
 func (b builder) TweetRatingIndexes() []byte {
-	return b.getPrefix(tweetIndex)
+	return b.getPrefix(tweetRatingIndex)
 }
 
 func (b builder) TweetRatingPositiveIndexes() fdb.KeyRange {
 	// "_tweetRatingIndex0.00001" "_tweetRatingIndex9"
 	return fdb.KeyRange{
-		Begin: fdb.Key(append(b.getPrefix(tweetIndex), []byte("0.00001")...)),
-		End:   fdb.Key(append(b.getPrefix(tweetIndex), []byte("9")...)),
+		Begin: fdb.Key(append(b.getPrefix(tweetRatingIndex), []byte("0.00001")...)),
+		End:   fdb.Key(append(b.getPrefix(tweetRatingIndex), []byte("9")...)),
 	}
 }
 
 func (b builder) TweetRatingIndex(ratingGrowSpeed float64, id string) []byte {
-	return append(append(b.getPrefix(tweetIndex), []byte(fmt.Sprintf("%.5f", ratingGrowSpeed))...), []byte(id)...)
+	return append(append(b.getPrefix(tweetRatingIndex), []byte(fmt.Sprintf("%.5f", ratingGrowSpeed))...), []byte(id)...)
 }
 
 func (b builder) Tweet(id string) []byte {

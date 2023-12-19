@@ -213,12 +213,12 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 }
 
 func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error) {
-	ch, err := d.GetTweets(ctx)
+	ch, err := d.GetTweetIndexes(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var result *common.TweetSnapshot
+	var result *common.TweetSnapshotIndex
 	for tweet := range ch {
 		if result == nil {
 			result = tweet
@@ -230,7 +230,7 @@ func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, e
 		}
 	}
 
-	return result, nil
+	return d.getTweet(ctx, result.ID)
 }
 
 func (d *db) GetTweetsOlderThen(ctx context.Context, after time.Time) ([]*common.TweetSnapshot, error) {
