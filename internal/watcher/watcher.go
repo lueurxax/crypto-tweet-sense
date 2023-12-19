@@ -194,6 +194,7 @@ func (w *watcher) updateTop() {
 func (w *watcher) updateTopTweet(ctx context.Context) error {
 	tweet, err := w.repo.GetFastestGrowingTweet(ctx)
 	if err != nil {
+		w.logger.WithError(err).Error("get fastest growing tweet")
 		return err
 	}
 
