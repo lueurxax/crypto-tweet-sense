@@ -132,7 +132,7 @@ func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot,
 
 	opts := new(fdbclient.RangeOptions)
 
-	opts.SetMode(fdb.StreamingModeWantAll)
+	opts.SetMode(fdb.StreamingModeSmall)
 	opts.SetReverse()
 
 	iter := tr.GetIterator(d.keyBuilder.TweetRatingPositiveIndexes(), opts)

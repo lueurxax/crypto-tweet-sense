@@ -111,9 +111,13 @@ func (b builder) TweetRatingIndexes() []byte {
 
 func (b builder) TweetRatingPositiveIndexes() fdb.KeyRange {
 	// "_tweetRatingIndex0.00001" "_tweetRatingIndex9"
+	key, err := fdb.Strinc(b.getPrefix(tweetRatingIndex))
+	if err != nil {
+		panic(err)
+	}
 	return fdb.KeyRange{
 		Begin: fdb.Key(append(b.getPrefix(tweetRatingIndex), []byte("0.00001")...)),
-		End:   fdb.Key(append(b.getPrefix(tweetRatingIndex), []byte("9")...)),
+		End:   fdb.Key(key),
 	}
 }
 
