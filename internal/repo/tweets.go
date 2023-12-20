@@ -107,6 +107,7 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 		tr.Set(d.keyBuilder.TweetRatingIndex(tweet.RatingGrowSpeed, tweet.ID), data)
 		tr.Set(d.keyBuilder.TweetCreationIndex(tweet.TimeParsed), []byte(tweet.ID))
 		tr.Set(d.keyBuilder.TweetCreationIndexV2(tweet.TimeParsed, tweet.ID), []byte(tweet.ID))
+
 		if err = tr.Commit(); err != nil {
 			d.log.WithError(err).Error("error while committing transaction")
 		}
