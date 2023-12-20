@@ -63,9 +63,22 @@ func (d *db) migratePrefix(ctx context.Context, prefix string, prefix2 keys.Pref
 		return err
 	}
 
-	for _, kv := range kvs {
-		tr.Clear(kv.Key)
+	if err = tr.Commit(); err != nil {
+		return err
 	}
 
-	return tr.Commit()
+	for _, kv := range kvs {
+		tr, err = d.db.NewTransaction(ctx)
+		if err != nil {
+			return err
+		}
+		key := append(prefix2[:], kv.Key[len(prefix):]...)
+		tr.Set(key, kv.Value)
+		tr.Clear(kv.Key)
+		if err = tr.Commit(); err != nil {
+			return err
+		}
+	}
+
+	return
 }

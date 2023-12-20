@@ -109,7 +109,9 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 
 	tx.Set(d.keyBuilder.RequestLimitsV2(id, window), dataV2)
 
-	tx.ClearRange(d.keyBuilder.RequestsByRequestLimits(id, window))
+	if err = tx.ClearRange(d.keyBuilder.RequestsByRequestLimits(id, window)); err != nil {
+		return err
+	}
 
 	for _, v := range v2.Requests {
 		data, err = v.Marshal()

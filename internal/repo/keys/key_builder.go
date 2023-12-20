@@ -84,7 +84,9 @@ func (b builder) RequestLimitsV2(id string, window time.Duration) []byte {
 }
 
 func (b builder) Requests(id string, window time.Duration, start time.Time) []byte {
-	slice := append(requestsPrefix[:], []byte(id)...)
+	slice := requestsPrefix[:]
+	slice = append(slice, []byte(id)...)
+
 	return binary.LittleEndian.AppendUint64(
 		binary.LittleEndian.AppendUint16(slice, uint16(window.Seconds())),
 		uint64(start.Unix()),
