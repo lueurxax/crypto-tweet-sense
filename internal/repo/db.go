@@ -39,11 +39,11 @@ func NewDB(fdb fdb.Database, log *logrus.Entry) DB {
 }
 
 func (d *db) Migrate(ctx context.Context) error {
-	for oldPrefix, newPrefix := range keys.OldToNewPrefixes {
+	/*for oldPrefix, newPrefix := range keys.OldToNewPrefixes {
 		if err := d.migratePrefix(ctx, oldPrefix, newPrefix); err != nil {
 			return err
 		}
-	}
+	}*/
 
 	v, err := d.GetVersion(ctx)
 	if err != nil {
@@ -51,13 +51,17 @@ func (d *db) Migrate(ctx context.Context) error {
 	}
 
 	m := migrations.Migrations(v)
-	for _, m := range m {
+	for _, el := range m {
 		tr, err := d.db.NewTransaction(ctx)
 		if err != nil {
 			return err
 		}
 
-		if err = m.Up(ctx, tr); err != nil {
+		if err = el.Up(ctx, tr); err != nil {
+			return err
+		}
+
+		if err = d.WriteVersion(ctx, el.Version()); err != nil {
 			return err
 		}
 
@@ -66,7 +70,7 @@ func (d *db) Migrate(ctx context.Context) error {
 		}
 	}
 
-	return d.WriteVersion(ctx, m[len(m)-1].Version())
+	return nil
 }
 
 func (d *db) migratePrefix(ctx context.Context, prefix string, prefix2 keys.Prefix) error {

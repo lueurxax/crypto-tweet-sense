@@ -21,7 +21,7 @@ func Migrations(version uint32) []Migration {
 
 	for i, m := range migrations {
 		v := m.Version()
-		if uint32(i) != v {
+		if uint32(i+1) != v {
 			panic("migration version must be equal to its index")
 		}
 

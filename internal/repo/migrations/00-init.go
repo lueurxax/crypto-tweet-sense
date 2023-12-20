@@ -46,5 +46,5 @@ func (i *Init) Down(context.Context, fdbclient.Transaction) error {
 }
 
 func (i *Init) Version() uint32 {
-	return 0
+	return 1
 }
