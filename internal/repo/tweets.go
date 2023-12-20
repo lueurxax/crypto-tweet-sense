@@ -106,6 +106,7 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 
 		tr.Set(d.keyBuilder.TweetRatingIndex(tweet.RatingGrowSpeed, tweet.ID), data)
 		tr.Set(d.keyBuilder.TweetCreationIndex(tweet.TimeParsed), []byte(tweet.ID))
+		tr.Set(d.keyBuilder.TweetCreationIndexV2(tweet.TimeParsed, tweet.ID), []byte(tweet.ID))
 	}
 
 	if err = tr.Commit(); err != nil {
@@ -128,7 +129,7 @@ func (d *db) DeleteTweet(ctx context.Context, id string) error {
 
 	tr.Clear(d.keyBuilder.Tweet(id))
 	tr.Clear(d.keyBuilder.TweetRatingIndex(data.RatingGrowSpeed, data.ID))
-	tr.Clear(d.keyBuilder.TweetCreationIndex(data.TimeParsed))
+	tr.Clear(d.keyBuilder.TweetCreationIndexV2(data.TimeParsed, data.ID))
 
 	return tr.Commit()
 }

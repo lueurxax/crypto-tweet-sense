@@ -15,4 +15,5 @@ const (
 	requests                  = "_requests"
 	tweetRatingIndex          = "_tweetRatingIndex"
 	tweetCreationIndex        = "_tweetCreationIndex"
+	tweetCreationIndexV2      = "_tweetCreationNanoIndex"
 )
