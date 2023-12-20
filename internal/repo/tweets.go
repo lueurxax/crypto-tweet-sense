@@ -563,6 +563,10 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 
 func (d *db) checkTweetOrClear(ctx context.Context, key fdb.Key, id string) error {
 	tr, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		return err
+	}
+
 	data, err := tr.Get(d.keyBuilder.Tweet(id))
 	if err != nil {
 		d.log.WithError(err).Error("error while get tweet")
