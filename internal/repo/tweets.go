@@ -524,12 +524,8 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 			return err
 		}
 
-		data, err := tr.Get(d.keyBuilder.Tweet(tweet.ID))
-		if err != nil {
+		if err = d.checkTweetOrClear(ctx, kv.Key, tweet.ID); err != nil {
 			return err
-		}
-		if data == nil {
-			tr.Clear(kv.Key)
 		}
 	}
 
@@ -553,12 +549,8 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 
 		counter++
 
-		data, err := tr.Get(d.keyBuilder.Tweet(string(kv.Value)))
-		if err != nil {
+		if err = d.checkTweetOrClear(ctx, kv.Key, string(kv.Value)); err != nil {
 			return err
-		}
-		if data == nil {
-			tr.Clear(kv.Key)
 		}
 	}
 
@@ -567,4 +559,19 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (d *db) checkTweetOrClear(ctx context.Context, key fdb.Key, id string) error {
+	tr, err := d.db.NewTransaction(ctx)
+	data, err := tr.Get(d.keyBuilder.Tweet(id))
+	if err != nil {
+		d.log.WithError(err).Error("error while get tweet")
+		return err
+	}
+
+	if data == nil {
+		tr.Clear(key)
+	}
+
+	return tr.Commit()
 }
