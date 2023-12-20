@@ -244,20 +244,24 @@ func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, e
 }
 
 func (d *db) GetTweetsOlderThen(ctx context.Context, after time.Time) ([]string, error) {
-	go d.getTweetsUntil(ctx, after)
+	ch := make(chan string, bufferSize)
 
-	ch, err := d.GetTweets(ctx)
+	tr, err := d.db.NewTransaction(ctx)
 	if err != nil {
-		return nil, err
+		d.log.WithError(err).Error("error while creating transaction")
 	}
 
+	go d.getTweetsUntilTx(tr, after, ch)
+
+	counter := 0
 	var result []string
 
 	for tweet := range ch {
-		if tweet.TimeParsed.Before(after) {
-			result = append(result, tweet.ID)
-		}
+		counter++
+		result = append(result, tweet)
 	}
+
+	d.log.WithField("processed", counter).Debug("getTweetsUntil")
 
 	return result, nil
 }
@@ -341,6 +345,7 @@ func (d *db) getTweetTx(tr fdbclient.Transaction, id string) (*common.TweetSnaps
 
 func (d *db) getTweets(tr fdbclient.Transaction, ch chan *common.TweetSnapshot) {
 	defer close(ch)
+
 	pr, err := fdb.PrefixRange(d.keyBuilder.Tweets())
 	if err != nil {
 		d.log.WithError(err).Error("error while creating prefix range")
@@ -437,25 +442,6 @@ func (d *db) getTweetIndexesByRange(tr fdbclient.Transaction, keyRange fdb.KeyRa
 	}
 
 	d.log.WithField("processed", counter).Debug("getTweetIndexesByRange")
-}
-
-func (d *db) getTweetsUntil(ctx context.Context, after time.Time) {
-	ch := make(chan string, bufferSize)
-
-	tr, err := d.db.NewTransaction(ctx)
-	if err != nil {
-		d.log.WithError(err).Error("error while creating transaction")
-	}
-
-	go d.getTweetsUntilTx(tr, after, ch)
-
-	counter := 0
-
-	for range ch {
-		counter++
-	}
-
-	d.log.WithField("processed", counter).Debug("getTweetsUntil")
 }
 
 func (d *db) getTweetsUntilTx(tr fdbclient.Transaction, createdAt time.Time, ch chan string) {
