@@ -90,6 +90,10 @@ func main() {
 
 	st := fdb.NewDB(db, logrusLogger.WithField(pkgKey, "fdb"))
 
+	if err = st.Migrate(ctx); err != nil {
+		panic(err)
+	}
+
 	if err = st.CleanWrongIndexes(ctx); err != nil {
 		panic(err)
 	}

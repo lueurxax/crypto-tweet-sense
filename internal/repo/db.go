@@ -1,6 +1,8 @@
 package fdb
 
 import (
+	"context"
+
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/gotd/td/telegram"
 	"github.com/sirupsen/logrus"
@@ -10,6 +12,7 @@ import (
 )
 
 type DB interface {
+	Migrate(ctx context.Context) error
 	version
 	tweetRepo
 	requestLimiter
@@ -32,4 +35,37 @@ func NewDB(fdb fdb.Database, log *logrus.Entry) DB {
 		db:         fdbclient.NewDatabase(fdb),
 		log:        log,
 	}
+}
+
+func (d *db) Migrate(ctx context.Context) error {
+	for oldPrefix, newPrefix := range keys.OldToNewPrefixes {
+		if err := d.migratePrefix(ctx, oldPrefix, newPrefix); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (d *db) migratePrefix(ctx context.Context, prefix string, prefix2 keys.Prefix) error {
+	tr, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		return err
+	}
+
+	pr, err := fdb.PrefixRange([]byte(prefix))
+	if err != nil {
+		return err
+	}
+
+	kvs, err := tr.GetRange(pr)
+	if err != nil {
+		return err
+	}
+
+	for _, kv := range kvs {
+		key := append(prefix2[:], kv.Key[len(prefix):]...)
+		tr.Set(key, kv.Value)
+	}
+	return tr.Commit()
 }
