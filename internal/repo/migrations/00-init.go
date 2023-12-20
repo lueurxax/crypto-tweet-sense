@@ -40,6 +40,5 @@ func (i *Init) Down(ctx context.Context, tr fdbclient.Transaction) error {
 }
 
 func (i *Init) Version() uint64 {
-	// TODO implement me
-	panic("implement me")
+	return 0
 }

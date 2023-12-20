@@ -80,5 +80,5 @@ func (d *db) migratePrefix(ctx context.Context, prefix string, prefix2 keys.Pref
 		}
 	}
 
-	return
+	return nil
 }
