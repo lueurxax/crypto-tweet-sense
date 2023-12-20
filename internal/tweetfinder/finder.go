@@ -2,6 +2,7 @@ package tweetfinder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -13,10 +14,9 @@ import (
 )
 
 const (
-	limit           = 10000
-	format          = "2006-01-02"
-	tooManyRequests = "429 Too Many Requests"
-	notFound        = "not found"
+	limit    = 10000
+	format   = "2006-01-02"
+	notFound = "not found"
 )
 
 type Finder interface {
@@ -52,7 +52,7 @@ func (f *finder) Init(context.Context) error {
 func (f *finder) Find(ctx context.Context, id string) (*common.TweetSnapshot, error) {
 	tweet, err := f.scraper.GetTweet(ctx, id)
 	if err != nil {
-		if strings.Contains(err.Error(), tooManyRequests) {
+		if errors.Is(err, twitterscraper.ErrRateLimitExceeded{}) {
 			f.delayManager.TooManyRequests(ctx)
 		}
 
@@ -100,7 +100,7 @@ func (f *finder) FindNext(ctx context.Context, start, end *time.Time, search, cu
 
 	tweets, nextCursor, err := f.scraper.FetchSearchTweets(ctx, query, limit, cursor)
 	if err != nil {
-		if strings.Contains(err.Error(), tooManyRequests) {
+		if errors.Is(err, twitterscraper.ErrRateLimitExceeded{}) {
 			f.delayManager.TooManyRequests(ctx)
 		}
 

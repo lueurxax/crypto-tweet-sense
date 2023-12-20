@@ -8,15 +8,15 @@ require (
 	github.com/buaazp/fasthttprouter v0.1.1
 	github.com/golang/mock v1.6.0
 	github.com/gotd/contrib v0.19.0
-	github.com/gotd/td v0.90.0
+	github.com/gotd/td v0.91.0
 	github.com/json-iterator/go v1.1.12
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/lueurxax/twitter-scraper v1.0.0
+	github.com/lueurxax/twitter-scraper v1.0.1
 	github.com/prometheus/client_golang v1.17.0
 	github.com/sashabaranov/go-openai v1.17.9
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
-	github.com/valyala/fasthttp v1.46.0
+	github.com/valyala/fasthttp v1.51.0
 	go.elastic.co/ecslogrus v1.0.0
 	go.uber.org/zap v1.26.0
 	golang.org/x/term v0.15.0
@@ -24,12 +24,12 @@ require (
 )
 
 require (
-	github.com/andybalholm/brotli v1.0.5 // indirect
+	github.com/andybalholm/brotli v1.0.6 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/go-faster/errors v0.7.0 // indirect
+	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/go-faster/jx v1.1.0 // indirect
 	github.com/go-faster/xor v1.0.0 // indirect
 	github.com/gotd/ige v0.2.2 // indirect
