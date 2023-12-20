@@ -64,8 +64,8 @@ func (d *db) migratePrefix(ctx context.Context, prefix string, prefix2 keys.Pref
 	}
 
 	for _, kv := range kvs {
-		key := append(prefix2[:], kv.Key[len(prefix):]...)
-		tr.Set(key, kv.Value)
+		tr.Clear(kv.Key)
 	}
+
 	return tr.Commit()
 }
