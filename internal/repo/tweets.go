@@ -500,18 +500,12 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 
 	opts.SetMode(fdb.StreamingModeWantAll)
 
-	iter := tr.GetIterator(pr, opts)
+	kvs, err := tr.GetRange(pr, opts)
+	if err != nil {
+		return err
+	}
 
-	counter := 0
-
-	for iter.Advance() {
-		kv, err := iter.Get()
-		if err != nil {
-			d.log.WithField("processed", counter).WithError(err).Error("error while iterating rating indexes")
-			return err
-		}
-
-		counter++
+	for _, kv := range kvs {
 
 		tweet := new(common.TweetSnapshotIndex)
 		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
@@ -533,22 +527,19 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 		d.log.WithError(err).Error("error while committing transaction")
 	}
 
+	d.log.WithField("processed", len(kvs)).Debug("CleanWrongIndexes by rating")
+
 	tr, err = d.db.NewTransaction(ctx)
 	if err != nil {
 		return err
 	}
 
-	iter = tr.GetIterator(d.keyBuilder.TweetUntil(time.Now().UTC()), opts)
+	kvs, err = tr.GetRange(d.keyBuilder.TweetUntil(time.Now().UTC()), opts)
+	if err != nil {
+		return err
+	}
 
-	for iter.Advance() {
-		kv, err := iter.Get()
-		if err != nil {
-			d.log.WithField("processed", counter).WithError(err).Error("error while iterating creation indexes")
-			return err
-		}
-
-		counter++
-
+	for _, kv := range kvs {
 		if err = d.checkTweetOrClear(ctx, kv.Key, string(kv.Value)); err != nil {
 			return err
 		}
@@ -557,6 +548,8 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 	if err = tr.Commit(); err != nil {
 		d.log.WithError(err).Error("error while committing transaction")
 	}
+
+	d.log.WithField("processed", len(kvs)).Debug("CleanWrongIndexes by creation")
 
 	return nil
 }
