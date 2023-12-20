@@ -135,7 +135,7 @@ func (p *pool) getFinderIndex() (int, bool) {
 	index := 0
 
 	for i, d := range p.finderTemp {
-		if d == 0 {
+		if d == 0 || d > 10 {
 			continue
 		}
 
