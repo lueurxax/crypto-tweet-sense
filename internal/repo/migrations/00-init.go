@@ -4,7 +4,10 @@ import (
 	"context"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
+	jsoniter "github.com/json-iterator/go"
 
+	"github.com/lueurxax/crypto-tweet-sense/internal/common"
+	"github.com/lueurxax/crypto-tweet-sense/internal/repo/keys"
 	"github.com/lueurxax/crypto-tweet-sense/pkg/fdbclient"
 )
 
@@ -26,19 +29,22 @@ func (i *Init) Up(_ context.Context, tr fdbclient.Transaction) error {
 	}
 
 	for _, kv := range kvs {
-		_, err := tr.Get(kv.Value)
-		if err != nil {
+		tweet := new(common.TweetSnapshot)
+		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
 			return err
 		}
+
+		tr.Set(keys.NewBuilder().TweetCreationIndexV2(tweet.TimeParsed, tweet.ID), []byte(tweet.ID))
 	}
+
 	return nil
 }
 
-func (i *Init) Down(ctx context.Context, tr fdbclient.Transaction) error {
+func (i *Init) Down(context.Context, fdbclient.Transaction) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (i *Init) Version() uint64 {
+func (i *Init) Version() uint32 {
 	return 0
 }

@@ -9,23 +9,24 @@ import (
 type Migration interface {
 	Up(ctx context.Context, tr fdbclient.Transaction) error
 	Down(ctx context.Context, tr fdbclient.Transaction) error
-	Version() uint64
+	Version() uint32
 }
 
-func Migrations(version uint64) map[uint64]Migration {
+func Migrations(version uint32) []Migration {
 	migrations := []Migration{
 		&Init{},
 	}
 
-	result := map[uint64]Migration{}
+	result := make([]Migration, 0, len(migrations))
+
 	for i, m := range migrations {
 		v := m.Version()
-		if uint64(i) != v {
-			panic("first migration must have version 0")
+		if uint32(i) != v {
+			panic("migration version must be equal to its index")
 		}
 
 		if v > version {
-			result[m.Version()] = m
+			result = append(result, m)
 		}
 	}
 

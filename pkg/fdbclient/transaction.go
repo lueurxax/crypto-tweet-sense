@@ -44,9 +44,12 @@ func (t *transaction) ClearRange(key []byte) error {
 	if err != nil {
 		panic(err)
 	}
+
 	t.calls = append(t.calls, func() {
 		t.tr.ClearRange(pr)
 	})
+
+	return nil
 }
 
 func (t *transaction) Get(key []byte) ([]byte, error) {

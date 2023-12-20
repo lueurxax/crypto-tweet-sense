@@ -116,6 +116,7 @@ func (b builder) TweetRatingPositiveIndexes() fdb.KeyRange {
 	if err != nil {
 		panic(err)
 	}
+
 	return fdb.KeyRange{
 		Begin: fdb.Key(append(tweetRatingIndexPrefix[:], []byte("0.00001")...)),
 		End:   fdb.Key(key),
