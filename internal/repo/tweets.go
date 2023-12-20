@@ -60,12 +60,12 @@ func (d *db) CheckIfSentTweetExist(ctx context.Context, link string) (bool, erro
 }
 
 func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
-	tr, err := d.db.NewTransaction(ctx)
-	if err != nil {
-		return err
-	}
-
 	for _, tweet := range tweets {
+		tr, err := d.db.NewTransaction(ctx)
+		if err != nil {
+			return err
+		}
+
 		key := d.keyBuilder.Tweet(tweet.ID)
 
 		oldTweet, err := d.getTweetTx(tr, tweet.ID)
@@ -107,13 +107,12 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 		tr.Set(d.keyBuilder.TweetRatingIndex(tweet.RatingGrowSpeed, tweet.ID), data)
 		tr.Set(d.keyBuilder.TweetCreationIndex(tweet.TimeParsed), []byte(tweet.ID))
 		tr.Set(d.keyBuilder.TweetCreationIndexV2(tweet.TimeParsed, tweet.ID), []byte(tweet.ID))
+		if err = tr.Commit(); err != nil {
+			d.log.WithError(err).Error("error while committing transaction")
+		}
 	}
 
-	if err = tr.Commit(); err != nil {
-		d.log.WithError(err).Error("error while committing transaction")
-	}
-
-	return err
+	return nil
 }
 
 func (d *db) DeleteTweet(ctx context.Context, id string) error {
@@ -534,7 +533,6 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 				return err
 			}
 		}
-
 	}
 
 	pr, err = fdb.PrefixRange(d.keyBuilder.TweetRatingIndexes())
