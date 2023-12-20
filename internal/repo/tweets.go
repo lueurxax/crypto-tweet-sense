@@ -487,13 +487,9 @@ func (d *db) getTweetsUntilTx(tr fdbclient.Transaction, createdAt time.Time, ch 
 }
 
 func (d *db) CleanWrongIndexes(ctx context.Context) error {
-	pr, err := fdb.PrefixRange(d.keyBuilder.TweetRatingIndexes())
+	pr, err := fdb.PrefixRange(d.keyBuilder.Tweets())
 	if err != nil {
-		return err
-	}
-
-	tr, err := d.db.NewTransaction(ctx)
-	if err != nil {
+		d.log.WithError(err).Error("error while creating prefix range")
 		return err
 	}
 
@@ -501,13 +497,62 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 
 	opts.SetMode(fdb.StreamingModeWantAll)
 
+	tr, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		return err
+	}
+
 	kvs, err := tr.GetRange(pr, opts)
 	if err != nil {
 		return err
 	}
 
-	for _, kv := range kvs {
+	if err = tr.Commit(); err != nil {
+		d.log.WithError(err).Error("error while committing transaction")
 
+		return err
+	}
+
+	for _, kv := range kvs {
+		if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
+			continue
+		}
+
+		tweet := new(common.TweetSnapshot)
+		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
+			d.log.
+				WithField("key", kv.Key).
+				WithField("json", string(kv.Value)).
+				WithError(err).
+				Error("error while unmarshaling tweet")
+
+			return err
+		}
+
+		if tweet.TimeParsed.Before(time.Now().UTC().Add(-time.Hour * 6)) {
+			if err = d.DeleteTweet(ctx, tweet.ID); err != nil {
+				return err
+			}
+		}
+
+	}
+
+	pr, err = fdb.PrefixRange(d.keyBuilder.TweetRatingIndexes())
+	if err != nil {
+		return err
+	}
+
+	tr, err = d.db.NewTransaction(ctx)
+	if err != nil {
+		return err
+	}
+
+	kvs, err = tr.GetRange(pr, opts)
+	if err != nil {
+		return err
+	}
+
+	for _, kv := range kvs {
 		tweet := new(common.TweetSnapshotIndex)
 		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
 			d.log.
