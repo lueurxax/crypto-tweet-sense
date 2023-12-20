@@ -46,6 +46,7 @@ func (d *db) Migrate(ctx context.Context) error {
 
 	m := migrations.Migrations(v)
 	for _, el := range m {
+		d.log.WithField("version", el.Version()).Info("migrating to version")
 		tr, err := d.db.NewTransaction(ctx)
 		if err != nil {
 			return err
@@ -62,6 +63,7 @@ func (d *db) Migrate(ctx context.Context) error {
 		if err = tr.Commit(); err != nil {
 			return err
 		}
+		d.log.WithField("version", el.Version()).Info("migrated to version")
 	}
 
 	return nil
