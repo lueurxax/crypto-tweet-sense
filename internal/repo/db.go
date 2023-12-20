@@ -39,12 +39,6 @@ func NewDB(fdb fdb.Database, log *logrus.Entry) DB {
 }
 
 func (d *db) Migrate(ctx context.Context) error {
-	/*for oldPrefix, newPrefix := range keys.OldToNewPrefixes {
-		if err := d.migratePrefix(ctx, oldPrefix, newPrefix); err != nil {
-			return err
-		}
-	}*/
-
 	v, err := d.GetVersion(ctx)
 	if err != nil {
 		return err

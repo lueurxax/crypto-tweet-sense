@@ -2,23 +2,6 @@ package keys
 
 type Prefix [2]byte
 
-const (
-	version                   = 'v'
-	tweet                     = 't'
-	sentTweet                 = 's'
-	tweetRating               = 'a'
-	editingTweet              = 'e'
-	telegramSessionStorageOld = "telegramSessionStorage"
-	twitterAccounts           = "_twitterAccounts"
-	twitterAccountsCookie     = "_cookiesTwitterAccount"
-	requestLimit              = "_requestLimit"
-	requestLimitV2            = "_v2requestLimit"
-	requests                  = "_requests"
-	tweetRatingIndex          = "_tweetRatingIndex"
-	tweetCreationIndex        = "_tweetCreationIndex"
-	tweetCreationIndexV2      = "_tweetCreationNanoIndex"
-)
-
 var (
 	// Prefixes for keys in the new format
 	versionPrefix                Prefix = [2]byte{0x00, 0x00}
@@ -35,21 +18,4 @@ var (
 	tweetRatingIndexPrefix       Prefix = [2]byte{0x00, 0x12}
 	tweetCreationIndexPrefix     Prefix = [2]byte{0x00, 0x13}
 	tweetCreationIndexV2Prefix   Prefix = [2]byte{0x00, 0x14}
-
-	OldToNewPrefixes = map[string]Prefix{
-		string(version):           versionPrefix,
-		string(tweet):             tweetPrefix,
-		string(sentTweet):         sentTweetPrefix,
-		string(tweetRating):       tweetRatingPrefix,
-		string(editingTweet):      editingTweetPrefix,
-		telegramSessionStorageOld: telegramSessionStoragePrefix,
-		twitterAccounts:           twitterAccountsPrefix,
-		twitterAccountsCookie:     twitterAccountsCookiePrefix,
-		requestLimit:              requestLimitPrefix,
-		requestLimitV2:            requestLimitV2Prefix,
-		requests:                  requestsPrefix,
-		tweetRatingIndex:          tweetRatingIndexPrefix,
-		tweetCreationIndex:        tweetCreationIndexPrefix,
-		tweetCreationIndexV2:      tweetCreationIndexV2Prefix,
-	}
 )

@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: twitter-exp
-          image: ghcr.io/lueurxax/crypto-tweet-sense-rating-updater:main
+          image: ghcr.io/lueurxax/crypto-tweet-sense-rating-updater:v0.1.10
           imagePullPolicy: Always
           env:
             - name: LOG_LEVEL
