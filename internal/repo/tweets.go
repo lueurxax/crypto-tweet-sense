@@ -507,7 +507,7 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 	for iter.Advance() {
 		kv, err := iter.Get()
 		if err != nil {
-			d.log.WithField("processed", counter).WithError(err).Error("error while iterating creation indexes")
+			d.log.WithField("processed", counter).WithError(err).Error("error while iterating rating indexes")
 			return err
 		}
 
