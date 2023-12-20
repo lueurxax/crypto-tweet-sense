@@ -27,6 +27,7 @@ type tweetRepo interface {
 	GetTweetsOlderThen(ctx context.Context, after time.Time) ([]string, error)
 	SaveSentTweet(ctx context.Context, link string) error
 	CheckIfSentTweetExist(ctx context.Context, link string) (bool, error)
+	CleanWrongIndexes(ctx context.Context) error
 }
 
 func (d *db) SaveSentTweet(ctx context.Context, link string) error {
@@ -482,4 +483,88 @@ func (d *db) getTweetsUntilTx(tr fdbclient.Transaction, createdAt time.Time, ch 
 	if err := tr.Commit(); err != nil {
 		d.log.WithError(err).Error("error while committing transaction")
 	}
+}
+
+func (d *db) CleanWrongIndexes(ctx context.Context) error {
+	pr, err := fdb.PrefixRange(d.keyBuilder.TweetRatingIndexes())
+	if err != nil {
+		return err
+	}
+
+	tr, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		return err
+	}
+
+	opts := new(fdbclient.RangeOptions)
+
+	opts.SetMode(fdb.StreamingModeWantAll)
+
+	iter := tr.GetIterator(pr, opts)
+
+	counter := 0
+
+	for iter.Advance() {
+		kv, err := iter.Get()
+		if err != nil {
+			d.log.WithField("processed", counter).WithError(err).Error("error while iterating creation indexes")
+			return err
+		}
+
+		counter++
+
+		tweet := new(common.TweetSnapshotIndex)
+		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
+			d.log.
+				WithField("key", kv.Key).
+				WithField("json", string(kv.Value)).
+				WithError(err).
+				Error("error while unmarshalling tweet index")
+
+			return err
+		}
+
+		data, err := tr.Get(d.keyBuilder.Tweet(tweet.ID))
+		if err != nil {
+			return err
+		}
+		if data == nil {
+			tr.Clear(kv.Key)
+		}
+	}
+
+	if err := tr.Commit(); err != nil {
+		d.log.WithError(err).Error("error while committing transaction")
+	}
+
+	tr, err = d.db.NewTransaction(ctx)
+	if err != nil {
+		return err
+	}
+
+	iter = tr.GetIterator(d.keyBuilder.TweetUntil(time.Now().UTC()), opts)
+
+	for iter.Advance() {
+		kv, err := iter.Get()
+		if err != nil {
+			d.log.WithField("processed", counter).WithError(err).Error("error while iterating creation indexes")
+			return err
+		}
+
+		counter++
+
+		data, err := tr.Get(d.keyBuilder.Tweet(string(kv.Value)))
+		if err != nil {
+			return err
+		}
+		if data == nil {
+			tr.Clear(kv.Key)
+		}
+	}
+
+	if err = tr.Commit(); err != nil {
+		d.log.WithError(err).Error("error while committing transaction")
+	}
+
+	return nil
 }

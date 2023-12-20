@@ -90,6 +90,10 @@ func main() {
 
 	st := fdb.NewDB(db, logrusLogger.WithField(pkgKey, "fdb"))
 
+	if err = st.CleanWrongIndexes(ctx); err != nil {
+		panic(err)
+	}
+
 	checker := ratingCollector.NewChecker(st, cfg.TopCount)
 
 	xConfig := tweetFinder.GetConfigPool()
