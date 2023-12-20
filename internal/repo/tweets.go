@@ -12,7 +12,11 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/pkg/fdbclient"
 )
 
-const bufferSize = 1000
+const (
+	bufferSize             = 1000
+	errCreatingTransaction = "error while creating transaction"
+	errIterating           = "error while iterating"
+)
 
 type tweetRepo interface {
 	Save(ctx context.Context, tweets []common.TweetSnapshot) error
@@ -81,6 +85,8 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 			return err
 		}
 
+		tr.Set(key, data)
+
 		index := &common.TweetSnapshotIndex{
 			ID:              tweet.ID,
 			RatingGrowSpeed: tweet.RatingGrowSpeed,
@@ -92,8 +98,6 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 		if err != nil {
 			return err
 		}
-
-		tr.Set(key, data)
 
 		if oldTweet != nil {
 			tr.Clear(d.keyBuilder.TweetRatingIndex(oldTweet.RatingGrowSpeed, oldTweet.ID))
@@ -131,7 +135,7 @@ func (d *db) DeleteTweet(ctx context.Context, id string) error {
 func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot, error) {
 	tr, err := d.db.NewTransaction(ctx)
 	if err != nil {
-		d.log.WithError(err).Error("error while creating transaction")
+		d.log.WithError(err).Error(errCreatingTransaction)
 		return nil, err
 	}
 
@@ -148,7 +152,7 @@ func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot,
 
 	kv, err := iter.Get()
 	if err != nil {
-		d.log.WithError(err).Error("error while iterating")
+		d.log.WithError(err).Error(errIterating)
 		return nil, err
 	}
 
@@ -175,6 +179,7 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 	var result *common.TweetSnapshotIndex
 
 	var fallbackResult *string
+
 	pretopcounter := 0
 
 	best := 0.0000000001
@@ -248,16 +253,18 @@ func (d *db) GetTweetsOlderThen(ctx context.Context, after time.Time) ([]string,
 
 	tr, err := d.db.NewTransaction(ctx)
 	if err != nil {
-		d.log.WithError(err).Error("error while creating transaction")
+		d.log.WithError(err).Error(errCreatingTransaction)
 	}
 
 	go d.getTweetsUntilTx(tr, after, ch)
 
 	counter := 0
-	var result []string
+
+	result := make([]string, 0)
 
 	for tweet := range ch {
 		counter++
+
 		result = append(result, tweet)
 	}
 
@@ -269,7 +276,7 @@ func (d *db) GetTweetsOlderThen(ctx context.Context, after time.Time) ([]string,
 func (d *db) GetTweets(ctx context.Context) (<-chan *common.TweetSnapshot, error) {
 	tr, err := d.db.NewTransaction(ctx)
 	if err != nil {
-		d.log.WithError(err).Error("error while creating transaction")
+		d.log.WithError(err).Error(errCreatingTransaction)
 		return nil, err
 	}
 
@@ -283,7 +290,7 @@ func (d *db) GetTweets(ctx context.Context) (<-chan *common.TweetSnapshot, error
 func (d *db) GetTweetIndexes(ctx context.Context) (<-chan *common.TweetSnapshotIndex, error) {
 	tr, err := d.db.NewTransaction(ctx)
 	if err != nil {
-		d.log.WithError(err).Error("error while creating transaction")
+		d.log.WithError(err).Error(errCreatingTransaction)
 		return nil, err
 	}
 
@@ -297,7 +304,7 @@ func (d *db) GetTweetIndexes(ctx context.Context) (<-chan *common.TweetSnapshotI
 func (d *db) GetTweetPositiveIndexes(ctx context.Context) (<-chan *common.TweetSnapshotIndex, error) {
 	tr, err := d.db.NewTransaction(ctx)
 	if err != nil {
-		d.log.WithError(err).Error("error while creating transaction")
+		d.log.WithError(err).Error(errCreatingTransaction)
 		return nil, err
 	}
 
@@ -363,9 +370,10 @@ func (d *db) getTweets(tr fdbclient.Transaction, ch chan *common.TweetSnapshot) 
 	for iter.Advance() {
 		kv, err := iter.Get()
 		if err != nil {
-			d.log.WithField("processed", counter).WithError(err).Error("error while iterating")
+			d.log.WithField("processed", counter).WithError(err).Error(errIterating)
 			return
 		}
+
 		if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
 			continue
 		}
@@ -377,6 +385,7 @@ func (d *db) getTweets(tr fdbclient.Transaction, ch chan *common.TweetSnapshot) 
 				WithField("json", string(kv.Value)).
 				WithError(err).
 				Error("error while unmarshaling tweet")
+
 			return
 		}
 		counter++
@@ -400,8 +409,10 @@ func (d *db) getTweetIndexes(tr fdbclient.Transaction, ch chan *common.TweetSnap
 	if err != nil {
 		close(ch)
 		d.log.WithError(err).Error("error while creating prefix range")
+
 		return
 	}
+
 	d.getTweetIndexesByRange(tr, pr, ch)
 }
 
@@ -430,6 +441,7 @@ func (d *db) getTweetIndexesByRange(tr fdbclient.Transaction, keyRange fdb.KeyRa
 				WithField("json", string(kv.Value)).
 				WithError(err).
 				Error("error while unmarshalling tweet index")
+
 			return
 		}
 		counter++
