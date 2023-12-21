@@ -34,7 +34,7 @@ func (i *Init) Up(_ context.Context, tr fdbclient.Transaction) error {
 			return err
 		}
 
-		tr.Set(keys.NewBuilder().TweetCreationIndexV2(tweet.TimeParsed, tweet.ID), []byte(tweet.ID))
+		tr.Set(keys.NewBuilder().TweetCreationIndex(tweet.TimeParsed, tweet.ID), []byte(tweet.ID))
 	}
 
 	return nil

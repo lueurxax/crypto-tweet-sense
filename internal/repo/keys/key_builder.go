@@ -16,7 +16,6 @@ type Builder interface {
 	TweetRatingPositiveIndexes() fdb.KeyRange
 	TweetRatingIndex(ratingGrowSpeed float64, id string) []byte
 	RequestLimits(id string, window time.Duration) []byte
-	RequestLimitsV2(id string, window time.Duration) []byte
 	Requests(id string, window time.Duration, start time.Time) []byte
 	RequestsByRequestLimits(id string, window time.Duration) []byte
 	TweetUsernameRatingKey(username string) []byte
@@ -28,8 +27,8 @@ type Builder interface {
 	TwitterAccount(login string) []byte
 	TwitterAccounts() []byte
 	Cookie(login string) []byte
-	TweetCreationIndexV2(createdAt time.Time, id string) []byte
-	TweetUntilV2(createdAt time.Time) fdb.KeyRange
+	TweetCreationIndex(createdAt time.Time, id string) []byte
+	TweetUntil(createdAt time.Time) fdb.KeyRange
 }
 
 type builder struct {
@@ -73,11 +72,6 @@ func (b builder) TweetUsernameRatingKey(username string) []byte {
 
 func (b builder) RequestLimits(id string, window time.Duration) []byte {
 	slice := append(requestLimitPrefix[:], []byte(id)...)
-	return binary.LittleEndian.AppendUint16(slice, uint16(window.Seconds()))
-}
-
-func (b builder) RequestLimitsV2(id string, window time.Duration) []byte {
-	slice := append(requestLimitV2Prefix[:], []byte(id)...)
 	return binary.LittleEndian.AppendUint16(slice, uint16(window.Seconds()))
 }
 
@@ -125,18 +119,18 @@ func (b builder) TweetRatingIndex(ratingGrowSpeed float64, id string) []byte {
 	return append(append(tweetRatingIndexPrefix[:], []byte(fmt.Sprintf("%.5f", ratingGrowSpeed))...), []byte(id)...)
 }
 
-func (b builder) TweetCreationIndexV2(createdAt time.Time, id string) []byte {
+func (b builder) TweetCreationIndex(createdAt time.Time, id string) []byte {
 	return append(
-		append(tweetCreationIndexV2Prefix[:], []byte(fmt.Sprintf("%d", createdAt.UTC().Unix()))...),
+		append(tweetCreationIndexPrefix[:], []byte(fmt.Sprintf("%d", createdAt.UTC().Unix()))...),
 		[]byte(id)...,
 	)
 }
 
-func (b builder) TweetUntilV2(createdAt time.Time) fdb.KeyRange {
+func (b builder) TweetUntil(createdAt time.Time) fdb.KeyRange {
 	return fdb.KeyRange{
-		Begin: fdb.Key(tweetCreationIndexV2Prefix[:]),
+		Begin: fdb.Key(tweetCreationIndexPrefix[:]),
 		End: fdb.Key(append(
-			tweetCreationIndexV2Prefix[:],
+			tweetCreationIndexPrefix[:],
 			[]byte(fmt.Sprintf("%d", createdAt.UTC().Unix()))...),
 		),
 	}

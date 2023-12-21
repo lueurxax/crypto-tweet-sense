@@ -105,7 +105,7 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 		}
 
 		tr.Set(d.keyBuilder.TweetRatingIndex(tweet.RatingGrowSpeed, tweet.ID), data)
-		tr.Set(d.keyBuilder.TweetCreationIndexV2(tweet.TimeParsed, tweet.ID), []byte(tweet.ID))
+		tr.Set(d.keyBuilder.TweetCreationIndex(tweet.TimeParsed, tweet.ID), []byte(tweet.ID))
 
 		if err = tr.Commit(); err != nil {
 			d.log.WithError(err).Error("error while committing transaction")
@@ -128,7 +128,7 @@ func (d *db) DeleteTweet(ctx context.Context, id string) error {
 
 	tr.Clear(d.keyBuilder.Tweet(id))
 	tr.Clear(d.keyBuilder.TweetRatingIndex(data.RatingGrowSpeed, data.ID))
-	tr.Clear(d.keyBuilder.TweetCreationIndexV2(data.TimeParsed, data.ID))
+	tr.Clear(d.keyBuilder.TweetCreationIndex(data.TimeParsed, data.ID))
 
 	return tr.Commit()
 }
@@ -375,10 +375,6 @@ func (d *db) getTweets(tr fdbclient.Transaction, ch chan *common.TweetSnapshot) 
 			return
 		}
 
-		if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
-			continue
-		}
-
 		tweet := new(common.TweetSnapshot)
 		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
 			d.log.
@@ -464,7 +460,7 @@ func (d *db) getTweetsUntilTx(tr fdbclient.Transaction, createdAt time.Time, ch 
 
 	opts.SetMode(fdb.StreamingModeWantAll)
 
-	iter := tr.GetIterator(d.keyBuilder.TweetUntilV2(createdAt), opts)
+	iter := tr.GetIterator(d.keyBuilder.TweetUntil(createdAt), opts)
 
 	counter := 0
 
@@ -513,10 +509,6 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 	}
 
 	for _, kv := range kvs {
-		if kv.Key.String() == string(d.keyBuilder.TelegramSessionStorage()) {
-			continue
-		}
-
 		tweet := new(common.TweetSnapshot)
 		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
 			d.log.
@@ -578,7 +570,7 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 		return err
 	}
 
-	kvs, err = tr.GetRange(d.keyBuilder.TweetUntilV2(time.Now().UTC()), opts)
+	kvs, err = tr.GetRange(d.keyBuilder.TweetUntil(time.Now().UTC()), opts)
 	if err != nil {
 		return err
 	}

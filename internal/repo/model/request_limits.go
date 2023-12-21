@@ -79,19 +79,31 @@ func (r *RequestLimits) ToCommon() common.RequestLimitData {
 func (r *RequestLimits) ToV2() *RequestLimitsV2 {
 	requests := make([]RequestsV2, 0)
 
+	start := r.Requests.Start
 	for i := 0; i < len(r.Requests.Data); i += maxRequestsInBatch {
-		start := r.Requests.Start.Add(time.Duration(r.Requests.Data[i]) * time.Second)
+		start = start.Add(time.Duration(r.Requests.Data[i]) * time.Second)
+		nextStart := start
 
 		nextLen := min(i+maxRequestsInBatch, len(r.Requests.Data)) - i
 		data := make([]uint32, 0, nextLen)
+
+		first := true
 		for _, v := range r.Requests.Data[i : i+nextLen] {
-			data = append(data, uint32(v+r.Requests.Data[i]))
+			if first {
+				v -= r.Requests.Data[i]
+				first = false
+			}
+
+			nextStart = nextStart.Add(time.Duration(v) * time.Second)
+
+			data = append(data, uint32(v))
 		}
 
 		requests = append(requests, RequestsV2{
 			Data:  data,
 			Start: start,
 		})
+		start = nextStart
 	}
 
 	return &RequestLimitsV2{
@@ -169,6 +181,35 @@ func (r *RequestLimitsV2) Unmarshal(data []byte) error {
 	}
 
 	return jsoniter.NewDecoder(buf).Decode(r)
+}
+
+func (r *RequestLimitsV2) CleanCounters() []RequestsV2 {
+	window := time.Duration(r.WindowSeconds) * time.Second
+	requestData := make([]RequestsV2, 0, len(r.Requests))
+
+	newStart := time.Now().Add(-window)
+
+	counter := int32(0)
+
+	for i, key := range r.Requests {
+		tt := key.Start.Add(time.Duration(key.Data[len(key.Data)-1]+uint32(counter)) * time.Second)
+
+		if time.Since(tt) < window {
+			value := int32(tt.Sub(newStart).Seconds())
+			requestData = append(requestData, RequestsV2{
+				Data:  []uint32{uint32(value)},
+				Start: newStart,
+			})
+			if i != len(r.Requests)-1 {
+				requestData = append(requestData, r.Requests[i+1:]...)
+			}
+			break
+		}
+
+		counter += int32(key.Data[len(key.Data)-1])
+	}
+
+	return requestData
 }
 
 type RequestsV2 struct {
