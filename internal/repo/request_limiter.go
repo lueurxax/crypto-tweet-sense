@@ -34,12 +34,6 @@ func (d *db) GetRequestLimit(ctx context.Context, id string, window time.Duratio
 		return common.RequestLimitData{}, err
 	}
 
-	counter := int32(0)
-	for i, v := range el.Requests.Data {
-		counter += v
-		el.Requests.Data[i] = counter
-	}
-
 	if err = tx.Commit(); err != nil {
 		return common.RequestLimitData{}, err
 	}

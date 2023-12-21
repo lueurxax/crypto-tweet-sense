@@ -2,6 +2,7 @@ package model
 
 import (
 	"testing"
+	"time"
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
@@ -35,6 +36,25 @@ func TestRequestLimits_ToV2(t *testing.T) {
 	t.Run("real data", func(t *testing.T) {
 		data := testStruct.ToV2()
 
+		first := testStruct.Requests.Start.Add(time.Duration(testStruct.Requests.Data[0]) * time.Second)
+		firstV2 := data.Requests[0].Start.Add(time.Duration(data.Requests[0].Data[0]) * time.Second)
+
+		second := first.Add(time.Duration(testStruct.Requests.Data[1]) * time.Second)
+		secondV2 := firstV2.Add(time.Duration(data.Requests[0].Data[1]) * time.Second)
+
+		n1 := testStruct.Requests.Start
+
+		for i := 0; i < maxRequestsInBatch; i++ {
+			n1 = n1.Add(time.Duration(testStruct.Requests.Data[i]) * time.Second)
+		}
+
+		n1 = n1.Add(time.Duration(testStruct.Requests.Data[maxRequestsInBatch]) * time.Second)
+
+		n1V2 := data.Requests[1].Start.Add(time.Duration(data.Requests[1].Data[0]) * time.Second)
+
+		assert.Equal(t, first, firstV2)
+		assert.Equal(t, second, secondV2)
+		assert.Equal(t, n1, n1V2)
 		assert.Equal(t, len(testStruct.Requests.Data), int(data.RequestsCount))
 		assert.Equal(t, len(testStruct.Requests.Data)/maxRequestsInBatch+1, len(data.Requests))
 	})

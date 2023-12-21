@@ -48,11 +48,18 @@ type managerV2 struct {
 func (m *managerV2) TooManyRequests(ctx context.Context) {
 	m.log.WithField("temp", m.CurrentTemp(ctx)).WithField(delayKey, m.delay).Error("too many requests")
 
+	settled := false
+
 	for _, limiter := range m.windowLimiters {
-		if err := limiter.TrySetThreshold(ctx, m.startTime); err != nil {
-			m.log.WithError(err).Error("error while setting threshold")
-			return
+		if limiter.Temp(ctx) < 5 && !settled {
+			if err := limiter.TrySetThreshold(ctx, m.startTime); err != nil {
+				m.log.WithError(err).Error("error while setting threshold")
+				return
+			}
+
+			settled = true
 		}
+
 		limiter.Inc()
 	}
 	m.forceRecalculate <- struct{}{}

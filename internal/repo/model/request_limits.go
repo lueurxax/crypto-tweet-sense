@@ -79,19 +79,31 @@ func (r *RequestLimits) ToCommon() common.RequestLimitData {
 func (r *RequestLimits) ToV2() *RequestLimitsV2 {
 	requests := make([]RequestsV2, 0)
 
+	start := r.Requests.Start
 	for i := 0; i < len(r.Requests.Data); i += maxRequestsInBatch {
-		start := r.Requests.Start.Add(time.Duration(r.Requests.Data[i]) * time.Second)
+		start = start.Add(time.Duration(r.Requests.Data[i]) * time.Second)
+		nextStart := start
 
 		nextLen := min(i+maxRequestsInBatch, len(r.Requests.Data)) - i
 		data := make([]uint32, 0, nextLen)
+
+		first := true
 		for _, v := range r.Requests.Data[i : i+nextLen] {
-			data = append(data, uint32(v+r.Requests.Data[i]))
+			if first {
+				v -= r.Requests.Data[i]
+				first = false
+			}
+
+			nextStart = nextStart.Add(time.Duration(v) * time.Second)
+
+			data = append(data, uint32(v))
 		}
 
 		requests = append(requests, RequestsV2{
 			Data:  data,
 			Start: start,
 		})
+		start = nextStart
 	}
 
 	return &RequestLimitsV2{
