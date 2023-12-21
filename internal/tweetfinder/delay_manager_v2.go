@@ -50,18 +50,23 @@ func (m *managerV2) TooManyRequests(ctx context.Context) {
 
 	settled := false
 
-	for _, limiter := range m.windowLimiters {
-		if limiter.Temp(ctx) < 5 && !settled {
-			if err := limiter.TrySetThreshold(ctx, m.startTime); err != nil {
-				m.log.WithError(err).Error("error while setting threshold")
-				return
+	level := 5.0
+	for !settled {
+		for _, limiter := range m.windowLimiters {
+			if limiter.Temp(ctx) < level && !settled {
+				if err := limiter.TrySetThreshold(ctx, m.startTime); err != nil {
+					m.log.WithError(err).Error("error while setting threshold")
+					return
+				}
+
+				settled = true
+				break
 			}
-
-			settled = true
 		}
-
-		limiter.Inc()
+		level++
 	}
+
+	m.AfterRequest()
 	m.forceRecalculate <- struct{}{}
 }
 
