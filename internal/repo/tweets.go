@@ -464,7 +464,7 @@ func (d *db) getTweetsUntilTx(tr fdbclient.Transaction, createdAt time.Time, ch 
 
 	opts.SetMode(fdb.StreamingModeWantAll)
 
-	iter := tr.GetIterator(d.keyBuilder.TweetUntil(createdAt), opts)
+	iter := tr.GetIterator(d.keyBuilder.TweetUntilV2(createdAt), opts)
 
 	counter := 0
 
@@ -578,7 +578,7 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 		return err
 	}
 
-	kvs, err = tr.GetRange(d.keyBuilder.TweetUntil(time.Now().UTC()), opts)
+	kvs, err = tr.GetRange(d.keyBuilder.TweetUntilV2(time.Now().UTC()), opts)
 	if err != nil {
 		return err
 	}

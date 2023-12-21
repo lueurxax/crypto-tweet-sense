@@ -28,9 +28,7 @@ type Builder interface {
 	TwitterAccount(login string) []byte
 	TwitterAccounts() []byte
 	Cookie(login string) []byte
-	TweetCreationIndex(createdAt time.Time) []byte
 	TweetCreationIndexV2(createdAt time.Time, id string) []byte
-	TweetUntil(createdAt time.Time) fdb.KeyRange
 	TweetUntilV2(createdAt time.Time) fdb.KeyRange
 }
 
@@ -127,25 +125,11 @@ func (b builder) TweetRatingIndex(ratingGrowSpeed float64, id string) []byte {
 	return append(append(tweetRatingIndexPrefix[:], []byte(fmt.Sprintf("%.5f", ratingGrowSpeed))...), []byte(id)...)
 }
 
-func (b builder) TweetCreationIndex(createdAt time.Time) []byte {
-	return append(tweetCreationIndexPrefix[:], []byte(fmt.Sprintf("%d", createdAt.UTC().Unix()))...)
-}
-
 func (b builder) TweetCreationIndexV2(createdAt time.Time, id string) []byte {
 	return append(
 		append(tweetCreationIndexV2Prefix[:], []byte(fmt.Sprintf("%d", createdAt.UTC().Unix()))...),
 		[]byte(id)...,
 	)
-}
-
-func (b builder) TweetUntil(createdAt time.Time) fdb.KeyRange {
-	return fdb.KeyRange{
-		Begin: fdb.Key(tweetCreationIndexPrefix[:]),
-		End: fdb.Key(append(
-			tweetCreationIndexPrefix[:],
-			[]byte(fmt.Sprintf("%d", createdAt.UTC().Unix()))...),
-		),
-	}
 }
 
 func (b builder) TweetUntilV2(createdAt time.Time) fdb.KeyRange {

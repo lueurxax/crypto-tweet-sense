@@ -16,6 +16,5 @@ var (
 	requestLimitV2Prefix         Prefix = [2]byte{0x00, 0x10}
 	requestsPrefix               Prefix = [2]byte{0x00, 0x11}
 	tweetRatingIndexPrefix       Prefix = [2]byte{0x00, 0x12}
-	tweetCreationIndexPrefix     Prefix = [2]byte{0x00, 0x13}
 	tweetCreationIndexV2Prefix   Prefix = [2]byte{0x00, 0x14}
 )
