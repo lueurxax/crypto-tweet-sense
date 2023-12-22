@@ -54,11 +54,18 @@ func (m *managerV2) TooManyRequests(ctx context.Context) {
 
 	for !settled {
 		for _, limiter := range m.windowLimiters {
-			if limiter.Temp(ctx) < level && !settled {
+			temp := limiter.Temp(ctx)
+			if temp < level && !settled {
 				if err := limiter.TrySetThreshold(ctx, m.startTime); err != nil {
 					m.log.WithError(err).Error("error while setting threshold")
 					return
 				}
+
+				m.log.
+					WithField("duration", limiter.Duration()).
+					WithField(delayKey, m.delay).
+					WithField("temp", temp).
+					Trace("setting threshold")
 
 				settled = true
 
