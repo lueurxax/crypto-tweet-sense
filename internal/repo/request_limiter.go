@@ -319,6 +319,25 @@ func (d *db) GetRequestLimitDebug(ctx context.Context, id string, window time.Du
 		return model.RequestLimitsV2{}, err
 	}
 
+	pr, err := fdb.PrefixRange(d.keyBuilder.RequestsByRequestLimits(id, window))
+	if err != nil {
+		return model.RequestLimitsV2{}, err
+	}
+
+	kvs, err := tx.GetRange(pr)
+	if err != nil {
+		return model.RequestLimitsV2{}, err
+	}
+
+	for _, kv := range kvs {
+		r := new(model.RequestsV2)
+		if err = r.Unmarshal(kv.Value); err != nil {
+			return model.RequestLimitsV2{}, err
+		}
+
+		el.Requests = append(el.Requests, *r)
+	}
+
 	if err = tx.Commit(); err != nil {
 		return model.RequestLimitsV2{}, err
 	}
