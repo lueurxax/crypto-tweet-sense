@@ -187,8 +187,9 @@ func (l *limiter) loop(ctx context.Context) {
 				isError = false
 			}
 		case <-l.putOutFireTicker.C:
-			l.log.WithField(durationKey, l.duration).Debug("put out fire")
 			if l.fire > 0 {
+				l.log.WithField(durationKey, l.duration).Debug("put out fire")
+
 				l.fire--
 			}
 		case <-ticker.C:
