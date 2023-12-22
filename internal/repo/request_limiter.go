@@ -264,6 +264,7 @@ func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Durat
 		d.log.WithField("key", key).WithField(dataKey, string(data)).Error(err)
 		return nil, err
 	}
+	el.Requests = make([]model.RequestsV2, 0)
 
 	pr, err := fdb.PrefixRange(d.keyBuilder.RequestsByRequestLimits(id, window))
 	if err != nil {
@@ -308,25 +309,32 @@ func (d *db) getRateLimitLite(tx fdbclient.Transaction, id string, window time.D
 	return el, err
 }
 
-func (d *db) GetRequestLimitDebug(ctx context.Context, id string, window time.Duration) (model.RequestLimitsV2, error) {
+func (d *db) GetRequestLimitDebug(ctx context.Context, id string, window time.Duration) (model.RequestLimitsV2Debug, error) {
+	result := model.RequestLimitsV2Debug{
+		Requests: make([]model.RequestsV2, 0),
+	}
 	tx, err := d.db.NewTransaction(ctx)
 	if err != nil {
-		return model.RequestLimitsV2{}, err
+		return result, err
 	}
 
 	el, err := d.getRateLimit(tx, id, window)
 	if err != nil {
-		return model.RequestLimitsV2{}, err
+		return result, err
 	}
+
+	result.RequestsCount = el.RequestsCount
+	result.WindowSeconds = el.WindowSeconds
+	result.Threshold = el.Threshold
 
 	pr, err := fdb.PrefixRange(d.keyBuilder.RequestsByRequestLimits(id, window))
 	if err != nil {
-		return model.RequestLimitsV2{}, err
+		return result, err
 	}
 
 	kvs, err := tx.GetRange(pr)
 	if err != nil {
-		return model.RequestLimitsV2{}, err
+		return result, err
 	}
 
 	d.log.WithField("elements", len(kvs)).Info("requests batches")
@@ -334,16 +342,16 @@ func (d *db) GetRequestLimitDebug(ctx context.Context, id string, window time.Du
 	for _, kv := range kvs {
 		r := new(model.RequestsV2)
 		if err = r.Unmarshal(kv.Value); err != nil {
-			return model.RequestLimitsV2{}, err
+			return result, err
 		}
 
-		el.Requests = append(el.Requests, *r)
+		result.Requests = append(result.Requests, *r)
 	}
 
 	if err = tx.Commit(); err != nil {
-		return model.RequestLimitsV2{}, err
+		return result, err
 	}
 
-	return *el, nil
+	return result, nil
 
 }

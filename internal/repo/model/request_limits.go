@@ -150,6 +150,13 @@ type RequestLimitsV2 struct {
 	Threshold     uint64       `json:"threshold"`
 }
 
+type RequestLimitsV2Debug struct {
+	WindowSeconds uint64       `json:"window_seconds"`
+	RequestsCount uint32       `json:"requests_count"`
+	Requests      []RequestsV2 `json:"requests"`
+	Threshold     uint64       `json:"threshold"`
+}
+
 func (r *RequestLimitsV2) Marshal() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	if err := jsoniter.NewEncoder(buf).Encode(r); err != nil {
