@@ -31,7 +31,7 @@ func (d *db) GetRequestLimit(ctx context.Context, id string, window time.Duratio
 		return common.RequestLimitData{}, err
 	}
 
-	el, err := d.getRateLimit(tx, id, window)
+	el, err := d.getRateLimitLite(tx, id, window)
 	if err != nil {
 		return common.RequestLimitData{}, err
 	}
@@ -40,14 +40,8 @@ func (d *db) GetRequestLimit(ctx context.Context, id string, window time.Duratio
 		return common.RequestLimitData{}, err
 	}
 
-	counter := int32(0)
-	for i, v := range el.Requests.Data {
-		counter += v
-		el.Requests.Data[i] = counter
-	}
-
 	return common.RequestLimitData{
-		RequestsCount: uint64(len(el.Requests.Data)),
+		RequestsCount: uint64(el.RequestsCount),
 		Threshold:     el.Threshold,
 	}, nil
 }
@@ -70,9 +64,16 @@ func (d *db) AddCounter(ctx context.Context, id string, window time.Duration, co
 		return err
 	}
 
-	d.log.WithField("request_limits", el).Trace("add counter")
-
 	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
+
+	data, err = el.Requests[len(el.Requests)-1].Marshal()
+	if err != nil {
+		return err
+	}
+
+	tx.Set(d.keyBuilder.Requests(id, window, el.Requests[len(el.Requests)-1].Start), data)
+
+	d.log.WithField("request_limits", el).Trace("add counter")
 
 	return tx.Commit()
 }
@@ -92,7 +93,23 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		el.Requests = make([]model.RequestsV2, 0)
 	}
 
-	el.Requests = el.CleanCounters()
+	deleteMap := make(map[time.Time]struct{})
+
+	for _, v := range el.Requests {
+		deleteMap[v.Start] = struct{}{}
+	}
+
+	requests := el.CleanCounters()
+
+	insert := make([]model.RequestsV2, 0, len(requests))
+
+	for _, v := range requests {
+		if _, ok := deleteMap[v.Start]; ok {
+			delete(deleteMap, v.Start)
+		} else {
+			insert = append(insert, v)
+		}
+	}
 
 	data, err := el.Marshal()
 	if err != nil {
@@ -101,21 +118,11 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 
 	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
 
-	// V2 write
-	v2 := el.ToV2()
-
-	dataV2, err := v2.Marshal()
-	if err != nil {
-		return err
+	for v := range deleteMap {
+		tx.Clear(d.keyBuilder.Requests(id, window, v))
 	}
 
-	tx.Set(d.keyBuilder.RequestLimits(id, window), dataV2)
-
-	if err = tx.ClearRange(d.keyBuilder.RequestsByRequestLimits(id, window)); err != nil {
-		return err
-	}
-
-	for _, v := range v2.Requests {
+	for _, v := range insert {
 		data, err = v.Marshal()
 		if err != nil {
 			return err
@@ -133,22 +140,16 @@ func (d *db) SetThreshold(ctx context.Context, id string, window time.Duration) 
 		return err
 	}
 
-	el, err := d.getRateLimit(tx, id, window)
+	el, err := d.getRateLimitLite(tx, id, window)
 	if err != nil {
 		return err
 	}
 
-	counters := 0
-
-	for _, v := range el.Requests {
-		counters += len(v.Data)
-	}
-
-	if counters == 0 {
+	if el.RequestsCount == 0 {
 		return nil
 	}
 
-	el.Threshold = uint64(counters)
+	el.Threshold = uint64(el.RequestsCount)
 
 	data, err := el.Marshal()
 	if err != nil {
@@ -166,7 +167,7 @@ func (d *db) IncreaseThresholdTo(ctx context.Context, id string, window time.Dur
 		return err
 	}
 
-	el, err := d.getRateLimit(tx, id, window)
+	el, err := d.getRateLimitLite(tx, id, window)
 	if err != nil {
 		return err
 	}
@@ -281,6 +282,27 @@ func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Durat
 		}
 
 		el.Requests = append(el.Requests, *r)
+	}
+
+	return el, err
+}
+
+func (d *db) getRateLimitLite(tx fdbclient.Transaction, id string, window time.Duration) (*model.RequestLimitsV2, error) {
+	key := d.keyBuilder.RequestLimits(id, window)
+
+	data, err := tx.Get(key)
+	if err != nil {
+		return nil, err
+	}
+
+	if data == nil {
+		return nil, ErrRequestLimitsNotFound
+	}
+
+	el := new(model.RequestLimitsV2)
+	if err = el.Unmarshal(data); err != nil {
+		d.log.WithField("key", key).WithField(dataKey, string(data)).Error(err)
+		return nil, err
 	}
 
 	return el, err

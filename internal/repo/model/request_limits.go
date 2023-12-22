@@ -61,12 +61,11 @@ func (r *RequestLimits) Unmarshal(data []byte) error {
 	}
 
 	buf := new(bytes.Buffer)
-	if _, err = io.Copy(buf, gzipReader); err != nil {
+	if _, err = io.Copy(buf, gzipReader); err != nil { //nolint:gosec
 		return err
 	}
 
 	return jsoniter.NewDecoder(buf).Decode(r)
-
 }
 
 func (r *RequestLimits) ToCommon() common.RequestLimitData {
@@ -85,7 +84,7 @@ func (r *RequestLimits) ToV2() *RequestLimitsV2 {
 		nextStart := start
 
 		nextLen := min(i+maxRequestsInBatch, len(r.Requests.Data)) - i
-		data := make([]uint32, 0, nextLen)
+		data := make([]uint32, 0, maxRequestsInBatch)
 
 		first := true
 		for _, v := range r.Requests.Data[i : i+nextLen] {
@@ -127,9 +126,11 @@ func (r *RequestLimits) CleanCounters() *Requests {
 		if time.Since(tt) < window {
 			value := int32(tt.Sub(newStart).Seconds())
 			requestData = append(requestData, value)
+
 			if i != len(r.Requests.Data)-1 {
 				requestData = append(requestData, r.Requests.Data[i+1:]...)
 			}
+
 			break
 		}
 
@@ -176,7 +177,7 @@ func (r *RequestLimitsV2) Unmarshal(data []byte) error {
 	}
 
 	buf := new(bytes.Buffer)
-	if _, err = io.Copy(buf, gzipReader); err != nil {
+	if _, err = io.Copy(buf, gzipReader); err != nil { //nolint:gosec
 		return err
 	}
 
@@ -189,27 +190,66 @@ func (r *RequestLimitsV2) CleanCounters() []RequestsV2 {
 
 	newStart := time.Now().Add(-window)
 
-	counter := int32(0)
-
-	for i, key := range r.Requests {
-		tt := key.Start.Add(time.Duration(key.Data[len(key.Data)-1]+uint32(counter)) * time.Second)
-
-		if time.Since(tt) < window {
-			value := int32(tt.Sub(newStart).Seconds())
-			requestData = append(requestData, RequestsV2{
-				Data:  []uint32{uint32(value)},
-				Start: newStart,
-			})
-			if i != len(r.Requests)-1 {
-				requestData = append(requestData, r.Requests[i+1:]...)
-			}
-			break
+	reached := false
+	for _, batch := range r.Requests {
+		if reached {
+			requestData = append(requestData, batch)
+			continue
 		}
 
-		counter += int32(key.Data[len(key.Data)-1])
+		counter := int32(0)
+
+		data := make([]uint32, 0, maxRequestsInBatch)
+
+		for j, key := range batch.Data {
+			tt := batch.Start.Add(time.Duration(key+uint32(counter)) * time.Second)
+
+			if time.Since(tt) < window {
+				value := int32(tt.Sub(newStart).Seconds())
+
+				data[0] = uint32(value)
+
+				if j != len(batch.Data)-1 {
+					data = batch.Data[j:]
+				}
+
+				reached = true
+
+				break
+			}
+
+			r.RequestsCount--
+
+			counter += int32(key)
+		}
+
+		requestData = append(requestData, RequestsV2{
+			Data:  data,
+			Start: newStart,
+		})
 	}
 
 	return requestData
+}
+
+func (r *RequestLimitsV2) AddCounter(counterTime time.Time) {
+	r.RequestsCount++
+	if len(r.Requests) == 0 || len(r.Requests[len(r.Requests)-1].Data) == maxRequestsInBatch {
+		r.Requests = append(r.Requests, RequestsV2{
+			Data:  []uint32{0},
+			Start: counterTime,
+		})
+
+		return
+	}
+
+	value := uint32(counterTime.Sub(r.Requests[len(r.Requests)-1].Start).Seconds())
+
+	for _, el := range r.Requests[len(r.Requests)-1].Data {
+		value -= el
+	}
+
+	r.Requests[len(r.Requests)-1].Data = append(r.Requests[len(r.Requests)-1].Data, value)
 }
 
 type RequestsV2 struct {
@@ -244,7 +284,7 @@ func (r *RequestsV2) Unmarshal(data []byte) error {
 	}
 
 	buf := new(bytes.Buffer)
-	if _, err = io.Copy(buf, gzipReader); err != nil {
+	if _, err = io.Copy(buf, gzipReader); err != nil { //nolint:gosec
 		return err
 	}
 
