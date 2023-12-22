@@ -65,6 +65,7 @@ func (m *managerV2) TooManyRequests(ctx context.Context) {
 					WithField("duration", limiter.Duration()).
 					WithField(delayKey, m.delay).
 					WithField("temp", temp).
+					WithField("level", level).
 					Trace("setting threshold")
 
 				settled = true
