@@ -111,6 +111,7 @@ func (p *pool) Find(ctx context.Context, id string) (*common.TweetSnapshot, erro
 
 func (p *pool) getFinder(ctx context.Context) (Finder, int, error) {
 	index, ok := p.getFinderIndex()
+
 	ticker := time.NewTicker(time.Second)
 
 	for !ok {
@@ -133,6 +134,13 @@ func (p *pool) getFinderIndex() (int, bool) {
 	p.mu.Lock()
 	minimal := 0.0
 	index := 0
+
+	for i := range p.finderTemp {
+		if p.finderTemp[i] != 0 {
+			p.finderDelays[i] = p.finders[i].CurrentDelay()
+			p.finderTemp[i] = p.finders[i].CurrentTemp(context.Background())
+		}
+	}
 
 	for i, d := range p.finderTemp {
 		if d == 0 || d > 6 {
@@ -157,12 +165,8 @@ func (p *pool) getFinderIndex() (int, bool) {
 
 func (p *pool) releaseFinder(i int) {
 	p.mu.Lock()
-	for index := range p.finderTemp {
-		if index == i || p.finderTemp[index] != 0 {
-			p.finderDelays[index] = p.finders[index].CurrentDelay()
-			p.finderTemp[index] = p.finders[index].CurrentTemp(context.Background())
-		}
-	}
+	p.finderDelays[i] = p.finders[i].CurrentDelay()
+	p.finderTemp[i] = p.finders[i].CurrentTemp(context.Background())
 	p.mu.Unlock()
 
 	select {
