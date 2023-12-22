@@ -22,7 +22,7 @@ type requestLimiter interface {
 	CheckIfExist(ctx context.Context, id string, window time.Duration) (bool, error)
 	Create(ctx context.Context, id string, window time.Duration, threshold uint64) error
 	GetRequestLimit(ctx context.Context, id string, window time.Duration) (common.RequestLimitData, error)
-	GetRequestLimitDebug(ctx context.Context, id string, window time.Duration) (model.RequestLimits, error)
+	GetRequestLimitDebug(ctx context.Context, id string, window time.Duration) (model.RequestLimitsV2, error)
 }
 
 func (d *db) GetRequestLimit(ctx context.Context, id string, window time.Duration) (common.RequestLimitData, error) {
