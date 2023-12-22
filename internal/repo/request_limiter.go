@@ -329,6 +329,8 @@ func (d *db) GetRequestLimitDebug(ctx context.Context, id string, window time.Du
 		return model.RequestLimitsV2{}, err
 	}
 
+	d.log.WithField("elements", len(kvs)).Info("requests batches")
+
 	for _, kv := range kvs {
 		r := new(model.RequestsV2)
 		if err = r.Unmarshal(kv.Value); err != nil {
