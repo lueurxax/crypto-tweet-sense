@@ -66,7 +66,7 @@ func (m *managerV2) TooManyRequests(ctx context.Context) {
 					WithField(delayKey, m.delay).
 					WithField("temp", temp).
 					WithField("level", level).
-					Trace("setting threshold")
+					Debug("setting threshold")
 
 				settled = true
 
@@ -93,6 +93,7 @@ func (m *managerV2) CurrentDelay() int64 {
 
 func (m *managerV2) CurrentTemp(ctx context.Context) float64 {
 	var temp float64
+
 	for _, limiter := range m.windowLimiters {
 		tr := limiter.Temp(ctx)
 
@@ -173,7 +174,7 @@ func (m *managerV2) recalculate(ctx context.Context, factor int) error {
 			m.delay /= 2
 		}
 
-		m.log.WithField(delayKey, m.delay).Debug("delay decreased")
+		m.log.WithField(delayKey, m.delay).Trace("delay decreased")
 	}
 
 	m.setter(m.delay)
