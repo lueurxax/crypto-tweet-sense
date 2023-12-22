@@ -264,6 +264,7 @@ func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Durat
 		d.log.WithField("key", key).WithField(dataKey, string(data)).Error(err)
 		return nil, err
 	}
+
 	el.Requests = make([]model.RequestsV2, 0)
 
 	pr, err := fdb.PrefixRange(d.keyBuilder.RequestsByRequestLimits(id, window))
@@ -310,9 +311,8 @@ func (d *db) getRateLimitLite(tx fdbclient.Transaction, id string, window time.D
 }
 
 func (d *db) GetRequestLimitDebug(ctx context.Context, id string, window time.Duration) (model.RequestLimitsV2Debug, error) {
-	result := model.RequestLimitsV2Debug{
-		Requests: make([]model.RequestsV2, 0),
-	}
+	result := model.RequestLimitsV2Debug{Requests: make([]model.RequestsV2, 0)}
+
 	tx, err := d.db.NewTransaction(ctx)
 	if err != nil {
 		return result, err
