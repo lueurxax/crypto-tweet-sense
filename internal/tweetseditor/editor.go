@@ -19,12 +19,22 @@ import (
 const (
 	prompt     = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip information such as airdrops or giveaway, if they are not useful for investing. I will parse your answer by code like json `{\"tweets\":[{\"telegram_message\":\"summarized message by tweet\", \"link\":\"link to tweet\", \"useful_information\":true, \"duplicate_information\": false}]}`, then can you prepare messages in json with prepared telegram message? \nTweets: %s." //nolint:lll
 	nextPrompt = "Additional tweets, create new message only for new information: %s."                                                                                                                                                                                                                                                                                                                                                                                                                                                                     //nolint:lll
-	queueLen   = 10
+
+	longStoryPrompt     = "Analyze several recent, popular tweets related to cryptocurrency. Extract key insights relevant for cryptocurrency investment, excluding non-investment related content like airdrops or giveaways. Summarize the useful information from each tweet. Format the summaries in json with fields: 'telegram_message' for the summary, 'useful_information' to indicate if the information is investment-relevant (true/false), and 'duplicate_information' to indicate if the information is repetitive (true/false), for example {\"telegram_message\":\"summarized message by tweet\", \"useful_information\":true, \"duplicate_information\": false}. \nTweets: %s." //nolint:lll
+	longStoryNextPrompt = "Additional tweets, create new message only for new information: %s."
+
+	queueLen = 10
 )
 
 type Tweet struct {
 	Content   string `json:"telegram_message"`
 	Link      string `json:"link"`
+	Useful    bool   `json:"useful_information"`
+	Duplicate bool   `json:"duplicate_information"`
+}
+
+type LongStoryMessage struct {
+	Content   string `json:"telegram_message"`
 	Useful    bool   `json:"useful_information"`
 	Duplicate bool   `json:"duplicate_information"`
 }
@@ -37,6 +47,7 @@ type repo interface {
 type Editor interface {
 	Edit(ctx context.Context) context.Context
 	SubscribeEdited() <-chan string
+	SubscribeLongStoryMessages() <-chan string
 }
 
 type editor struct {
@@ -45,6 +56,12 @@ type editor struct {
 	sendInterval  time.Duration
 	cleanInterval time.Duration
 	existMessages []openai.ChatCompletionMessage
+
+	longStoryEditedCh chan string
+	longStoryBuffer   [20]common.Tweet
+	longStoryIndex    uint8
+	longStoryMessages []openai.ChatCompletionMessage
+
 	repo
 
 	log log.Logger
@@ -60,9 +77,13 @@ func (e *editor) SubscribeEdited() <-chan string {
 	return e.editedCh
 }
 
+func (e *editor) SubscribeLongStoryMessages() <-chan string {
+	return e.longStoryEditedCh
+}
+
 func (e *editor) editLoop(ctx context.Context) {
 	ticker := time.NewTicker(e.sendInterval)
-	contextCleanerTicker := time.NewTicker(e.sendInterval)
+	contextCleanerTicker := time.NewTicker(e.sendInterval * 10)
 
 	for {
 		select {
@@ -97,9 +118,16 @@ func (e *editor) editLoop(ctx context.Context) {
 			if err = e.repo.DeleteEditedTweets(ctx, deletingTweets); err != nil {
 				e.log.WithError(err).Error("delete edited tweets error")
 			}
+
+			if err = e.longStoryProcess(ctx, collectedTweets); err != nil {
+				e.log.WithError(err).Error("long story process error")
+			}
 		case <-contextCleanerTicker.C:
 			if len(e.existMessages) > 0 {
 				e.existMessages = make([]openai.ChatCompletionMessage, 0)
+			}
+			if len(e.longStoryMessages) > 0 {
+				e.longStoryMessages = make([]openai.ChatCompletionMessage, 0)
 			}
 		}
 	}
@@ -206,13 +234,96 @@ func (e *editor) formatTweet(tweet common.Tweet, text string) (str string) {
 	return
 }
 
+func (e *editor) longStoryProcess(ctx context.Context, tweets []common.Tweet) error {
+	for _, tweet := range tweets {
+		e.longStoryBuffer[e.longStoryIndex] = tweet
+		e.longStoryIndex++
+
+		if e.longStoryIndex == 20 {
+			if err := e.longStorySend(ctx); err != nil {
+				return err
+			}
+
+			e.longStoryIndex = 0
+		}
+	}
+
+	return nil
+}
+
+func (e *editor) longStorySend(ctx context.Context) error {
+	tweetsStr := ""
+
+	for _, twee := range e.longStoryBuffer {
+		text := twee.Text + "Link - " + twee.PermanentURL
+		tweetsStr = strings.Join([]string{tweetsStr, text}, "\n")
+	}
+
+	request := ""
+	if len(e.existMessages) == 0 {
+		request = fmt.Sprintf(longStoryPrompt, tweetsStr)
+	} else {
+		request = fmt.Sprintf(longStoryNextPrompt, tweetsStr)
+	}
+
+	requestMessage := openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleUser,
+		Content: request,
+	}
+
+	resp, err := e.client.CreateChatCompletion(
+		ctx,
+		openai.ChatCompletionRequest{
+			ResponseFormat: &openai.ChatCompletionResponseFormat{
+				Type: openai.ChatCompletionResponseFormatTypeJSONObject,
+			},
+			Model:    openai.GPT4TurboPreview,
+			Messages: append(e.longStoryMessages, requestMessage),
+		},
+	)
+
+	if err != nil {
+		e.log.WithError(err).Error("long story summary generation error")
+		return err
+	}
+
+	e.log.WithField("response", resp).Debug("long story summary generation result")
+
+	res := LongStoryMessage{}
+
+	if err = jsoniter.UnmarshalFromString(resp.Choices[0].Message.Content, &res); err != nil {
+		// TODO: try to search correct json in string
+		e.log.WithError(err).Error("long story summary unmarshal error")
+		e.longStoryEditedCh <- utils.Escape(resp.Choices[0].Message.Content)
+
+		return err
+	}
+
+	if !res.Useful || res.Duplicate {
+		return nil
+	}
+
+	e.longStoryEditedCh <- utils.Escape(res.Content)
+
+	e.existMessages = append(e.existMessages, requestMessage, openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleAssistant,
+		Content: resp.Choices[0].Message.Content,
+	})
+
+	return nil
+}
+
 func NewEditor(client *openai.Client, db repo, sendInterval, cleanInterval time.Duration, log log.Logger) Editor {
 	return &editor{
-		editedCh:      make(chan string, queueLen),
-		sendInterval:  sendInterval,
-		cleanInterval: cleanInterval,
-		client:        client,
-		repo:          db,
-		log:           log,
+		editedCh:          make(chan string, queueLen),
+		client:            client,
+		sendInterval:      sendInterval,
+		cleanInterval:     cleanInterval,
+		existMessages:     make([]openai.ChatCompletionMessage, 0),
+		longStoryEditedCh: make(chan string, queueLen),
+		longStoryBuffer:   [20]common.Tweet{},
+		longStoryMessages: make([]openai.ChatCompletionMessage, 0),
+		repo:              db,
+		log:               log,
 	}
 }

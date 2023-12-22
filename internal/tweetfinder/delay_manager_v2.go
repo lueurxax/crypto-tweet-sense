@@ -9,7 +9,9 @@ import (
 )
 
 const (
-	delayKey         = "delay"
+	delayKey = "delay"
+	tempKey  = "temp"
+
 	loopInterval     = time.Second * 10
 	recalculateError = "error while recalculate"
 )
@@ -46,7 +48,7 @@ type managerV2 struct {
 }
 
 func (m *managerV2) TooManyRequests(ctx context.Context) {
-	m.log.WithField("temp", m.CurrentTemp(ctx)).WithField(delayKey, m.delay).Error("too many requests")
+	m.log.WithField(tempKey, m.CurrentTemp(ctx)).WithField(delayKey, m.delay).Error("too many requests")
 
 	settled := false
 
@@ -64,7 +66,7 @@ func (m *managerV2) TooManyRequests(ctx context.Context) {
 				m.log.
 					WithField("duration", limiter.Duration()).
 					WithField(delayKey, m.delay).
-					WithField("temp", temp).
+					WithField(tempKey, temp).
 					WithField("level", level).
 					Debug("setting threshold")
 
