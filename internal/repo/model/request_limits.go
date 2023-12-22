@@ -214,11 +214,11 @@ func (r *RequestLimitsV2) CleanCounters() []RequestsV2 {
 			if time.Since(tt) < window {
 				value := int32(tt.Sub(newStart).Seconds())
 
-				data[0] = uint32(value)
-
 				if j != len(batch.Data)-1 {
 					data = batch.Data[j:]
 				}
+
+				data[0] = uint32(value)
 
 				reached = true
 
