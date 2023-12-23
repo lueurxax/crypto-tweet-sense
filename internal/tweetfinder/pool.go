@@ -57,7 +57,7 @@ func (p *pool) IsHot() bool {
 	hotCounter := 0
 
 	for _, temp := range p.finderTemp {
-		if temp == 0 {
+		if skipFinder(temp) {
 			hotCounter++
 		}
 	}
@@ -155,7 +155,7 @@ func (p *pool) getFinderIndex(ctx context.Context) (int, bool) {
 	}
 
 	for i, d := range p.finderTemp {
-		if d == 0 || d > 6 {
+		if skipFinder(d) {
 			continue
 		}
 
@@ -173,6 +173,10 @@ func (p *pool) getFinderIndex(ctx context.Context) (int, bool) {
 	p.mu.Unlock()
 
 	return index, minimal != 0
+}
+
+func skipFinder(d float64) bool {
+	return d == 0 || d > 6
 }
 
 func (p *pool) releaseFinder(i int) {
