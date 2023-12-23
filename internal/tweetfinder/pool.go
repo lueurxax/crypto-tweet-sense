@@ -176,7 +176,7 @@ func (p *pool) getFinderIndex(ctx context.Context) (int, bool) {
 }
 
 func skipFinder(d float64) bool {
-	return d == 0 || d > 6
+	return d == 0 || d > 4
 }
 
 func (p *pool) releaseFinder(i int) {

@@ -52,7 +52,7 @@ func (m *managerV2) TooManyRequests(ctx context.Context) {
 
 	settled := false
 
-	level := 5.0
+	level := 3.0
 
 	for !settled {
 		for _, limiter := range m.windowLimiters {
