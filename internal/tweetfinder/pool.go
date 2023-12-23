@@ -53,6 +53,18 @@ type pool struct {
 	metricsDelay *prometheus.GaugeVec
 }
 
+func (p *pool) IsHot() bool {
+	hotCounter := 0
+
+	for _, temp := range p.finderTemp {
+		if temp == 0 {
+			hotCounter++
+		}
+	}
+
+	return hotCounter > len(p.finderTemp)/2
+}
+
 func (p *pool) CurrentTemp(context.Context) float64 {
 	sum := 0.0
 
@@ -81,7 +93,7 @@ func (p *pool) Init(ctx context.Context) error {
 		return err
 	}
 
-	go p.reinit()
+	go p.reinit(ctx)
 
 	return nil
 }
@@ -110,7 +122,7 @@ func (p *pool) Find(ctx context.Context, id string) (*common.TweetSnapshot, erro
 }
 
 func (p *pool) getFinder(ctx context.Context) (Finder, int, error) {
-	index, ok := p.getFinderIndex()
+	index, ok := p.getFinderIndex(ctx)
 
 	ticker := time.NewTicker(time.Second)
 
@@ -124,13 +136,13 @@ func (p *pool) getFinder(ctx context.Context) (Finder, int, error) {
 			break
 		}
 
-		index, ok = p.getFinderIndex()
+		index, ok = p.getFinderIndex(ctx)
 	}
 
 	return p.finders[index], index, nil
 }
 
-func (p *pool) getFinderIndex() (int, bool) {
+func (p *pool) getFinderIndex(ctx context.Context) (int, bool) {
 	p.mu.Lock()
 	minimal := 0.0
 	index := 0
@@ -138,7 +150,7 @@ func (p *pool) getFinderIndex() (int, bool) {
 	for i := range p.finderTemp {
 		if p.finderTemp[i] != 0 {
 			p.finderDelays[i] = p.finders[i].CurrentDelay()
-			p.finderTemp[i] = p.finders[i].CurrentTemp(context.Background())
+			p.finderTemp[i] = p.finders[i].CurrentTemp(ctx)
 		}
 	}
 
@@ -264,10 +276,10 @@ func (p *pool) init(ctx context.Context) error {
 	return nil
 }
 
-func (p *pool) reinit() {
+func (p *pool) reinit(ctx context.Context) {
 	ticker := time.NewTicker(time.Minute)
 	for range ticker.C {
-		if err := p.init(context.Background()); err != nil {
+		if err := p.init(ctx); err != nil {
 			p.log.WithError(err).Error("error while reinit pool")
 		}
 	}

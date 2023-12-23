@@ -11,11 +11,14 @@ import (
 )
 
 const (
-	tweetKey        = "tweet"
-	timeout         = time.Minute * 5
-	oldFastInterval = time.Second * 5
-	oldestInterval  = time.Second * 30
-	queryKey        = "query"
+	tweetKey = "tweet"
+	timeout  = time.Minute * 1
+	queryKey = "query"
+
+	oldFastInterval    = time.Second * 5
+	oldestInterval     = time.Second * 30
+	oldFastHotInterval = time.Minute
+	oldestHotInterval  = time.Minute * 5
 )
 
 type Watcher interface {
@@ -25,6 +28,7 @@ type Watcher interface {
 type finder interface {
 	FindNext(ctx context.Context, start, end *time.Time, search, cursor string) ([]common.TweetSnapshot, string, error)
 	Find(ctx context.Context, id string) (*common.TweetSnapshot, error)
+	IsHot() bool
 }
 
 type repo interface {
@@ -188,6 +192,11 @@ func (w *watcher) updateTop() {
 		}
 
 		cancel()
+		if w.finder.IsHot() {
+			tick.Reset(time.Minute * 10)
+		} else {
+			tick.Reset(time.Minute)
+		}
 	}
 }
 
@@ -215,7 +224,11 @@ func (w *watcher) updateOldestFast() {
 
 		cancel()
 
-		tick.Reset(w.doubleDelayer.Duration(id))
+		if w.finder.IsHot() {
+			tick.Reset(oldFastHotInterval)
+		} else {
+			tick.Reset(w.doubleDelayer.Duration(id))
+		}
 	}
 }
 
@@ -260,6 +273,12 @@ func (w *watcher) updateOldest() {
 		}
 
 		cancel()
+
+		if w.finder.IsHot() {
+			tick.Reset(oldestHotInterval)
+		} else {
+			tick.Reset(oldestInterval)
+		}
 	}
 }
 

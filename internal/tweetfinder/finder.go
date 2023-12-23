@@ -20,6 +20,7 @@ const (
 )
 
 type Finder interface {
+	IsHot() bool
 	FindNext(ctx context.Context, start, end *time.Time, search, cursor string) ([]common.TweetSnapshot, string, error)
 	Find(ctx context.Context, id string) (*common.TweetSnapshot, error)
 	CurrentDelay() int64
@@ -39,6 +40,10 @@ type finder struct {
 	delayManager
 
 	log log.Logger
+}
+
+func (f *finder) IsHot() bool {
+	panic("implement me")
 }
 
 func (f *finder) CurrentTemp(ctx context.Context) float64 {
