@@ -240,11 +240,13 @@ func (e *editor) longStoryProcess(ctx context.Context, tweets []common.Tweet) er
 		e.longStoryIndex++
 
 		if e.longStoryIndex == 20 {
-			if err := e.longStorySend(ctx); err != nil {
-				return err
-			}
+			err := e.longStorySend(ctx)
 
 			e.longStoryIndex = 0
+
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -260,7 +262,7 @@ func (e *editor) longStorySend(ctx context.Context) error {
 	}
 
 	request := ""
-	if len(e.existMessages) == 0 {
+	if len(e.longStoryMessages) == 0 {
 		request = fmt.Sprintf(longStoryPrompt, tweetsStr)
 	} else {
 		request = fmt.Sprintf(longStoryNextPrompt, tweetsStr)

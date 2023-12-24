@@ -198,7 +198,7 @@ func TestLongStory(t *testing.T) {
 		s.Send(ctx, output)
 		time.Sleep(time.Second)
 		r.data = moreTestTweets
-		time.Sleep(time.Minute)
+		time.Sleep(10 * time.Minute)
 		cancel()
 	})
 }
