@@ -83,7 +83,7 @@ func (e *editor) SubscribeLongStoryMessages() <-chan string {
 
 func (e *editor) editLoop(ctx context.Context) {
 	ticker := time.NewTicker(e.sendInterval)
-	contextCleanerTicker := time.NewTicker(e.sendInterval * 10)
+	contextCleanerTicker := time.NewTicker(10 * e.sendInterval)
 
 	for {
 		select {
@@ -126,6 +126,7 @@ func (e *editor) editLoop(ctx context.Context) {
 			if len(e.existMessages) > 0 {
 				e.existMessages = make([]openai.ChatCompletionMessage, 0)
 			}
+
 			if len(e.longStoryMessages) > 0 {
 				e.longStoryMessages = make([]openai.ChatCompletionMessage, 0)
 			}
@@ -240,7 +241,19 @@ func (e *editor) longStoryProcess(ctx context.Context, tweets []common.Tweet) er
 		e.longStoryIndex++
 
 		if e.longStoryIndex == 20 {
-			err := e.longStorySend(ctx)
+			// FIXME temporary solution
+			retry := 0
+
+			err := errors.New("initial error")
+
+			for err != nil && retry < 10 {
+				err = e.longStorySend(ctx)
+				if err != nil {
+					e.log.WithField("retry", retry).WithError(err).Error("long story summary generation error")
+
+					retry++
+				}
+			}
 
 			e.longStoryIndex = 0
 
@@ -254,11 +267,10 @@ func (e *editor) longStoryProcess(ctx context.Context, tweets []common.Tweet) er
 }
 
 func (e *editor) longStorySend(ctx context.Context) error {
-	tweetsStr := ""
+	tweetsStr := e.longStoryBuffer[0].Text
 
-	for _, twee := range e.longStoryBuffer {
-		text := twee.Text + "Link - " + twee.PermanentURL
-		tweetsStr = strings.Join([]string{tweetsStr, text}, "\n")
+	for _, twee := range e.longStoryBuffer[1:] {
+		tweetsStr = strings.Join([]string{tweetsStr, twee.Text}, "\n")
 	}
 
 	request := ""
