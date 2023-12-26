@@ -111,6 +111,12 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		}
 	}
 
+	el.RequestsCount = 0
+
+	for _, v := range el.Requests {
+		el.RequestsCount += uint32(len(v.Data))
+	}
+
 	data, err := el.Marshal()
 	if err != nil {
 		return err
@@ -146,6 +152,7 @@ func (d *db) SetThreshold(ctx context.Context, id string, window time.Duration) 
 	}
 
 	if el.RequestsCount == 0 {
+		d.log.WithField("id", id).WithField("duration", int(window.Seconds())).Debug("can't set threshold, no requests")
 		return nil
 	}
 

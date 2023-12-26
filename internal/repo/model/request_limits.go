@@ -226,8 +226,6 @@ func (r *RequestLimitsV2) CleanCounters() []RequestsV2 {
 				break
 			}
 
-			r.RequestsCount--
-
 			counter += int32(key)
 		}
 
