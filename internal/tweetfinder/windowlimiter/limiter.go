@@ -74,6 +74,8 @@ func (l *limiter) Temp(ctx context.Context) float64 {
 
 	temp := (float64(rl.RequestsCount) + 0.1) / float64(rl.Threshold)
 
+	temp = min(temp, 2)
+
 	if l.fire > 0 {
 		temp += float64(l.fire)
 	}
