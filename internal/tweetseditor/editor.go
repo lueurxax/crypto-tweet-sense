@@ -275,7 +275,7 @@ func (e *editor) longStorySend(ctx context.Context) error {
 
 	e.log.WithField("tweets", tweetsStr).Debug("long story summary generation request")
 
-	request := ""
+	var request string
 	if len(e.longStoryMessages) == 0 {
 		request = fmt.Sprintf(longStoryPrompt, tweetsStr)
 	} else {

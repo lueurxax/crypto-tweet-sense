@@ -123,6 +123,10 @@ func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.
 
 			w.logger.WithError(err).Error("find tweets")
 
+			if errors.Is(err, tweetfinder.ErrTimeoutSelectFinder) {
+				return
+			}
+
 			continue
 		}
 

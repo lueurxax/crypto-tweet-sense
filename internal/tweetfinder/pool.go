@@ -126,10 +126,15 @@ func (p *pool) getFinder(ctx context.Context) (Finder, int, error) {
 
 	ticker := time.NewTicker(time.Second)
 
+	timer := time.NewTimer(time.Minute)
+	defer timer.Stop()
+
 	for !ok {
 		select {
 		case <-ctx.Done():
 			return nil, 0, ctx.Err()
+		case <-timer.C:
+			return nil, 0, ErrTimeoutSelectFinder
 		case <-p.releaseSignal:
 			break
 		case <-ticker.C:
