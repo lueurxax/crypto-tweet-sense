@@ -482,7 +482,7 @@ func (d *db) getTweetsUntilTx(tr fdbclient.Transaction, createdAt time.Time, ch 
 }
 
 func (d *db) CleanWrongIndexes(ctx context.Context) error {
-	d.log.Debug("CleanWrongIndexes")
+	d.log.Info("CleanWrongIndexes")
 
 	pr, err := fdb.PrefixRange(d.keyBuilder.TweetRatingIndexes())
 	if err != nil {
@@ -523,7 +523,7 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 		d.log.WithError(err).Error("error while committing transaction")
 	}
 
-	d.log.WithField("processed", len(kvs)).Debug("CleanWrongIndexes by rating")
+	d.log.WithField("processed", len(kvs)).Info("CleanWrongIndexes by rating")
 
 	tr, err = d.db.NewTransaction(ctx)
 	if err != nil {
@@ -545,7 +545,7 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 		d.log.WithError(err).Error("error while committing transaction")
 	}
 
-	d.log.WithField("processed", len(kvs)).Debug("CleanWrongIndexes by creation")
+	d.log.WithField("processed", len(kvs)).Info("CleanWrongIndexes by creation")
 
 	return nil
 }

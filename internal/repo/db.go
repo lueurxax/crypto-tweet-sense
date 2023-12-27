@@ -44,6 +44,8 @@ func (d *db) Migrate(ctx context.Context) error {
 		return err
 	}
 
+	d.log.WithField("version", v).Info("current version")
+
 	m := migrations.Migrations(v)
 	for _, el := range m {
 		d.log.WithField("version", el.Version()).Info("migrating to version")

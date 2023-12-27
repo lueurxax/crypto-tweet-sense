@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: twitter-exp
-          image: ghcr.io/lueurxax/crypto-tweet-sense-rating-updater:v0.1.10
+          image: ghcr.io/lueurxax/crypto-tweet-sense-rating-updater:v0.1.36
           imagePullPolicy: Always
           env:
             - name: LOG_LEVEL
@@ -39,13 +39,13 @@ spec:
             - name: PHONE
               value: "+35797699363"
             - name: DATABASEPATH
-              value: "/etc/fdb/fdb.cluster"
+              value: "/etc/fdb/cluster-file"
           volumeMounts:
             - name: db-cluster
               mountPath: /etc/fdb/
       volumes:
         - name: db-cluster
           configMap:
-            name: fdb.cluster
+            name: crypto-tweet-sense-config
       imagePullSecrets:
         - name: regcred
