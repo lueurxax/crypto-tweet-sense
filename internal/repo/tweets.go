@@ -482,6 +482,8 @@ func (d *db) getTweetsUntilTx(tr fdbclient.Transaction, createdAt time.Time, ch 
 }
 
 func (d *db) CleanWrongIndexes(ctx context.Context) error {
+	d.log.Debug("CleanWrongIndexes")
+
 	pr, err := fdb.PrefixRange(d.keyBuilder.TweetRatingIndexes())
 	if err != nil {
 		return err
