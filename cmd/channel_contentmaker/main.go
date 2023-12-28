@@ -35,6 +35,7 @@ type config struct {
 	BotToken                   string        `envconfig:"BOT_TOKEN" required:"true"`
 	ChatID                     int64         `envconfig:"CHAT_ID" required:"true"`
 	LongChatID                 int64         `envconfig:"LONG_CHAT_ID" required:"true"`
+	RusLongChatID              int64         `envconfig:"RUS_LONG_CHAT_ID" required:"true"`
 	ChatGPTToken               string        `envconfig:"CHAT_GPT_TOKEN" required:"true"`              // OpenAI token
 	EditorSendInterval         time.Duration `envconfig:"EDITOR_SEND_INTERVAL" default:"30m"`          // Interval to send edited tweets to telegram
 	EditorCleanContextInterval time.Duration `envconfig:"EDITOR_CLEAN_CONTEXT_INTERVAL" default:"12h"` // Interval to clean chatgpt context
@@ -92,7 +93,8 @@ func main() {
 	}
 
 	s := sender.NewSender(api, &telebot.Chat{ID: cfg.ChatID}, logger.WithField(pkgKey, "sender"))
-	ls := sender.NewSender(api, &telebot.Chat{ID: cfg.LongChatID}, logger.WithField(pkgKey, "sender"))
+	ls := sender.NewSender(api, &telebot.Chat{ID: cfg.LongChatID}, logger.WithField(pkgKey, "long sender"))
+	rls := sender.NewSender(api, &telebot.Chat{ID: cfg.RusLongChatID}, logger.WithField(pkgKey, "rus sender"))
 
 	editor := tweetseditor.NewEditor(
 		openai.NewClient(cfg.ChatGPTToken),
@@ -104,6 +106,7 @@ func main() {
 	editor.Edit(ctx)
 	ctx = s.Send(ctx, editor.SubscribeEdited())
 	ctx = ls.Send(ctx, editor.SubscribeLongStoryMessages())
+	ctx = rls.Send(ctx, editor.SubscribeRusStoryMessages())
 
 	logger.Info("service started")
 	<-ctx.Done()

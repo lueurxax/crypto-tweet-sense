@@ -22,8 +22,9 @@ const (
 
 	longStoryPrompt     = "Analyze several recent, popular tweets related to cryptocurrency. Extract key insights relevant for cryptocurrency investment, excluding non-investment related content like airdrops or giveaways. Summarize the useful information from each tweet. Format the summaries in json with fields: 'telegram_message' for the summary, 'useful_information' to indicate if the information is investment-relevant (true/false), and 'duplicate_information' to indicate if the information is repetitive (true/false), for example {\"telegram_message\":\"summarized message by tweet\", \"useful_information\":true, \"duplicate_information\": false}. \nTweets: %s." //nolint:lll
 	longStoryNextPrompt = "Additional tweets, create new message only for new information: %s."
+	russianPrompt       = "Translate to russian with same json format"
 
-	queueLen = 10
+	queueLen = 100
 )
 
 type Tweet struct {
@@ -48,6 +49,7 @@ type Editor interface {
 	Edit(ctx context.Context) context.Context
 	SubscribeEdited() <-chan string
 	SubscribeLongStoryMessages() <-chan string
+	SubscribeRusStoryMessages() <-chan string
 }
 
 type editor struct {
@@ -62,6 +64,8 @@ type editor struct {
 	longStoryIndex    uint8
 	longStoryMessages []openai.ChatCompletionMessage
 
+	russianLongStoryEditedCh chan string
+
 	repo
 
 	log log.Logger
@@ -73,13 +77,11 @@ func (e *editor) Edit(ctx context.Context) context.Context {
 	return ctx
 }
 
-func (e *editor) SubscribeEdited() <-chan string {
-	return e.editedCh
-}
+func (e *editor) SubscribeEdited() <-chan string { return e.editedCh }
 
-func (e *editor) SubscribeLongStoryMessages() <-chan string {
-	return e.longStoryEditedCh
-}
+func (e *editor) SubscribeLongStoryMessages() <-chan string { return e.longStoryEditedCh }
+
+func (e *editor) SubscribeRusStoryMessages() <-chan string { return e.russianLongStoryEditedCh }
 
 func (e *editor) editLoop(ctx context.Context) {
 	ticker := time.NewTicker(e.sendInterval)
@@ -321,25 +323,69 @@ func (e *editor) longStorySend(ctx context.Context) error {
 
 	e.longStoryEditedCh <- utils.Escape(res.Content)
 
-	e.existMessages = append(e.existMessages, requestMessage, openai.ChatCompletionMessage{
+	e.longStoryMessages = append(e.longStoryMessages, requestMessage, openai.ChatCompletionMessage{
 		Role:    openai.ChatMessageRoleAssistant,
 		Content: resp.Choices[0].Message.Content,
 	})
 
+	go e.translateLongStory(ctx)
+
 	return nil
+}
+
+func (e *editor) translateLongStory(ctx context.Context) {
+	requestMessage := openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleUser,
+		Content: russianPrompt,
+	}
+
+	resp, err := e.client.CreateChatCompletion(
+		ctx,
+		openai.ChatCompletionRequest{
+			ResponseFormat: &openai.ChatCompletionResponseFormat{
+				Type: openai.ChatCompletionResponseFormatTypeJSONObject,
+			},
+			Model:    openai.GPT4TurboPreview,
+			Messages: append(e.longStoryMessages, requestMessage),
+		},
+	)
+
+	if err != nil {
+		e.log.WithError(err).Error("rus long story summary generation error")
+		return
+	}
+
+	e.log.WithField("response", resp).Debug("rus long story summary generation result")
+
+	res := LongStoryMessage{}
+
+	if err = jsoniter.UnmarshalFromString(resp.Choices[0].Message.Content, &res); err != nil {
+		// TODO: try to search correct json in string
+		e.log.WithError(err).Error("rus long story summary unmarshal error")
+		e.russianLongStoryEditedCh <- utils.Escape(resp.Choices[0].Message.Content)
+
+		return
+	}
+
+	if !res.Useful || res.Duplicate {
+		return
+	}
+
+	e.russianLongStoryEditedCh <- utils.Escape(res.Content)
 }
 
 func NewEditor(client *openai.Client, db repo, sendInterval, cleanInterval time.Duration, log log.Logger) Editor {
 	return &editor{
-		editedCh:          make(chan string, queueLen),
-		client:            client,
-		sendInterval:      sendInterval,
-		cleanInterval:     cleanInterval,
-		existMessages:     make([]openai.ChatCompletionMessage, 0),
-		longStoryEditedCh: make(chan string, queueLen),
-		longStoryBuffer:   [20]common.Tweet{},
-		longStoryMessages: make([]openai.ChatCompletionMessage, 0),
-		repo:              db,
-		log:               log,
+		editedCh:                 make(chan string, queueLen),
+		client:                   client,
+		sendInterval:             sendInterval,
+		cleanInterval:            cleanInterval,
+		existMessages:            make([]openai.ChatCompletionMessage, 0),
+		longStoryEditedCh:        make(chan string, queueLen),
+		longStoryBuffer:          [20]common.Tweet{},
+		longStoryMessages:        make([]openai.ChatCompletionMessage, 0),
+		russianLongStoryEditedCh: make(chan string, queueLen),
+		repo:                     db,
+		log:                      log,
 	}
 }

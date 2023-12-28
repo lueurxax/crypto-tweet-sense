@@ -202,3 +202,31 @@ func TestLongStory(t *testing.T) {
 		cancel()
 	})
 }
+
+func TestRusLongStory(t *testing.T) {
+	t.Run("some tweets request", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		client := openai.NewClient(os.Getenv("CHAT_GPT_TOKEN"))
+		logrusLogger := logrus.New()
+		logrusLogger.SetLevel(logrus.TraceLevel)
+		logger := log.NewLogger(logrusLogger)
+		r := &testRepo{data: testTweets}
+		ed := NewEditor(client, r, time.Second, time.Hour*24, logger)
+		ctx = ed.Edit(ctx)
+		output := ed.SubscribeRusStoryMessages()
+
+		chatID, err := strconv.ParseInt(os.Getenv("CHAT_ID"), 10, 64)
+		require.NoError(t, err)
+
+		api, err := telebot.NewBot(
+			telebot.Settings{Token: os.Getenv("BOT_TOKEN"), Poller: &telebot.LongPoller{Timeout: 10 * time.Second}},
+		)
+		require.NoError(t, err)
+		s := sender.NewSender(api, &telebot.Chat{ID: chatID}, logger)
+		s.Send(ctx, output)
+		time.Sleep(time.Second)
+		r.data = moreTestTweets
+		time.Sleep(10 * time.Minute)
+		cancel()
+	})
+}
