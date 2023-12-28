@@ -526,6 +526,8 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 		go d.checkTweetOrClear(ctx, kv.Key, tweet.ID, wg)
 	}
 
+	wg.Wait()
+
 	d.log.WithField("processed", len(kvs)).Info("CleanWrongIndexes by rating")
 
 	tr, err = d.db.NewTransaction(ctx)
