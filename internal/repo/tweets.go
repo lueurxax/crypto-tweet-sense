@@ -503,7 +503,12 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 		return err
 	}
 
+	if err := tr.Commit(); err != nil {
+		d.log.WithError(err).Error("error while committing transaction")
+	}
+
 	wg := new(sync.WaitGroup)
+
 	for _, kv := range kvs {
 		tweet := new(common.TweetSnapshotIndex)
 		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
@@ -519,10 +524,6 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 		wg.Add(1)
 
 		go d.checkTweetOrClear(ctx, kv.Key, tweet.ID, wg)
-	}
-
-	if err := tr.Commit(); err != nil {
-		d.log.WithError(err).Error("error while committing transaction")
 	}
 
 	d.log.WithField("processed", len(kvs)).Info("CleanWrongIndexes by rating")
@@ -556,6 +557,7 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 
 func (d *db) checkTweetOrClear(ctx context.Context, key fdb.Key, id string, wg *sync.WaitGroup) {
 	defer wg.Done()
+
 	tr, err := d.db.NewTransaction(ctx)
 	if err != nil {
 		d.log.WithError(err).Error("error while creating transaction")
