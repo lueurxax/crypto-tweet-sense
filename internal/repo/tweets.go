@@ -3,6 +3,7 @@ package fdb
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
@@ -502,6 +503,7 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 		return err
 	}
 
+	wg := new(sync.WaitGroup)
 	for _, kv := range kvs {
 		tweet := new(common.TweetSnapshotIndex)
 		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
@@ -514,9 +516,9 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 			return err
 		}
 
-		if err = d.checkTweetOrClear(ctx, kv.Key, tweet.ID); err != nil {
-			return err
-		}
+		wg.Add(1)
+
+		go d.checkTweetOrClear(ctx, kv.Key, tweet.ID, wg)
 	}
 
 	if err := tr.Commit(); err != nil {
@@ -535,36 +537,44 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 		return err
 	}
 
-	for _, kv := range kvs {
-		if err = d.checkTweetOrClear(ctx, kv.Key, string(kv.Value)); err != nil {
-			return err
-		}
-	}
-
 	if err = tr.Commit(); err != nil {
 		d.log.WithError(err).Error("error while committing transaction")
 	}
+
+	for _, kv := range kvs {
+		wg.Add(1)
+
+		go d.checkTweetOrClear(ctx, kv.Key, string(kv.Value), wg)
+	}
+
+	wg.Wait()
 
 	d.log.WithField("processed", len(kvs)).Info("CleanWrongIndexes by creation")
 
 	return nil
 }
 
-func (d *db) checkTweetOrClear(ctx context.Context, key fdb.Key, id string) error {
+func (d *db) checkTweetOrClear(ctx context.Context, key fdb.Key, id string, wg *sync.WaitGroup) {
+	defer wg.Done()
 	tr, err := d.db.NewTransaction(ctx)
 	if err != nil {
-		return err
+		d.log.WithError(err).Error("error while creating transaction")
+
+		return
 	}
 
 	data, err := tr.Get(d.keyBuilder.Tweet(id))
 	if err != nil {
 		d.log.WithError(err).Error("error while get tweet")
-		return err
+
+		return
 	}
 
 	if data == nil {
 		tr.Clear(key)
 	}
 
-	return tr.Commit()
+	if err = tr.Commit(); err != nil {
+		d.log.WithError(err).Error("error while committing transaction")
+	}
 }
