@@ -41,8 +41,10 @@ type LongStoryMessage struct {
 }
 
 type repo interface {
-	GetTweetForEdit(ctx context.Context) ([]common.Tweet, error)
-	DeleteEditedTweets(ctx context.Context, ids []string) error
+	GetTweetForShortEdit(ctx context.Context) ([]common.Tweet, error)
+	DeleteShortEditedTweets(ctx context.Context, ids []string) error
+	GetTweetForLongEdit(ctx context.Context, count int) ([]common.Tweet, error)
+	DeleteLongEditedTweets(ctx context.Context, ids []string) error
 }
 
 type Editor interface {
@@ -60,8 +62,6 @@ type editor struct {
 	existMessages []openai.ChatCompletionMessage
 
 	longStoryEditedCh chan string
-	longStoryBuffer   [20]common.Tweet
-	longStoryIndex    uint8
 	longStoryMessages []openai.ChatCompletionMessage
 
 	russianLongStoryEditedCh chan string
@@ -85,6 +85,7 @@ func (e *editor) SubscribeRusStoryMessages() <-chan string { return e.russianLon
 
 func (e *editor) editLoop(ctx context.Context) {
 	ticker := time.NewTicker(e.sendInterval)
+	longTicker := time.NewTicker(2 * e.sendInterval)
 	contextCleanerTicker := time.NewTicker(10 * e.sendInterval)
 
 	for {
@@ -95,7 +96,7 @@ func (e *editor) editLoop(ctx context.Context) {
 
 			return
 		case <-ticker.C:
-			collectedTweets, err := e.repo.GetTweetForEdit(ctx)
+			collectedTweets, err := e.repo.GetTweetForShortEdit(ctx)
 			if err != nil {
 				if errors.Is(err, fdb.ErrTweetsNotFound) {
 					e.log.Info("skip edit, because no tweets")
@@ -117,12 +118,39 @@ func (e *editor) editLoop(ctx context.Context) {
 				deletingTweets = append(deletingTweets, tweet.ID)
 			}
 
-			if err = e.repo.DeleteEditedTweets(ctx, deletingTweets); err != nil {
+			if err = e.repo.DeleteShortEditedTweets(ctx, deletingTweets); err != nil {
 				e.log.WithError(err).Error("delete edited tweets error")
+			}
+		case <-longTicker.C:
+			collectedTweets, err := e.repo.GetTweetForLongEdit(ctx, 20)
+			if err != nil {
+				if errors.Is(err, fdb.ErrTweetsNotFound) {
+					e.log.Info("skip edit, because no tweets")
+					continue
+				}
+
+				if errors.Is(err, fdb.ErrNotEnoughTweets) {
+					e.log.Info("skip edit, because not enough tweets")
+					continue
+				}
+
+				e.log.WithError(err).Error("get tweets for edit error")
+
+				continue
 			}
 
 			if err = e.longStoryProcess(ctx, collectedTweets); err != nil {
-				e.log.WithError(err).Error("long story process error")
+				e.log.WithError(err).Error("edit error")
+				continue
+			}
+
+			deletingTweets := make([]string, 0, len(collectedTweets))
+			for _, tweet := range collectedTweets {
+				deletingTweets = append(deletingTweets, tweet.ID)
+			}
+
+			if err = e.repo.DeleteLongEditedTweets(ctx, deletingTweets); err != nil {
+				e.log.WithError(err).Error("delete edited tweets error")
 			}
 		case <-contextCleanerTicker.C:
 			if len(e.existMessages) > 0 {
@@ -238,40 +266,27 @@ func (e *editor) formatTweet(tweet common.Tweet, text string) (str string) {
 }
 
 func (e *editor) longStoryProcess(ctx context.Context, tweets []common.Tweet) error {
-	for _, tweet := range tweets {
-		e.longStoryBuffer[e.longStoryIndex] = tweet
-		e.longStoryIndex++
+	// FIXME temporary solution
+	retry := 0
 
-		if e.longStoryIndex == 20 {
-			// FIXME temporary solution
-			retry := 0
+	err := errors.New("initial error")
 
-			err := errors.New("initial error")
+	for err != nil && retry < 10 {
+		err = e.longStorySend(ctx, tweets)
+		if err != nil {
+			e.log.WithField("retry", retry).WithError(err).Error("long story summary generation error")
 
-			for err != nil && retry < 10 {
-				err = e.longStorySend(ctx)
-				if err != nil {
-					e.log.WithField("retry", retry).WithError(err).Error("long story summary generation error")
-
-					retry++
-				}
-			}
-
-			e.longStoryIndex = 0
-
-			if err != nil {
-				return err
-			}
+			retry++
 		}
 	}
 
-	return nil
+	return err
 }
 
-func (e *editor) longStorySend(ctx context.Context) error {
-	tweetsStr := e.longStoryBuffer[0].Text
+func (e *editor) longStorySend(ctx context.Context, tweets []common.Tweet) error {
+	tweetsStr := tweets[0].Text
 
-	for _, twee := range e.longStoryBuffer[1:] {
+	for _, twee := range tweets[1:] {
 		tweetsStr = strings.Join([]string{tweetsStr, twee.Text}, "\n")
 	}
 
@@ -365,7 +380,6 @@ func NewEditor(client *openai.Client, db repo, sendInterval, cleanInterval time.
 		cleanInterval:            cleanInterval,
 		existMessages:            make([]openai.ChatCompletionMessage, 0),
 		longStoryEditedCh:        make(chan string, queueLen),
-		longStoryBuffer:          [20]common.Tweet{},
 		longStoryMessages:        make([]openai.ChatCompletionMessage, 0),
 		russianLongStoryEditedCh: make(chan string, queueLen),
 		repo:                     db,

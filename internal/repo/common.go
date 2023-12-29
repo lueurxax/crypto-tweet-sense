@@ -3,6 +3,7 @@ package fdb
 import "errors"
 
 var ErrTweetsNotFound = errors.New("no tweets found")
+var ErrNotEnoughTweets = errors.New("not enough tweets")
 var ErrRequestLimitsNotFound = errors.New("no request limits found")
 var ErrRequestLimitsUnmarshallingError = errors.New("request limits unmarshalling error")
 var ErrAlreadyExists = errors.New("already exists")

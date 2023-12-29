@@ -5,6 +5,7 @@ import (
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/lueurxax/crypto-tweet-sense/pkg/fdbclient"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 )
@@ -13,6 +14,8 @@ type editingTweetsRepo interface {
 	SaveTweetForEdit(ctx context.Context, tweet *common.Tweet) error
 	GetTweetForShortEdit(ctx context.Context) ([]common.Tweet, error)
 	DeleteShortEditedTweets(ctx context.Context, ids []string) error
+	GetTweetForLongEdit(ctx context.Context, count int) ([]common.Tweet, error)
+	DeleteLongEditedTweets(ctx context.Context, ids []string) error
 }
 
 func (d *db) SaveTweetForEdit(ctx context.Context, tweet *common.Tweet) error {
@@ -84,7 +87,7 @@ func (d *db) DeleteShortEditedTweets(ctx context.Context, ids []string) error {
 	return tx.Commit()
 }
 
-func (d *db) GetTweetForLongEdit(ctx context.Context) ([]common.Tweet, error) {
+func (d *db) GetTweetForLongEdit(ctx context.Context, count int) ([]common.Tweet, error) {
 	tx, err := d.db.NewTransaction(ctx)
 	if err != nil {
 		return nil, err
@@ -95,13 +98,20 @@ func (d *db) GetTweetForLongEdit(ctx context.Context) ([]common.Tweet, error) {
 		return nil, err
 	}
 
-	kvs, err := tx.GetRange(pr)
+	opts := new(fdbclient.RangeOptions)
+	opts.SetLimit(count)
+
+	kvs, err := tx.GetRange(pr, opts)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(kvs) == 0 {
 		return nil, ErrTweetsNotFound
+	}
+
+	if len(kvs) < count {
+		return nil, ErrNotEnoughTweets
 	}
 
 	res := make([]common.Tweet, 0, len(kvs))
