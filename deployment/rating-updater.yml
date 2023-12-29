@@ -46,6 +46,6 @@ spec:
       volumes:
         - name: db-cluster
           configMap:
-            name: crypto-tweet-sense-config
+            name: c1-config
       imagePullSecrets:
         - name: regcred

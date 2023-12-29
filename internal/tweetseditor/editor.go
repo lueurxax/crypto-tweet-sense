@@ -20,9 +20,9 @@ const (
 	prompt     = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip information such as airdrops or giveaway, if they are not useful for investing. I will parse your answer by code like json `{\"tweets\":[{\"telegram_message\":\"summarized message by tweet\", \"link\":\"link to tweet\", \"useful_information\":true, \"duplicate_information\": false}]}`, then can you prepare messages in json with prepared telegram message? \nTweets: %s." //nolint:lll
 	nextPrompt = "Additional tweets, create new message only for new information: %s."                                                                                                                                                                                                                                                                                                                                                                                                                                                                     //nolint:lll
 
-	longStoryPrompt     = "Analyze several recent, popular tweets related to cryptocurrency. Extract key insights relevant for cryptocurrency investment, excluding non-investment related content like airdrops or giveaways. Summarize the useful information from each tweet. Format the summaries in json with fields: 'telegram_message' for the summary, 'useful_information' to indicate if the information is investment-relevant (true/false), and 'duplicate_information' to indicate if the information is repetitive (true/false), for example {\"telegram_message\":\"summarized message by tweet\", \"useful_information\":true, \"duplicate_information\": false}. \nTweets: %s." //nolint:lll
+	longStoryPrompt     = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make expanded summary? Skip information such as airdrops or giveaway, if they are not useful for investing. Format the summaries in json with fields: 'telegram_message' for the summary, 'useful_information' to indicate if the information is investment-relevant (true/false), and 'duplicate_information' to indicate if the information is repetitive (true/false), for example {\"telegram_message\":\"summarized message by tweet\", \"useful_information\":true, \"duplicate_information\": false}. \nTweets: %s." //nolint:lll
 	longStoryNextPrompt = "Additional tweets, create new message only for new information: %s."
-	russianPrompt       = "Translate to russian with same json format"
+	russianPrompt       = "Translate to russian this text: "
 
 	queueLen = 100
 )
@@ -328,25 +328,22 @@ func (e *editor) longStorySend(ctx context.Context) error {
 		Content: resp.Choices[0].Message.Content,
 	})
 
-	go e.translateLongStory(ctx)
+	go e.translateLongStory(ctx, res.Content)
 
 	return nil
 }
 
-func (e *editor) translateLongStory(ctx context.Context) {
+func (e *editor) translateLongStory(ctx context.Context, content string) {
 	requestMessage := openai.ChatCompletionMessage{
 		Role:    openai.ChatMessageRoleUser,
-		Content: russianPrompt,
+		Content: russianPrompt + content,
 	}
 
 	resp, err := e.client.CreateChatCompletion(
 		ctx,
 		openai.ChatCompletionRequest{
-			ResponseFormat: &openai.ChatCompletionResponseFormat{
-				Type: openai.ChatCompletionResponseFormatTypeJSONObject,
-			},
 			Model:    openai.GPT4TurboPreview,
-			Messages: append(e.longStoryMessages, requestMessage),
+			Messages: []openai.ChatCompletionMessage{requestMessage},
 		},
 	)
 
@@ -357,21 +354,7 @@ func (e *editor) translateLongStory(ctx context.Context) {
 
 	e.log.WithField("response", resp).Debug("rus long story summary generation result")
 
-	res := LongStoryMessage{}
-
-	if err = jsoniter.UnmarshalFromString(resp.Choices[0].Message.Content, &res); err != nil {
-		// TODO: try to search correct json in string
-		e.log.WithError(err).Error("rus long story summary unmarshal error")
-		e.russianLongStoryEditedCh <- utils.Escape(resp.Choices[0].Message.Content)
-
-		return
-	}
-
-	if !res.Useful || res.Duplicate {
-		return
-	}
-
-	e.russianLongStoryEditedCh <- utils.Escape(res.Content)
+	e.russianLongStoryEditedCh <- utils.Escape(resp.Choices[0].Message.Content)
 }
 
 func NewEditor(client *openai.Client, db repo, sendInterval, cleanInterval time.Duration, log log.Logger) Editor {

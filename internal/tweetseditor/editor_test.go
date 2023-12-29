@@ -119,18 +119,18 @@ var testTweets = []common.Tweet{
 		PermanentURL: "https://twitter.com/krugermacro/status/1413122239264561156",
 	},
 	{
-		Text: `🚨 BREAKING: 
-
-	BRICS Currency Agreement Nearing as Consensus Is Close!
-
-	#XRP 🤝🏼 BRICS currency `,
+		Text:         `$50 Giveaway || Ends in 24 Hrs 🤯`,
 		PermanentURL: "https://twitter.com/krugermacro/status/1413122239264561156",
 	},
 }
 
 var moreTestTweets = []common.Tweet{
 	{
-		Text:         `$50 Giveaway || Ends in 24 Hrs 🤯`,
+		Text: `🚨 BREAKING: 
+
+	BRICS Currency Agreement Nearing as Consensus Is Close!
+
+	#XRP 🤝🏼 BRICS currency `,
 		PermanentURL: "https://twitter.com/krugermacro/status/1413122239264561156",
 	},
 }
