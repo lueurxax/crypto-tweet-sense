@@ -21,8 +21,10 @@ type Builder interface {
 	TweetUsernameRatingKey(username string) []byte
 	TweetRatings() []byte
 	SentTweet(link string) []byte
-	EditingTweet(id string) []byte
-	EditingTweets() []byte
+	EditingTweetShort(id string) []byte
+	EditingTweetLong(id string) []byte
+	EditingTweetsShort() []byte
+	EditingTweetsLong() []byte
 	TelegramSessionStorage() []byte
 	TwitterAccount(login string) []byte
 	TwitterAccounts() []byte
@@ -46,12 +48,20 @@ func (b builder) TwitterAccount(login string) []byte {
 	return append(twitterAccountsPrefix[:], []byte(login)...)
 }
 
-func (b builder) EditingTweet(id string) []byte {
-	return append(editingTweetPrefix[:], []byte(id)...)
+func (b builder) EditingTweetShort(id string) []byte {
+	return append(editingTweetShortPrefix[:], []byte(id)...)
 }
 
-func (b builder) EditingTweets() []byte {
-	return editingTweetPrefix[:]
+func (b builder) EditingTweetsShort() []byte {
+	return editingTweetShortPrefix[:]
+}
+
+func (b builder) EditingTweetLong(id string) []byte {
+	return append(editingTweetLongPrefix[:], []byte(id)...)
+}
+
+func (b builder) EditingTweetsLong() []byte {
+	return editingTweetLongPrefix[:]
 }
 
 func (b builder) TelegramSessionStorage() []byte {

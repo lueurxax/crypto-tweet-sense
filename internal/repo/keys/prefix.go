@@ -8,7 +8,8 @@ var (
 	tweetPrefix                  Prefix = [2]byte{0x00, 0x01}
 	sentTweetPrefix              Prefix = [2]byte{0x00, 0x03}
 	tweetRatingPrefix            Prefix = [2]byte{0x00, 0x04}
-	editingTweetPrefix           Prefix = [2]byte{0x00, 0x05}
+	editingTweetShortPrefix      Prefix = [2]byte{0x00, 0x05}
+	editingTweetLongPrefix       Prefix = [2]byte{0x00, 0x09}
 	telegramSessionStoragePrefix Prefix = [2]byte{0x00, 0x06}
 	twitterAccountsPrefix        Prefix = [2]byte{0x00, 0x07}
 	twitterAccountsCookiePrefix  Prefix = [2]byte{0x00, 0x08}
