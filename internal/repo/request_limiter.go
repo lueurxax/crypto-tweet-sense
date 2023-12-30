@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
+	"github.com/eko/gocache/lib/v4/store"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/repo/model"
@@ -31,7 +32,7 @@ func (d *db) GetRequestLimit(ctx context.Context, id string, window time.Duratio
 		return common.RequestLimitData{}, err
 	}
 
-	el, err := d.getRateLimitLite(tx, id, window)
+	el, err := d.getRateLimit(ctx, tx, id, window)
 	if err != nil {
 		return common.RequestLimitData{}, err
 	}
@@ -52,7 +53,7 @@ func (d *db) AddCounter(ctx context.Context, id string, window time.Duration, co
 		return err
 	}
 
-	el, err := d.getRateLimit(tx, id, window)
+	el, err := d.getRateLimit(ctx, tx, id, window)
 	if err != nil {
 		return err
 	}
@@ -64,7 +65,9 @@ func (d *db) AddCounter(ctx context.Context, id string, window time.Duration, co
 		return err
 	}
 
-	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
+	key := d.keyBuilder.RequestLimits(id, window)
+
+	tx.Set(key, data)
 
 	data, err = el.Requests[len(el.Requests)-1].Marshal()
 	if err != nil {
@@ -72,6 +75,10 @@ func (d *db) AddCounter(ctx context.Context, id string, window time.Duration, co
 	}
 
 	tx.Set(d.keyBuilder.Requests(id, window, el.Requests[len(el.Requests)-1].Start), data)
+
+	if err = d.requestsCache.Set(ctx, key, el); err != nil {
+		d.log.WithError(err).Error("set cache error")
+	}
 
 	d.log.WithField("request_limits", el).Trace("add counter")
 
@@ -84,7 +91,7 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		return err
 	}
 
-	el, err := d.getRateLimit(tx, id, window)
+	el, err := d.getRateLimit(ctx, tx, id, window)
 	if err != nil {
 		return errors.Join(err, ErrRequestLimitsUnmarshallingError)
 	}
@@ -122,6 +129,8 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		return err
 	}
 
+	key := d.keyBuilder.RequestLimits(id, window)
+
 	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
 
 	for v := range deleteMap {
@@ -137,6 +146,12 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		tx.Set(d.keyBuilder.Requests(id, window, v.Start), data)
 	}
 
+	el.Requests = requests
+
+	if err = d.requestsCache.Set(ctx, key, el); err != nil {
+		d.log.WithError(err).Error("set cache error")
+	}
+
 	return tx.Commit()
 }
 
@@ -146,7 +161,7 @@ func (d *db) SetThreshold(ctx context.Context, id string, window time.Duration) 
 		return err
 	}
 
-	el, err := d.getRateLimitLite(tx, id, window)
+	el, err := d.getRateLimit(ctx, tx, id, window)
 	if err != nil {
 		return err
 	}
@@ -163,7 +178,13 @@ func (d *db) SetThreshold(ctx context.Context, id string, window time.Duration) 
 		return err
 	}
 
-	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
+	key := d.keyBuilder.RequestLimits(id, window)
+
+	tx.Set(key, data)
+
+	if err = d.requestsCache.Set(ctx, key, el); err != nil {
+		d.log.WithError(err).Error("set cache error")
+	}
 
 	return tx.Commit()
 }
@@ -174,7 +195,7 @@ func (d *db) IncreaseThresholdTo(ctx context.Context, id string, window time.Dur
 		return err
 	}
 
-	el, err := d.getRateLimitLite(tx, id, window)
+	el, err := d.getRateLimit(ctx, tx, id, window)
 	if err != nil {
 		return err
 	}
@@ -197,7 +218,13 @@ func (d *db) IncreaseThresholdTo(ctx context.Context, id string, window time.Dur
 		return err
 	}
 
-	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
+	key := d.keyBuilder.RequestLimits(id, window)
+
+	tx.Set(key, data)
+
+	if err = d.requestsCache.Set(ctx, key, el); err != nil {
+		d.log.WithError(err).Error("set cache error")
+	}
 
 	return tx.Commit()
 }
@@ -254,8 +281,17 @@ func (d *db) Create(ctx context.Context, id string, window time.Duration, thresh
 	return tx.Commit()
 }
 
-func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Duration) (*model.RequestLimitsV2, error) {
+func (d *db) getRateLimit(ctx context.Context, tx fdbclient.Transaction, id string, window time.Duration) (*model.RequestLimitsV2, error) {
 	key := d.keyBuilder.RequestLimits(id, window)
+
+	el, err := d.requestsCache.Get(ctx, key)
+	if err == nil {
+		return el, nil
+	}
+
+	if !errors.Is(err, store.NotFound{}) {
+		return nil, err
+	}
 
 	data, err := tx.Get(key)
 	if err != nil {
@@ -266,7 +302,7 @@ func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Durat
 		return nil, ErrRequestLimitsNotFound
 	}
 
-	el := new(model.RequestLimitsV2)
+	el = new(model.RequestLimitsV2)
 	if err = el.Unmarshal(data); err != nil {
 		d.log.WithField("key", key).WithField(dataKey, string(data)).Error(err)
 		return nil, err
@@ -293,25 +329,8 @@ func (d *db) getRateLimit(tx fdbclient.Transaction, id string, window time.Durat
 		el.Requests = append(el.Requests, *r)
 	}
 
-	return el, err
-}
-
-func (d *db) getRateLimitLite(tx fdbclient.Transaction, id string, window time.Duration) (*model.RequestLimitsV2, error) {
-	key := d.keyBuilder.RequestLimits(id, window)
-
-	data, err := tx.Get(key)
-	if err != nil {
-		return nil, err
-	}
-
-	if data == nil {
-		return nil, ErrRequestLimitsNotFound
-	}
-
-	el := new(model.RequestLimitsV2)
-	if err = el.Unmarshal(data); err != nil {
-		d.log.WithField("key", key).WithField(dataKey, string(data)).Error(err)
-		return nil, err
+	if err = d.requestsCache.Set(ctx, key, el); err != nil {
+		d.log.WithError(err).Error("set cache error")
 	}
 
 	return el, err
@@ -325,7 +344,7 @@ func (d *db) GetRequestLimitDebug(ctx context.Context, id string, window time.Du
 		return result, err
 	}
 
-	el, err := d.getRateLimit(tx, id, window)
+	el, err := d.getRateLimit(ctx, tx, id, window)
 	if err != nil {
 		return result, err
 	}

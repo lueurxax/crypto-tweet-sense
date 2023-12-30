@@ -4,7 +4,11 @@ import (
 	"context"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
+	"github.com/dgraph-io/ristretto"
+	"github.com/eko/gocache/lib/v4/cache"
+	ristrettoStore "github.com/eko/gocache/store/ristretto/v4"
 	"github.com/gotd/td/telegram"
+	"github.com/lueurxax/crypto-tweet-sense/internal/repo/model"
 	"github.com/sirupsen/logrus"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/repo/keys"
@@ -24,17 +28,28 @@ type DB interface {
 }
 
 type db struct {
-	keyBuilder keys.Builder
-	db         fdbclient.Database
+	keyBuilder    keys.Builder
+	db            fdbclient.Database
+	requestsCache *cache.Cache[*model.RequestLimitsV2]
 
 	log *logrus.Entry
 }
 
 func NewDB(fdb fdb.Database, log *logrus.Entry) DB {
+	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
+		NumCounters: 1000,
+		MaxCost:     100000000,
+		BufferItems: 64,
+	})
+	if err != nil {
+		panic(err)
+	}
+
 	return &db{
-		keyBuilder: keys.NewBuilder(),
-		db:         fdbclient.NewDatabase(fdb),
-		log:        log,
+		keyBuilder:    keys.NewBuilder(),
+		db:            fdbclient.NewDatabase(fdb),
+		requestsCache: cache.New[*model.RequestLimitsV2](ristrettoStore.NewRistretto(ristrettoCache)),
+		log:           log,
 	}
 }
 
