@@ -27,6 +27,8 @@ RUN go mod download -x
 ADD . .
 
 ARG VERSION
+RUN go build -v -ldflags="-w -s -X main.version=${VERSION}" -o /bin/limiters_reader cmd/limiters_reader/*.go
+RUN go build -v -ldflags="-w -s -X main.version=${VERSION}" -o /bin/add_twitter_account cmd/add_twitter_account/*.go
 RUN go build -v -ldflags="-w -s -X main.version=${VERSION}" -o /bin/crypto-tweet-sense cmd/twitter_scrapper/*.go
 
 CMD /bin/crypto-tweet-sense
