@@ -64,6 +64,7 @@ func (d *db) Migrate(ctx context.Context) error {
 	m := migrations.Migrations(v)
 	for _, el := range m {
 		d.log.WithField("version", el.Version()).Info("migrating to version")
+
 		tr, err := d.db.NewTransaction(ctx)
 		if err != nil {
 			return err
@@ -80,6 +81,7 @@ func (d *db) Migrate(ctx context.Context) error {
 		if err = tr.Commit(); err != nil {
 			return err
 		}
+
 		d.log.WithField("version", el.Version()).Info("migrated to version")
 	}
 
@@ -111,9 +113,12 @@ func (d *db) migratePrefix(ctx context.Context, prefix string, prefix2 keys.Pref
 		if err != nil {
 			return err
 		}
+
 		key := append(prefix2[:], kv.Key[len(prefix):]...)
+
 		tr.Set(key, kv.Value)
 		tr.Clear(kv.Key)
+
 		if err = tr.Commit(); err != nil {
 			return err
 		}
