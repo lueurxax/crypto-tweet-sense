@@ -136,6 +136,10 @@ func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.
 		tmpTweet := firstTweet
 
 		for i := range tweets {
+			if i == 0 {
+				w.logger.WithField("created", tweets[i].TimeParsed).Debug("tweet batch starting")
+			}
+
 			if tweets[i].TimeParsed.Before(tmpTweet) {
 				tmpTweet = tweets[i].TimeParsed
 			}
