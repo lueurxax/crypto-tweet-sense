@@ -18,9 +18,6 @@ type Builder interface {
 	RequestLimits(id string, window time.Duration) []byte
 	Requests(id string, window time.Duration, start time.Time) []byte
 	RequestsByRequestLimits(id string, window time.Duration) []byte
-	RequestLimitsUnzip(id string, window time.Duration) []byte
-	RequestsUnzip(id string, window time.Duration, start time.Time) []byte
-	RequestsByRequestLimitsUnzip(id string, window time.Duration) []byte
 	TweetUsernameRatingKey(username string) []byte
 	TweetRatings() []byte
 	SentTweet(link string) []byte
@@ -81,26 +78,6 @@ func (b builder) TweetRatings() []byte {
 
 func (b builder) TweetUsernameRatingKey(username string) []byte {
 	return append(tweetRatingPrefix[:], []byte(username)...)
-}
-
-func (b builder) RequestLimitsUnzip(id string, window time.Duration) []byte {
-	slice := append(requestLimitUnzipPrefix[:], []byte(id)...)
-	return binary.LittleEndian.AppendUint16(slice, uint16(window.Seconds()))
-}
-
-func (b builder) RequestsUnzip(id string, window time.Duration, start time.Time) []byte {
-	slice := requestsUnzipPrefix[:]
-	slice = append(slice, []byte(id)...)
-
-	return binary.LittleEndian.AppendUint64(
-		binary.LittleEndian.AppendUint16(slice, uint16(window.Seconds())),
-		uint64(start.Unix()),
-	)
-}
-
-func (b builder) RequestsByRequestLimitsUnzip(id string, window time.Duration) []byte {
-	slice := append(requestsUnzipPrefix[:], []byte(id)...)
-	return binary.LittleEndian.AppendUint16(slice, uint16(window.Seconds()))
 }
 
 func (b builder) RequestLimits(id string, window time.Duration) []byte {

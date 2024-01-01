@@ -13,10 +13,8 @@ var (
 	telegramSessionStoragePrefix Prefix = [2]byte{0x00, 0x06}
 	twitterAccountsPrefix        Prefix = [2]byte{0x00, 0x07}
 	twitterAccountsCookiePrefix  Prefix = [2]byte{0x00, 0x08}
-	requestLimitPrefix           Prefix = [2]byte{0x00, 0x10}
-	requestLimitUnzipPrefix      Prefix = [2]byte{0x00, 0x1a}
-	requestsUnzipPrefix          Prefix = [2]byte{0x00, 0x1b}
-	requestsPrefix               Prefix = [2]byte{0x00, 0x11}
+	requestLimitPrefix           Prefix = [2]byte{0x00, 0x1a}
+	requestsPrefix               Prefix = [2]byte{0x00, 0x1b}
 	tweetRatingIndexPrefix       Prefix = [2]byte{0x00, 0x12}
 	tweetCreationIndexPrefix     Prefix = [2]byte{0x00, 0x14}
 )

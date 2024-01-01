@@ -158,44 +158,10 @@ type RequestLimitsV2Debug struct {
 }
 
 func (r *RequestLimitsV2) Marshal() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := jsoniter.NewEncoder(buf).Encode(r); err != nil {
-		return nil, err
-	}
-
-	out := new(bytes.Buffer)
-	gzipWriter := gzip.NewWriter(out)
-
-	if _, err := io.Copy(gzipWriter, buf); err != nil {
-		return nil, err
-	}
-
-	if err := gzipWriter.Close(); err != nil {
-		return nil, err
-	}
-
-	return out.Bytes(), nil
-}
-
-func (r *RequestLimitsV2) Unmarshal(data []byte) error {
-	gzipReader, err := gzip.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return err
-	}
-
-	buf := new(bytes.Buffer)
-	if _, err = io.Copy(buf, gzipReader); err != nil { //nolint:gosec
-		return err
-	}
-
-	return jsoniter.NewDecoder(buf).Decode(r)
-}
-
-func (r *RequestLimitsV2) MarshalV2() ([]byte, error) {
 	return jsoniter.Marshal(r)
 }
 
-func (r *RequestLimitsV2) UnmarshalV2(data []byte) error {
+func (r *RequestLimitsV2) Unmarshal(data []byte) error {
 	return jsoniter.Unmarshal(data, r)
 }
 
@@ -272,43 +238,9 @@ type RequestsV2 struct {
 }
 
 func (r *RequestsV2) Marshal() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := jsoniter.NewEncoder(buf).Encode(r); err != nil {
-		return nil, err
-	}
-
-	out := new(bytes.Buffer)
-	gzipWriter := gzip.NewWriter(out)
-
-	if _, err := io.Copy(gzipWriter, buf); err != nil {
-		return nil, err
-	}
-
-	if err := gzipWriter.Close(); err != nil {
-		return nil, err
-	}
-
-	return out.Bytes(), nil
-}
-
-func (r *RequestsV2) Unmarshal(data []byte) error {
-	gzipReader, err := gzip.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return err
-	}
-
-	buf := new(bytes.Buffer)
-	if _, err = io.Copy(buf, gzipReader); err != nil { //nolint:gosec
-		return err
-	}
-
-	return jsoniter.NewDecoder(buf).Decode(r)
-}
-
-func (r *RequestsV2) MarshalV2() ([]byte, error) {
 	return jsoniter.Marshal(r)
 }
 
-func (r *RequestsV2) UnmarshalV2(data []byte) error {
+func (r *RequestsV2) Unmarshal(data []byte) error {
 	return jsoniter.Unmarshal(data, r)
 }

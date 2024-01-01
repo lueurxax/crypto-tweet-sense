@@ -131,17 +131,9 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 
 	key := d.keyBuilder.RequestLimits(id, window)
 
-	tx.Set(d.keyBuilder.RequestLimits(id, window), data)
-
-	data, err = el.MarshalV2()
-	if err != nil {
-		return err
-	}
-
-	tx.Set(d.keyBuilder.RequestLimitsUnzip(id, window), data)
+	tx.Set(key, data)
 
 	for v := range deleteMap {
-		tx.Clear(d.keyBuilder.RequestsUnzip(id, window, v))
 		tx.Clear(d.keyBuilder.Requests(id, window, v))
 	}
 
@@ -152,13 +144,6 @@ func (d *db) CleanCounters(ctx context.Context, id string, window time.Duration)
 		}
 
 		tx.Set(d.keyBuilder.Requests(id, window, v.Start), data)
-
-		data, err = v.MarshalV2()
-		if err != nil {
-			return err
-		}
-
-		tx.Set(d.keyBuilder.RequestsUnzip(id, window, v.Start), data)
 	}
 
 	el.Requests = requests
@@ -394,5 +379,4 @@ func (d *db) GetRequestLimitDebug(ctx context.Context, id string, window time.Du
 	}
 
 	return result, nil
-
 }
