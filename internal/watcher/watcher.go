@@ -98,7 +98,7 @@ func (w *watcher) searchAll(liveCtx context.Context, query string) {
 }
 
 func (w *watcher) search(ctx context.Context, query string) {
-	w.searchWithQuery(ctx, query, time.Now().UTC().Add(-w.config.SearchInterval-minAgeOfTweet))
+	w.searchWithQuery(ctx, query, time.Now().UTC().Add(-w.config.SearchInterval))
 	w.logger.WithField(queryKey, query).Debug("watcher checked news")
 }
 
