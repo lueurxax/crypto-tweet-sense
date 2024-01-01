@@ -19,7 +19,6 @@ const (
 	oldestInterval     = time.Second * 30
 	oldFastHotInterval = time.Minute
 	oldestHotInterval  = time.Minute * 5
-	minAgeOfTweet      = time.Minute * 10
 )
 
 type Watcher interface {
@@ -99,7 +98,7 @@ func (w *watcher) searchAll(liveCtx context.Context, query string) {
 }
 
 func (w *watcher) search(ctx context.Context, query string) {
-	w.searchWithQuery(ctx, query, time.Now().Add(-w.config.SearchInterval-minAgeOfTweet))
+	w.searchWithQuery(ctx, query, time.Now().UTC().Add(-w.config.SearchInterval-minAgeOfTweet))
 	w.logger.WithField(queryKey, query).Debug("watcher checked news")
 }
 
@@ -109,13 +108,11 @@ func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.
 	cursor := ""
 	firstTweet := time.Now().UTC()
 
-	end := start.Add(w.config.SearchInterval)
-
 	for start.Before(firstTweet) {
 		tweets, nextCursor, err := w.finder.FindNext(
 			ctx,
 			&start,
-			&end,
+			nil,
 			query,
 			cursor,
 		)
@@ -136,10 +133,6 @@ func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.
 		tmpTweet := firstTweet
 
 		for i := range tweets {
-			if i == 0 {
-				w.logger.WithField("created", tweets[i].TimeParsed).Debug("tweet batch starting")
-			}
-
 			if tweets[i].TimeParsed.Before(tmpTweet) {
 				tmpTweet = tweets[i].TimeParsed
 			}

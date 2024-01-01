@@ -62,7 +62,7 @@ func (p *pool) IsHot() bool {
 		}
 	}
 
-	return hotCounter > len(p.finderTemp)/2
+	return hotCounter > len(p.finderTemp)*9/10
 }
 
 func (p *pool) CurrentTemp(context.Context) float64 {
