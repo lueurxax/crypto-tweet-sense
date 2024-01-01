@@ -191,6 +191,14 @@ func (r *RequestLimitsV2) Unmarshal(data []byte) error {
 	return jsoniter.NewDecoder(buf).Decode(r)
 }
 
+func (r *RequestLimitsV2) MarshalV2() ([]byte, error) {
+	return jsoniter.Marshal(r)
+}
+
+func (r *RequestLimitsV2) UnmarshalV2(data []byte) error {
+	return jsoniter.Unmarshal(data, r)
+}
+
 func (r *RequestLimitsV2) CleanCounters() []RequestsV2 {
 	window := time.Duration(r.WindowSeconds) * time.Second
 	requestData := make([]RequestsV2, 0, len(r.Requests))
@@ -295,4 +303,12 @@ func (r *RequestsV2) Unmarshal(data []byte) error {
 	}
 
 	return jsoniter.NewDecoder(buf).Decode(r)
+}
+
+func (r *RequestsV2) MarshalV2() ([]byte, error) {
+	return jsoniter.Marshal(r)
+}
+
+func (r *RequestsV2) UnmarshalV2(data []byte) error {
+	return jsoniter.Unmarshal(data, r)
 }
