@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	limit    = 10000
+	limit    = 50
 	format   = "2006-01-02"
 	notFound = "not found"
 )

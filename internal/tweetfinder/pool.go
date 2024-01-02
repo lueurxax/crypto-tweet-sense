@@ -17,6 +17,8 @@ const (
 	startDelay  = 15
 	finderLogin = "finder_login"
 	pkgKey      = "pkg"
+
+	defaultUserAgent = "TwitterAndroid/99"
 )
 
 type accountManager interface {
@@ -212,6 +214,7 @@ func (p *pool) init(ctx context.Context) error {
 
 	for i, account := range accounts {
 		scraper := twitterscraper.New().WithDelay(startDelay).SetSearchMode(twitterscraper.SearchLatest)
+		scraper.SetUserAgent(defaultUserAgent)
 
 		if len(proxies) > len(p.finders)+i {
 			if err = scraper.SetProxy(proxies[len(p.finders)+i]); err != nil {

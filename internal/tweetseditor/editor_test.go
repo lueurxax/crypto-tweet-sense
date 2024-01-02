@@ -139,6 +139,26 @@ type testRepo struct {
 	data []common.Tweet
 }
 
+func (t *testRepo) GetTweetForShortEdit(ctx context.Context) ([]common.Tweet, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *testRepo) DeleteShortEditedTweets(ctx context.Context, ids []string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *testRepo) GetTweetForLongEdit(ctx context.Context, count int) ([]common.Tweet, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *testRepo) DeleteLongEditedTweets(ctx context.Context, ids []string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (t *testRepo) GetTweetForEdit(context.Context) ([]common.Tweet, error) {
 	return t.data, nil
 }
@@ -176,12 +196,12 @@ func TestNewEditor(t *testing.T) {
 }
 
 func TestLongStory(t *testing.T) {
+	logrusLogger := logrus.New()
+	logrusLogger.SetLevel(logrus.TraceLevel)
+	logger := log.NewLogger(logrusLogger)
 	t.Run("some tweets request", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		client := openai.NewClient(os.Getenv("CHAT_GPT_TOKEN"))
-		logrusLogger := logrus.New()
-		logrusLogger.SetLevel(logrus.TraceLevel)
-		logger := log.NewLogger(logrusLogger)
 		r := &testRepo{data: testTweets}
 		ed := NewEditor(client, r, time.Second, time.Hour*24, logger)
 		ctx = ed.Edit(ctx)
