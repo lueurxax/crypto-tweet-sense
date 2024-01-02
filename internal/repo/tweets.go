@@ -3,11 +3,11 @@ package fdb
 import (
 	"context"
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/lueurxax/crypto-tweet-sense/internal/repo/checkcleanpool"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/pkg/fdbclient"
@@ -526,7 +526,8 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 		d.log.WithError(err).Error("error while committing transaction")
 	}
 
-	wg := new(sync.WaitGroup)
+	pool := checkcleanpool.NewPool(d)
+	pool.Start()
 
 	for _, kv := range kvs {
 		tweet := new(common.TweetSnapshotIndex)
@@ -540,12 +541,8 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 			return err
 		}
 
-		wg.Add(1)
-
-		go d.checkTweetOrClear(ctx, kv.Key, tweet.ID, wg)
+		pool.CheckTweetOrClear(ctx, kv.Key, tweet.ID)
 	}
-
-	wg.Wait()
 
 	d.log.WithField("processed", len(kvs)).Info("CleanWrongIndexes by rating")
 
@@ -564,21 +561,17 @@ func (d *db) CleanWrongIndexes(ctx context.Context) error {
 	}
 
 	for _, kv := range kvs {
-		wg.Add(1)
-
-		go d.checkTweetOrClear(ctx, kv.Key, string(kv.Value), wg)
+		pool.CheckTweetOrClear(ctx, kv.Key, string(kv.Value))
 	}
 
-	wg.Wait()
+	pool.Stop()
 
 	d.log.WithField("processed", len(kvs)).Info("CleanWrongIndexes by creation")
 
 	return nil
 }
 
-func (d *db) checkTweetOrClear(ctx context.Context, key fdb.Key, id string, wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func (d *db) CheckTweetOrClear(ctx context.Context, key fdb.Key, id string) {
 	tr, err := d.db.NewTransaction(ctx)
 	if err != nil {
 		d.log.WithError(err).Error("error while creating transaction")
