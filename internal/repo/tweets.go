@@ -230,10 +230,11 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 	res, err := d.getTweet(ctx, result.ID)
 	if err != nil {
 		if errors.Is(err, ErrTweetsNotFound) {
-			if err = d.db.Clear(ctx, result.Key); err != nil {
-				return nil, 0, err
+			if clearErr := d.db.Clear(ctx, result.Key); err != nil {
+				return nil, 0, clearErr
 			}
 		}
+
 		return nil, 0, err
 	}
 
