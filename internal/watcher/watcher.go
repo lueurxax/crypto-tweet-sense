@@ -35,7 +35,7 @@ type repo interface {
 	Save(ctx context.Context, tweets []common.TweetSnapshot) error
 	DeleteTweet(ctx context.Context, id string) error
 	GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot, error)
-	GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, error)
+	GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, int, error)
 	GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error)
 	GetTweetsOlderThen(ctx context.Context, after time.Time) ([]string, error)
 	CheckIfSentTweetExist(ctx context.Context, link string) (bool, error)
@@ -222,14 +222,16 @@ func (w *watcher) updateOldestFast() {
 	for range tick.C {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 
-		id, err := w.updateOldestFastTweet(ctx)
+		id, count, err := w.updateOldestFastTweet(ctx)
 		if err != nil {
 			w.logger.WithError(err).Error("update oldest fast tweet")
 		}
 
 		cancel()
 
-		if w.finder.IsHot() {
+		if count > 50 {
+			tick.Reset(time.Millisecond)
+		} else if w.finder.IsHot() {
 			tick.Reset(oldFastHotInterval)
 		} else {
 			tick.Reset(w.doubleDelayer.Duration(id))
@@ -237,15 +239,15 @@ func (w *watcher) updateOldestFast() {
 	}
 }
 
-func (w *watcher) updateOldestFastTweet(ctx context.Context) (string, error) {
-	tweet, err := w.repo.GetOldestTopReachableTweet(ctx, w.ratingChecker.CurrentTop())
+func (w *watcher) updateOldestFastTweet(ctx context.Context) (string, int, error) {
+	tweet, count, err := w.repo.GetOldestTopReachableTweet(ctx, w.ratingChecker.CurrentTop())
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	w.logger.WithField(tweetKey, tweet).Debug("oldest fast tweet")
 
-	return tweet.ID, w.updateTweet(ctx, tweet.ID)
+	return tweet.ID, count, w.updateTweet(ctx, tweet.ID)
 }
 
 func (w *watcher) updateTweet(ctx context.Context, id string) error {

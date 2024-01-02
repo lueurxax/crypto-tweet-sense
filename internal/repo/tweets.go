@@ -23,7 +23,7 @@ type tweetRepo interface {
 	Save(ctx context.Context, tweets []common.TweetSnapshot) error
 	DeleteTweet(ctx context.Context, id string) error
 	GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot, error)
-	GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, error)
+	GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, int, error)
 	GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error)
 	GetTweetsOlderThen(ctx context.Context, after time.Time) ([]string, error)
 	SaveSentTweet(ctx context.Context, link string) error
@@ -172,10 +172,10 @@ func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot,
 	return d.getTweet(ctx, index.ID)
 }
 
-func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, error) {
+func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, int, error) {
 	ch, err := d.GetTweetPositiveIndexes(ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	var result *common.TweetSnapshotIndex
@@ -216,13 +216,22 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 
 	if result == nil {
 		if fallbackResult != nil {
-			return d.getTweet(ctx, *fallbackResult)
+			result, err := d.getTweet(ctx, *fallbackResult)
+			if err != nil {
+				return nil, 0, err
+			}
+			return result, 0, nil
 		}
 
-		return nil, ErrTweetsNotFound
+		return nil, 0, ErrTweetsNotFound
 	}
 
-	return d.getTweet(ctx, result.ID)
+	res, err := d.getTweet(ctx, result.ID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return res, pretopcounter, nil
 }
 
 func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error) {
