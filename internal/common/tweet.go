@@ -3,6 +3,8 @@ package common
 import (
 	"fmt"
 	"time"
+
+	"github.com/apple/foundationdb/bindings/go/src/fdb"
 )
 
 type Tweet struct {
@@ -43,6 +45,7 @@ type TweetSnapshot struct {
 
 type TweetSnapshotIndex struct {
 	ID              string
+	Key             fdb.Key `json:"-"`
 	RatingGrowSpeed float64
 	CreatedAt       time.Time
 	CheckedAt       time.Time

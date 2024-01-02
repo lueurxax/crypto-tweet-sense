@@ -220,6 +220,7 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 			if err != nil {
 				return nil, 0, err
 			}
+
 			return result, 0, nil
 		}
 
@@ -228,6 +229,11 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 
 	res, err := d.getTweet(ctx, result.ID)
 	if err != nil {
+		if errors.Is(err, ErrTweetsNotFound) {
+			if err = d.db.Clear(ctx, result.Key); err != nil {
+				return nil, 0, err
+			}
+		}
 		return nil, 0, err
 	}
 
@@ -451,6 +457,9 @@ func (d *db) getTweetIndexesByRange(tr fdbclient.Transaction, keyRange fdb.KeyRa
 
 			return
 		}
+
+		tweet.Key = kv.Key
+
 		counter++
 
 		ch <- tweet
