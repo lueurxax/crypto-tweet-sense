@@ -112,7 +112,7 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 			d.log.WithError(err).Error("error while committing transaction")
 		}
 
-		if oldTweet != nil {
+		if oldTweet == nil {
 			atomic.AddInt32(d.tweetsCounter, 1)
 		}
 	}

@@ -36,6 +36,7 @@ func (m *metrics) Start(ctx context.Context) {
 
 				continue
 			}
+
 			m.currentProcessingTweets.WithLabelValues().Observe(float64(count))
 		}
 	}
