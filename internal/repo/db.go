@@ -32,6 +32,8 @@ type db struct {
 	db            fdbclient.Database
 	requestsCache *cache.Cache[*model.RequestLimitsV2]
 
+	tweetsCounter *int32
+
 	log *logrus.Entry
 }
 

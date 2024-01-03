@@ -14,6 +14,7 @@ import (
 	foundeationDB "github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/buaazp/fasthttprouter"
 	"github.com/kelseyhightower/envconfig"
+	watcherMetrics "github.com/lueurxax/crypto-tweet-sense/internal/watcher/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -127,7 +128,14 @@ func main() {
 		Help:      "Requests delay in seconds",
 	}, []string{"login"})
 
-	prometheus.MustRegister(one, next, delay)
+	tweetCounter := prometheus.NewSummaryVec(prometheus.SummaryOpts{
+		Namespace: namespace,
+		Subsystem: subsystem,
+		Name:      "tweets_count",
+		Help:      "Tweets count",
+	}, []string{})
+
+	prometheus.MustRegister(one, next, delay, tweetCounter)
 
 	finder := tweetFinder.NewPool(one, next, delay, xConfig, accountManager, st, logger.WithField(pkgKey, "tweet_finder_pool"))
 	if err = finder.Init(ctx); err != nil {
@@ -135,6 +143,8 @@ func main() {
 	}
 
 	finderWithMetrics := tweetFinder.NewMetricMiddleware(one, next, "pool", finder)
+
+	go watcherMetrics.NewMetrics(tweetCounter, st, logger.WithField(pkgKey, "watcher_metrics")).Start(ctx)
 
 	watch := watcher.NewWatcher(
 		watcher.GetConfig(),

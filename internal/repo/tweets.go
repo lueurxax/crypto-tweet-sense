@@ -3,6 +3,7 @@ package fdb
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/apple/foundationdb/bindings/go/src/fdb"
@@ -29,6 +30,7 @@ type tweetRepo interface {
 	SaveSentTweet(ctx context.Context, link string) error
 	CheckIfSentTweetExist(ctx context.Context, link string) (bool, error)
 	CleanWrongIndexes(ctx context.Context) error
+	Count(ctx context.Context) (uint32, error)
 }
 
 func (d *db) SaveSentTweet(ctx context.Context, link string) error {
@@ -109,6 +111,10 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 		if err = tr.Commit(); err != nil {
 			d.log.WithError(err).Error("error while committing transaction")
 		}
+
+		if oldTweet != nil {
+			atomic.AddInt32(d.tweetsCounter, 1)
+		}
 	}
 
 	return nil
@@ -129,7 +135,13 @@ func (d *db) DeleteTweet(ctx context.Context, id string) error {
 	tr.Clear(d.keyBuilder.TweetRatingIndex(data.RatingGrowSpeed, data.ID))
 	tr.Clear(d.keyBuilder.TweetCreationIndex(data.TimeParsed, data.ID))
 
-	return tr.Commit()
+	if err = tr.Commit(); err != nil {
+		return err
+	}
+
+	atomic.AddInt32(d.tweetsCounter, -1)
+
+	return nil
 }
 
 func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot, error) {
@@ -287,20 +299,6 @@ func (d *db) GetTweetsOlderThen(ctx context.Context, after time.Time) ([]string,
 	d.log.WithField("processed", counter).Debug("getTweetsUntil")
 
 	return result, nil
-}
-
-func (d *db) GetTweets(ctx context.Context) (<-chan *common.TweetSnapshot, error) {
-	tr, err := d.db.NewTransaction(ctx)
-	if err != nil {
-		d.log.WithError(err).Error(errCreatingTransaction)
-		return nil, err
-	}
-
-	ch := make(chan *common.TweetSnapshot, bufferSize)
-
-	go d.getTweets(tr, ch)
-
-	return ch, nil
 }
 
 func (d *db) GetTweetIndexes(ctx context.Context) (<-chan *common.TweetSnapshotIndex, error) {
@@ -500,6 +498,13 @@ func (d *db) getTweetsUntilTx(tr fdbclient.Transaction, createdAt time.Time, ch 
 }
 
 func (d *db) CleanWrongIndexes(ctx context.Context) error {
+	currentTweetsCount, err := d.Count(ctx)
+	if err != nil {
+		return err
+	}
+
+	d.log.WithField("count", currentTweetsCount).Info("currentTweetsCount")
+
 	d.log.Info("CleanWrongIndexes")
 
 	pr, err := fdb.PrefixRange(d.keyBuilder.TweetRatingIndexes())
@@ -591,4 +596,41 @@ func (d *db) CheckTweetOrClear(ctx context.Context, key fdb.Key, id string) {
 	if err = tr.Commit(); err != nil {
 		d.log.WithError(err).Error("error while committing transaction")
 	}
+}
+
+func (d *db) Count(ctx context.Context) (uint32, error) {
+	if d.tweetsCounter != nil {
+		count := atomic.LoadInt32(d.tweetsCounter)
+		if count > 0 {
+			return uint32(count), nil
+		}
+	} else {
+		d.tweetsCounter = new(int32)
+	}
+
+	tr, err := d.db.NewTransaction(ctx)
+	if err != nil {
+		d.log.WithError(err).Error("error while creating transaction")
+
+		return 0, nil
+	}
+
+	pr, err := fdb.PrefixRange(d.keyBuilder.Tweets())
+	if err != nil {
+		d.log.WithError(err).Error("error while creating prefix range")
+		return 0, nil
+	}
+
+	opts := new(fdbclient.RangeOptions)
+
+	opts.SetMode(fdb.StreamingModeWantAll)
+
+	kvs, err := tr.GetRange(pr, opts)
+	if err != nil {
+		return 0, err
+	}
+
+	atomic.StoreInt32(d.tweetsCounter, int32(len(kvs)))
+
+	return uint32(len(kvs)), nil
 }
