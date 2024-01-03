@@ -8,6 +8,7 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
 	"github.com/lueurxax/crypto-tweet-sense/internal/tweetfinder"
+	"github.com/lueurxax/crypto-tweet-sense/internal/watcher/singlell"
 )
 
 const (
@@ -23,6 +24,11 @@ const (
 
 type Watcher interface {
 	Watch(ctx context.Context)
+}
+
+type singleLL[T any] interface {
+	Push(n T)
+	Pop() (T, bool)
 }
 
 type finder interface {
@@ -52,6 +58,12 @@ type doubleDelayer interface {
 	Duration(id string) time.Duration
 }
 
+type searchRequest struct {
+	query  string
+	start  time.Time
+	cursor string
+}
+
 type watcher struct {
 	queries map[string]time.Time
 
@@ -59,6 +71,7 @@ type watcher struct {
 	repo
 	ratingChecker
 	doubleDelayer
+	singleLL singleLL[searchRequest]
 
 	logger log.Logger
 	config *Config
@@ -70,52 +83,28 @@ func (w *watcher) Watch(ctx context.Context) {
 	}
 
 	for query := range w.queries {
-		go w.searchAll(ctx, query)
+		go w.initSearchCursor(ctx, query)
 	}
 
 	go w.updateTop()
 	go w.updateOldestFast()
 	go w.updateOldest()
 	go w.cleanTooOld()
+	go w.searchAll(ctx)
 }
 
-func (w *watcher) searchAll(liveCtx context.Context, query string) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
-
-	w.search(ctx, query)
-
-	cancel()
-
-	tick := time.NewTicker(w.config.SearchInterval)
-	for range tick.C {
-		select {
-		case <-liveCtx.Done():
-			return
-		default:
-			go w.search(context.Background(), query)
-		}
+func (w *watcher) search(ctx context.Context) {
+	obj, ok := w.singleLL.Pop()
+	if ok {
+		return
 	}
-}
+	w.logger.WithField(queryKey, obj.query).WithField("start", obj.start).Debug("searching")
 
-func (w *watcher) search(ctx context.Context, query string) {
-	w.searchWithQuery(ctx, query, time.Now().UTC().Add(-w.config.SearchInterval))
-	w.logger.WithField(queryKey, query).Debug("watcher checked news")
-}
-
-func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.Time) {
-	w.logger.WithField(queryKey, query).WithField("start", start).Debug("searching")
-
-	cursor := ""
+	cursor := obj.cursor
 	firstTweet := time.Now().UTC()
 
-	for start.Before(firstTweet) {
-		tweets, nextCursor, err := w.finder.FindNext(
-			ctx,
-			&start,
-			nil,
-			query,
-			cursor,
-		)
+	for obj.start.Before(firstTweet) {
+		tweets, nextCursor, err := w.finder.FindNext(ctx, nil, nil, obj.query, cursor)
 		if err != nil {
 			if errors.Is(err, tweetfinder.ErrNoTops) {
 				return
@@ -148,6 +137,8 @@ func (w *watcher) searchWithQuery(ctx context.Context, query string, start time.
 		firstTweet = tmpTweet
 		cursor = nextCursor
 	}
+
+	w.logger.WithField("start", obj.start).WithField(queryKey, obj.query).Debug("watcher checked news")
 }
 
 func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot) float64 {
@@ -229,13 +220,17 @@ func (w *watcher) updateOldestFast() {
 
 		cancel()
 
-		if count > 50 {
-			tick.Reset(time.Millisecond)
-		} else if w.finder.IsHot() {
-			tick.Reset(oldFastHotInterval)
-		} else {
-			tick.Reset(w.doubleDelayer.Duration(id))
+		var resetInterval time.Duration
+		switch {
+		case count > 50:
+			resetInterval = time.Millisecond
+		case w.finder.IsHot():
+			resetInterval = oldFastHotInterval
+		default:
+			resetInterval = w.doubleDelayer.Duration(id)
 		}
+
+		tick.Reset(resetInterval)
 	}
 }
 
@@ -331,6 +326,44 @@ func (w *watcher) cleanTooOldTweets(ctx context.Context) error {
 	return nil
 }
 
+func (w *watcher) initSearchCursor(ctx context.Context, query string) {
+	for range time.Tick(w.config.SearchInterval) {
+		start := time.Now().UTC().Add(-w.config.SearchInterval)
+		tweets, nextCursor, err := w.finder.FindNext(
+			ctx,
+			nil,
+			nil,
+			query,
+			"",
+		)
+		if err != nil {
+			w.logger.WithError(err).Error("find tweets")
+			return
+		}
+		w.singleLL.Push(searchRequest{
+			query:  query,
+			start:  start,
+			cursor: nextCursor,
+		})
+
+		for i := range tweets {
+			tweets[i].RatingGrowSpeed = w.processTweet(ctx, &tweets[i])
+		}
+
+		if err = w.repo.Save(ctx, tweets); err != nil {
+			w.logger.WithError(err).Error("save tweets")
+			continue
+		}
+	}
+}
+
+func (w *watcher) searchAll(ctx context.Context) {
+	<-time.After(w.config.SearchInterval * 10)
+	for range time.Tick(w.config.SearchInterval) {
+		w.search(ctx)
+	}
+}
+
 func NewWatcher(config *Config, finder finder, repo repo, checker ratingChecker, doubleDelayer doubleDelayer, logger log.Logger) Watcher {
 	start := time.Now().Add(config.SearchInterval)
 
@@ -340,6 +373,7 @@ func NewWatcher(config *Config, finder finder, repo repo, checker ratingChecker,
 	}
 
 	return &watcher{
+		singleLL:      singlell.New[searchRequest](),
 		config:        config,
 		doubleDelayer: doubleDelayer,
 		queries:       queries,
