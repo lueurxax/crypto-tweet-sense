@@ -376,7 +376,7 @@ func (w *watcher) searchAll(ctx context.Context) {
 		}
 
 		if time.Now().Add(-oldEnough).After(nextObj.start) {
-			w.search(ctx, nextObj)
+			go w.search(ctx, nextObj)
 			nextObj, ok = w.singleLL.Pop()
 		}
 	}
