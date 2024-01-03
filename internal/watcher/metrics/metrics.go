@@ -24,7 +24,7 @@ type metrics struct {
 }
 
 func (m *metrics) Start(ctx context.Context) {
-	ticker := time.NewTimer(time.Second * 10)
+	ticker := time.NewTicker(time.Second * 10)
 	for range ticker.C {
 		select {
 		case <-ctx.Done():
@@ -36,6 +36,8 @@ func (m *metrics) Start(ctx context.Context) {
 
 				continue
 			}
+
+			m.log.WithField("count", count).Trace("current processing tweets")
 
 			m.currentProcessingTweets.WithLabelValues().Observe(float64(count))
 		}
