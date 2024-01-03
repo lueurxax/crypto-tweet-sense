@@ -23,9 +23,7 @@ const (
 type tweetRepo interface {
 	Save(ctx context.Context, tweets []common.TweetSnapshot) error
 	DeleteTweet(ctx context.Context, id string) error
-	GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot, error)
 	GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, int, error)
-	GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error)
 	GetTweetsOlderThen(ctx context.Context, after time.Time) ([]string, error)
 	SaveSentTweet(ctx context.Context, link string) error
 	CheckIfSentTweetExist(ctx context.Context, link string) (bool, error)
@@ -144,44 +142,6 @@ func (d *db) DeleteTweet(ctx context.Context, id string) error {
 	return nil
 }
 
-func (d *db) GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot, error) {
-	tr, err := d.db.NewTransaction(ctx)
-	if err != nil {
-		d.log.WithError(err).Error(errCreatingTransaction)
-		return nil, err
-	}
-
-	opts := new(fdbclient.RangeOptions)
-
-	opts.SetMode(fdb.StreamingModeSmall)
-	opts.SetReverse()
-
-	iter := tr.GetIterator(d.keyBuilder.TweetRatingPositiveIndexes(), opts)
-
-	if !iter.Advance() {
-		return nil, ErrTweetsNotFound
-	}
-
-	kv, err := iter.Get()
-	if err != nil {
-		d.log.WithError(err).Error(errIterating)
-		return nil, err
-	}
-
-	index := new(common.TweetSnapshotIndex)
-	if err = jsoniter.Unmarshal(kv.Value, index); err != nil {
-		d.log.
-			WithField("key", kv.Key).
-			WithField("json", string(kv.Value)).
-			WithError(err).
-			Error("error while unmarshalling tweet index")
-
-		return nil, err
-	}
-
-	return d.getTweet(ctx, index.ID)
-}
-
 func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, int, error) {
 	ch, err := d.GetTweetPositiveIndexes(ctx)
 	if err != nil {
@@ -240,7 +200,7 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 	res, err := d.getTweet(ctx, result.ID)
 	if err != nil {
 		if errors.Is(err, ErrTweetsNotFound) {
-			if clearErr := d.db.Clear(ctx, result.Key); err != nil {
+			if clearErr := d.db.Clear(ctx, result.Key); clearErr != nil {
 				return nil, 0, clearErr
 			}
 		}
@@ -249,31 +209,6 @@ func (d *db) GetOldestTopReachableTweet(ctx context.Context, top float64) (*comm
 	}
 
 	return res, pretopcounter, nil
-}
-
-func (d *db) GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error) {
-	ch, err := d.GetTweetIndexes(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var result *common.TweetSnapshotIndex
-	for tweet := range ch {
-		if result == nil {
-			result = tweet
-			continue
-		}
-
-		if result.CheckedAt.After(tweet.CheckedAt) {
-			result = tweet
-		}
-	}
-
-	if result == nil {
-		return nil, ErrTweetsNotFound
-	}
-
-	return d.getTweet(ctx, result.ID)
 }
 
 func (d *db) GetTweetsOlderThen(ctx context.Context, after time.Time) ([]string, error) {
@@ -299,20 +234,6 @@ func (d *db) GetTweetsOlderThen(ctx context.Context, after time.Time) ([]string,
 	d.log.WithField("processed", counter).Debug("getTweetsUntil")
 
 	return result, nil
-}
-
-func (d *db) GetTweetIndexes(ctx context.Context) (<-chan *common.TweetSnapshotIndex, error) {
-	tr, err := d.db.NewTransaction(ctx)
-	if err != nil {
-		d.log.WithError(err).Error(errCreatingTransaction)
-		return nil, err
-	}
-
-	ch := make(chan *common.TweetSnapshotIndex, bufferSize)
-
-	go d.getTweetIndexes(tr, ch)
-
-	return ch, nil
 }
 
 func (d *db) GetTweetPositiveIndexes(ctx context.Context) (<-chan *common.TweetSnapshotIndex, error) {
@@ -364,66 +285,8 @@ func (d *db) getTweetTx(tr fdbclient.Transaction, id string) (*common.TweetSnaps
 	return tweet, nil
 }
 
-func (d *db) getTweets(tr fdbclient.Transaction, ch chan *common.TweetSnapshot) {
-	defer close(ch)
-
-	pr, err := fdb.PrefixRange(d.keyBuilder.Tweets())
-	if err != nil {
-		d.log.WithError(err).Error("error while creating prefix range")
-		return
-	}
-
-	opts := new(fdbclient.RangeOptions)
-
-	opts.SetMode(fdb.StreamingModeWantAll)
-
-	iter := tr.GetIterator(pr, opts)
-
-	counter := 0
-
-	for iter.Advance() {
-		kv, err := iter.Get()
-		if err != nil {
-			d.log.WithField("processed", counter).WithError(err).Error(errIterating)
-			return
-		}
-
-		tweet := new(common.TweetSnapshot)
-		if err = jsoniter.Unmarshal(kv.Value, tweet); err != nil {
-			d.log.
-				WithField("key", kv.Key).
-				WithField("json", string(kv.Value)).
-				WithError(err).
-				Error("error while unmarshaling tweet")
-
-			return
-		}
-		counter++
-
-		ch <- tweet
-	}
-
-	if err = tr.Commit(); err != nil {
-		d.log.WithError(err).Error("error while committing transaction")
-
-		return
-	}
-}
-
 func (d *db) getTweetPositiveIndexes(tr fdbclient.Transaction, ch chan *common.TweetSnapshotIndex) {
 	d.getTweetIndexesByRange(tr, d.keyBuilder.TweetRatingPositiveIndexes(), ch)
-}
-
-func (d *db) getTweetIndexes(tr fdbclient.Transaction, ch chan *common.TweetSnapshotIndex) {
-	pr, err := fdb.PrefixRange(d.keyBuilder.TweetRatingIndexes())
-	if err != nil {
-		close(ch)
-		d.log.WithError(err).Error("error while creating prefix range")
-
-		return
-	}
-
-	d.getTweetIndexesByRange(tr, pr, ch)
 }
 
 func (d *db) getTweetIndexesByRange(tr fdbclient.Transaction, keyRange fdb.KeyRange, ch chan *common.TweetSnapshotIndex) {

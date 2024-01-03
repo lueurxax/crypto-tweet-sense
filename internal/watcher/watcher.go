@@ -17,9 +17,7 @@ const (
 	queryKey = "query"
 
 	oldFastInterval    = time.Second * 5
-	oldestInterval     = time.Second * 30
 	oldFastHotInterval = time.Minute
-	oldestHotInterval  = time.Minute * 5
 )
 
 type Watcher interface {
@@ -40,9 +38,7 @@ type finder interface {
 type repo interface {
 	Save(ctx context.Context, tweets []common.TweetSnapshot) error
 	DeleteTweet(ctx context.Context, id string) error
-	GetFastestGrowingTweet(ctx context.Context) (*common.TweetSnapshot, error)
 	GetOldestTopReachableTweet(ctx context.Context, top float64) (*common.TweetSnapshot, int, error)
-	GetOldestSyncedTweet(ctx context.Context) (*common.TweetSnapshot, error)
 	GetTweetsOlderThen(ctx context.Context, after time.Time) ([]string, error)
 	CheckIfSentTweetExist(ctx context.Context, link string) (bool, error)
 	SaveSentTweet(ctx context.Context, link string) error
@@ -86,9 +82,7 @@ func (w *watcher) Watch(ctx context.Context) {
 		go w.initSearchCursor(ctx, query)
 	}
 
-	go w.updateTop()
 	go w.updateOldestFast()
-	go w.updateOldest()
 	go w.cleanTooOld()
 	go w.searchAll(ctx)
 }
@@ -173,37 +167,6 @@ func (w *watcher) processTweet(ctx context.Context, tweet *common.TweetSnapshot)
 	return ratingSpeed
 }
 
-func (w *watcher) updateTop() {
-	tick := time.NewTicker(time.Minute)
-	for range tick.C {
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-
-		if err := w.updateTopTweet(ctx); err != nil {
-			w.logger.WithError(err).Error("update top tweet")
-		}
-
-		cancel()
-
-		if w.finder.IsHot() {
-			tick.Reset(time.Minute * 10)
-		} else {
-			tick.Reset(time.Minute)
-		}
-	}
-}
-
-func (w *watcher) updateTopTweet(ctx context.Context) error {
-	tweet, err := w.repo.GetFastestGrowingTweet(ctx)
-	if err != nil {
-		w.logger.WithError(err).Error("get fastest growing tweet")
-		return err
-	}
-
-	w.logger.WithField(tweetKey, tweet).Debug("top tweet")
-
-	return w.updateTweet(ctx, tweet.ID)
-}
-
 func (w *watcher) updateOldestFast() {
 	tick := time.NewTicker(oldFastInterval)
 	for range tick.C {
@@ -260,37 +223,6 @@ func (w *watcher) updateTweet(ctx context.Context, id string) error {
 	}
 
 	return w.repo.DeleteTweet(ctx, tweet.ID)
-}
-
-func (w *watcher) updateOldest() {
-	tick := time.NewTicker(oldestInterval)
-	for range tick.C {
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-
-		if err := w.updateOldestTweet(ctx); err != nil {
-			w.logger.WithError(err).Error("update oldest tweet")
-		}
-
-		cancel()
-
-		if w.finder.IsHot() {
-			tick.Reset(oldestHotInterval)
-		} else {
-			tick.Reset(oldestInterval)
-		}
-	}
-}
-
-func (w *watcher) updateOldestTweet(ctx context.Context) error {
-	tweet, err := w.repo.GetOldestSyncedTweet(ctx)
-	if err != nil {
-		w.logger.WithError(err).Error("get oldest synced tweet")
-		return err
-	}
-
-	w.logger.WithField(tweetKey, tweet).Debug("oldest tweet")
-
-	return w.updateTweet(ctx, tweet.ID)
 }
 
 func (w *watcher) cleanTooOld() {
