@@ -18,7 +18,7 @@ type Metrics interface {
 
 type metrics struct {
 	repo
-	currentProcessingTweets *prometheus.SummaryVec
+	currentProcessingTweets *prometheus.GaugeVec
 
 	log log.Logger
 }
@@ -39,11 +39,11 @@ func (m *metrics) Start(ctx context.Context) {
 
 			m.log.WithField("count", count).Trace("current processing tweets")
 
-			m.currentProcessingTweets.WithLabelValues().Observe(float64(count))
+			m.currentProcessingTweets.WithLabelValues().Set(float64(count))
 		}
 	}
 }
 
-func NewMetrics(currentProcessingTweets *prometheus.SummaryVec, repo repo, logger log.Logger) Metrics {
+func NewMetrics(currentProcessingTweets *prometheus.GaugeVec, repo repo, logger log.Logger) Metrics {
 	return &metrics{currentProcessingTweets: currentProcessingTweets, repo: repo, log: logger}
 }

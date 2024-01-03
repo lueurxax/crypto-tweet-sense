@@ -128,7 +128,7 @@ func main() {
 		Help:      "Requests delay in seconds",
 	}, []string{"login"})
 
-	tweetCounter := prometheus.NewSummaryVec(prometheus.SummaryOpts{
+	tweetCounter := prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Subsystem: subsystem,
 		Name:      "tweets_count",
