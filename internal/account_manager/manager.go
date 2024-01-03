@@ -56,7 +56,7 @@ func (m *manager) AuthScrapper(ctx context.Context, account common.TwitterAccoun
 	cookies, err := m.repo.GetCookie(ctx, account.Login)
 	if err != nil {
 		if !errors.Is(err, fdb.ErrCookieNotFound) {
-			m.log.WithError(err).WithField("login", account.Login).Error("error while login")
+			m.log.WithError(err).WithField("login", account.Login).Error("error on get cookie")
 			return err
 		}
 

@@ -87,25 +87,23 @@ func (d *db) Save(ctx context.Context, tweets []common.TweetSnapshot) error {
 			return err
 		}
 
-		tr.Set(key, data)
-
-		index := &common.TweetSnapshotIndex{
+		dataIndex, err := jsoniter.Marshal(&common.TweetSnapshotIndex{
 			ID:              tweet.ID,
 			RatingGrowSpeed: tweet.RatingGrowSpeed,
 			CreatedAt:       tweet.TimeParsed,
 			CheckedAt:       tweet.CheckedAt,
-		}
-
-		data, err = jsoniter.Marshal(index)
+		})
 		if err != nil {
 			return err
 		}
+
+		tr.Set(key, data)
 
 		if oldTweet != nil {
 			tr.Clear(d.keyBuilder.TweetRatingIndex(oldTweet.RatingGrowSpeed, oldTweet.ID))
 		}
 
-		tr.Set(d.keyBuilder.TweetRatingIndex(tweet.RatingGrowSpeed, tweet.ID), data)
+		tr.Set(d.keyBuilder.TweetRatingIndex(tweet.RatingGrowSpeed, tweet.ID), dataIndex)
 		tr.Set(d.keyBuilder.TweetCreationIndex(tweet.TimeParsed, tweet.ID), []byte(tweet.ID))
 
 		if err = tr.Commit(); err != nil {
