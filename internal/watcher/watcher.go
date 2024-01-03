@@ -324,14 +324,16 @@ func (w *watcher) cleanTooOldTweets(ctx context.Context) error {
 }
 
 func (w *watcher) initSearchCursor(ctx context.Context, query string) {
+	start := time.Now().UTC().Add(-w.config.SearchInterval)
+
 	ticker := time.NewTicker(w.config.SearchInterval)
 	for range ticker.C {
-		start := time.Now().UTC().Add(-w.config.SearchInterval)
+		w.logger.WithField(queryKey, query).WithField("start", start).Debug("init search cursor")
 
 		tweets, nextCursor, err := w.finder.FindNext(ctx, nil, nil, query, "")
 		if err != nil {
 			w.logger.WithError(err).Error("find tweets")
-			return
+			continue
 		}
 
 		w.singleLL.Push(searchRequest{
@@ -339,6 +341,8 @@ func (w *watcher) initSearchCursor(ctx context.Context, query string) {
 			start:  start,
 			cursor: nextCursor,
 		})
+
+		start = time.Now().UTC()
 
 		for i := range tweets {
 			tweets[i].RatingGrowSpeed = w.processTweet(ctx, &tweets[i])
@@ -360,9 +364,14 @@ func (w *watcher) searchAll(ctx context.Context) {
 
 	nextObj, ok := w.singleLL.Pop()
 
-	for range time.Tick(time.Second) {
-		if ok == false {
+	ticker := time.NewTicker(time.Second)
+
+	for range ticker.C {
+		if !ok {
+			w.logger.Warn("empty singleLL")
+
 			nextObj, ok = w.singleLL.Pop()
+
 			continue
 		}
 
