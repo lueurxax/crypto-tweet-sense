@@ -217,6 +217,7 @@ func (w *watcher) updateOldestFast() {
 		cancel()
 
 		var resetInterval time.Duration
+
 		switch {
 		case count > 50:
 			resetInterval = time.Millisecond
@@ -323,19 +324,16 @@ func (w *watcher) cleanTooOldTweets(ctx context.Context) error {
 }
 
 func (w *watcher) initSearchCursor(ctx context.Context, query string) {
-	for range time.Tick(w.config.SearchInterval) {
+	ticker := time.NewTicker(w.config.SearchInterval)
+	for range ticker.C {
 		start := time.Now().UTC().Add(-w.config.SearchInterval)
-		tweets, nextCursor, err := w.finder.FindNext(
-			ctx,
-			nil,
-			nil,
-			query,
-			"",
-		)
+
+		tweets, nextCursor, err := w.finder.FindNext(ctx, nil, nil, query, "")
 		if err != nil {
 			w.logger.WithError(err).Error("find tweets")
 			return
 		}
+
 		w.singleLL.Push(searchRequest{
 			query:  query,
 			start:  start,
@@ -355,6 +353,7 @@ func (w *watcher) initSearchCursor(ctx context.Context, query string) {
 
 func (w *watcher) searchAll(ctx context.Context) {
 	var oldEnough = w.config.SearchInterval * 10
+
 	<-time.After(oldEnough)
 
 	w.logger.Info("start search all")
@@ -366,6 +365,7 @@ func (w *watcher) searchAll(ctx context.Context) {
 			nextObj, ok = w.singleLL.Pop()
 			continue
 		}
+
 		if time.Now().Add(-oldEnough).After(nextObj.start) {
 			w.search(ctx, nextObj)
 			nextObj, ok = w.singleLL.Pop()
