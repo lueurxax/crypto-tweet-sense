@@ -93,11 +93,7 @@ func (w *watcher) Watch(ctx context.Context) {
 	go w.searchAll(ctx)
 }
 
-func (w *watcher) search(ctx context.Context) {
-	obj, ok := w.singleLL.Pop()
-	if ok {
-		return
-	}
+func (w *watcher) search(ctx context.Context, obj searchRequest) {
 	w.logger.WithField(queryKey, obj.query).WithField("start", obj.start).Debug("searching")
 
 	cursor := obj.cursor
@@ -358,9 +354,22 @@ func (w *watcher) initSearchCursor(ctx context.Context, query string) {
 }
 
 func (w *watcher) searchAll(ctx context.Context) {
-	<-time.After(w.config.SearchInterval * 10)
-	for range time.Tick(w.config.SearchInterval) {
-		w.search(ctx)
+	var oldEnough = w.config.SearchInterval * 10
+	<-time.After(oldEnough)
+
+	w.logger.Info("start search all")
+
+	nextObj, ok := w.singleLL.Pop()
+
+	for range time.Tick(time.Second) {
+		if ok == false {
+			nextObj, ok = w.singleLL.Pop()
+			continue
+		}
+		if time.Now().Add(-oldEnough).After(nextObj.start) {
+			w.search(ctx, nextObj)
+			nextObj, ok = w.singleLL.Pop()
+		}
 	}
 }
 
