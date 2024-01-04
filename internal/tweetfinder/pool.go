@@ -53,6 +53,7 @@ type pool struct {
 	metricsOne   *prometheus.HistogramVec
 	metricsNext  *prometheus.HistogramVec
 	metricsDelay *prometheus.GaugeVec
+	proxies      []string
 }
 
 func (p *pool) IsHot() bool {
@@ -210,16 +211,15 @@ func (p *pool) init(ctx context.Context) error {
 		return err
 	}
 
-	proxies := p.config.GetProxies()
-
-	for i, account := range accounts {
+	for _, account := range accounts {
 		scraper := twitterscraper.New().WithDelay(startDelay).SetSearchMode(twitterscraper.SearchLatest)
 		scraper.SetUserAgent(defaultUserAgent)
 
-		if len(proxies) > len(p.finders)+i {
-			if err = scraper.SetProxy(proxies[len(p.finders)+i]); err != nil {
+		if len(p.proxies) > 0 {
+			if err = scraper.SetProxy(p.proxies[0]); err != nil {
 				return err
 			}
+			p.proxies = p.proxies[1:]
 		}
 
 		if err = p.manager.AuthScrapper(ctx, account, scraper); err != nil {
@@ -304,6 +304,7 @@ func NewPool(metricsOne, metricsNext *prometheus.HistogramVec, metricsDelay *pro
 		finders:      make([]Finder, 0),
 		manager:      manager,
 		repo:         db,
+		proxies:      config.GetProxies(),
 		mu:           sync.RWMutex{},
 		finderDelays: make([]int64, 0),
 		finderTemp:   make([]float64, 0),
