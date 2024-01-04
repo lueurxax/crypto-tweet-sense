@@ -213,12 +213,14 @@ func (p *pool) init(ctx context.Context) error {
 
 	for _, account := range accounts {
 		scraper := twitterscraper.New().WithDelay(startDelay).SetSearchMode(twitterscraper.SearchLatest)
+		scraper.WithClientTimeout(time.Minute)
 		scraper.SetUserAgent(defaultUserAgent)
 
 		if len(p.proxies) > 0 {
 			if err = scraper.SetProxy(p.proxies[0]); err != nil {
 				return err
 			}
+
 			p.proxies = p.proxies[1:]
 		}
 

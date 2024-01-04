@@ -322,6 +322,8 @@ github.com/lueurxax/twitter-scraper v1.0.3 h1:8tGIKmMOroalocDJ4jDoN0bUFY2UvUpfGR
 github.com/lueurxax/twitter-scraper v1.0.3/go.mod h1:I26VdwZra6X2XAM/WhVhc4AqrfjZu5jcB7Ju0GAvTfA=
 github.com/lueurxax/twitter-scraper v1.0.4 h1:Cvx+oOinlCulpvSJZzJZyPv8de7HAeqST6iHXc2wFsI=
 github.com/lueurxax/twitter-scraper v1.0.4/go.mod h1:I26VdwZra6X2XAM/WhVhc4AqrfjZu5jcB7Ju0GAvTfA=
+github.com/lueurxax/twitter-scraper v1.0.5 h1:Z0+lE1tMwJcu1aW7HENudqqegVlXpYBSAwINCIPWuyI=
+github.com/lueurxax/twitter-scraper v1.0.5/go.mod h1:I26VdwZra6X2XAM/WhVhc4AqrfjZu5jcB7Ju0GAvTfA=
 github.com/magefile/mage v1.9.0/go.mod h1:z5UZb/iS3GoOSn0JgWuiw7dxlurVYTu+/jHXqQg881A=
 github.com/magefile/mage v1.15.0 h1:BvGheCMAsG3bWUDbZ8AyXXpCNwU9u5CB6sM+HNb9HYg=
 github.com/magefile/mage v1.15.0/go.mod h1:z5UZb/iS3GoOSn0JgWuiw7dxlurVYTu+/jHXqQg881A=
