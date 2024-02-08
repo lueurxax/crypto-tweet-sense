@@ -96,17 +96,16 @@ func main() {
 	ls := sender.NewSender(api, &telebot.Chat{ID: cfg.LongChatID}, logger.WithField(pkgKey, "long sender"))
 	rls := sender.NewSender(api, &telebot.Chat{ID: cfg.RusLongChatID}, logger.WithField(pkgKey, "rus sender"))
 
-	editor := tweetseditor.NewEditor(
-		openai.NewClient(cfg.ChatGPTToken),
-		st,
-		cfg.EditorSendInterval,
-		cfg.EditorCleanContextInterval,
-		logger.WithField(pkgKey, "editor"),
+	editor := tweetseditor.NewEditor(openai.NewClient(cfg.ChatGPTToken), logger.WithField(pkgKey, "editor"))
+
+	editorManager := tweetseditor.NewManager(
+		cfg.EditorSendInterval, cfg.EditorCleanContextInterval, editor, st, logger.WithField(pkgKey, "edit_manager"),
 	)
-	editor.Edit(ctx)
-	ctx = s.Send(ctx, editor.SubscribeEdited())
-	ctx = ls.Send(ctx, editor.SubscribeLongStoryMessages())
-	ctx = rls.Send(ctx, editor.SubscribeRusStoryMessages())
+
+	editorManager.Edit(ctx)
+	ctx = s.Send(ctx, editorManager.SubscribeEdited())
+	ctx = ls.Send(ctx, editorManager.SubscribeLongStoryMessages())
+	ctx = rls.Send(ctx, editorManager.SubscribeRusStoryMessages())
 
 	logger.Info("service started")
 	<-ctx.Done()

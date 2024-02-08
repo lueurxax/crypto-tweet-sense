@@ -3,18 +3,15 @@ package tweetseditor
 import (
 	"context"
 	"os"
-	"strconv"
 	"testing"
-	"time"
 
-	"github.com/sashabaranov/go-openai"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/require"
-	"gopkg.in/telebot.v3"
-
+	jsoniter "github.com/json-iterator/go"
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
-	"github.com/lueurxax/crypto-tweet-sense/internal/sender"
+	"github.com/sashabaranov/go-openai"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var testTweets = []common.Tweet{
@@ -135,38 +132,6 @@ var moreTestTweets = []common.Tweet{
 	},
 }
 
-type testRepo struct {
-	data []common.Tweet
-}
-
-func (t *testRepo) GetTweetForShortEdit(ctx context.Context) ([]common.Tweet, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (t *testRepo) DeleteShortEditedTweets(ctx context.Context, ids []string) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (t *testRepo) GetTweetForLongEdit(ctx context.Context, count int) ([]common.Tweet, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (t *testRepo) DeleteLongEditedTweets(ctx context.Context, ids []string) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (t *testRepo) GetTweetForEdit(context.Context) ([]common.Tweet, error) {
-	return t.data, nil
-}
-
-func (t *testRepo) DeleteEditedTweets(context.Context, []string) error {
-	return nil
-}
-
 func TestNewEditor(t *testing.T) {
 	t.Run("some tweets request", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -174,23 +139,25 @@ func TestNewEditor(t *testing.T) {
 		logrusLogger := logrus.New()
 		logrusLogger.SetLevel(logrus.TraceLevel)
 		logger := log.NewLogger(logrusLogger)
-		r := &testRepo{data: testTweets}
-		ed := NewEditor(client, r, time.Second, time.Hour*24, logger)
-		ctx = ed.Edit(ctx)
-		output := ed.SubscribeEdited()
+		ed := NewEditor(client, logger)
+		output := make(chan string, 100)
 
-		chatID, err := strconv.ParseInt(os.Getenv("CHAT_ID"), 10, 64)
-		require.NoError(t, err)
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case msg := <-output:
+					t.Log(msg)
+				}
+			}
+		}()
 
-		api, err := telebot.NewBot(
-			telebot.Settings{Token: os.Getenv("BOT_TOKEN"), Poller: &telebot.LongPoller{Timeout: 10 * time.Second}},
-		)
-		require.NoError(t, err)
-		s := sender.NewSender(api, &telebot.Chat{ID: chatID}, logger)
-		s.Send(ctx, output)
-		time.Sleep(time.Second)
-		r.data = moreTestTweets
-		time.Sleep(time.Minute)
+		err := ed.Edit(ctx, testTweets, output)
+		assert.NoError(t, err)
+
+		err = ed.Edit(ctx, moreTestTweets, output)
+		assert.NoError(t, err)
 		cancel()
 	})
 }
@@ -199,26 +166,62 @@ func TestLongStory(t *testing.T) {
 	logrusLogger := logrus.New()
 	logrusLogger.SetLevel(logrus.TraceLevel)
 	logger := log.NewLogger(logrusLogger)
+
 	t.Run("some tweets request", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		client := openai.NewClient(os.Getenv("CHAT_GPT_TOKEN"))
-		r := &testRepo{data: testTweets}
-		ed := NewEditor(client, r, time.Second, time.Hour*24, logger)
-		ctx = ed.Edit(ctx)
-		output := ed.SubscribeLongStoryMessages()
+		ed := NewEditor(client, logger)
+		output := make(chan string, 100)
 
-		chatID, err := strconv.ParseInt(os.Getenv("CHAT_ID"), 10, 64)
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case msg := <-output:
+					t.Log(msg)
+				}
+			}
+		}()
+
+		_, err := ed.EditLongStory(ctx, testTweets, output)
+		assert.NoError(t, err)
+
+		_, err = ed.EditLongStory(ctx, moreTestTweets, output)
+		assert.NoError(t, err)
+		cancel()
+	})
+
+	t.Run("processTweetsFromJson", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		client := openai.NewClient(os.Getenv("CHAT_GPT_TOKEN"))
+
+		data, err := os.ReadFile("./test/fixtures/tweets.json")
 		require.NoError(t, err)
 
-		api, err := telebot.NewBot(
-			telebot.Settings{Token: os.Getenv("BOT_TOKEN"), Poller: &telebot.LongPoller{Timeout: 10 * time.Second}},
-		)
+		var tweets []common.Tweet
+		err = jsoniter.Unmarshal(data, &tweets)
 		require.NoError(t, err)
-		s := sender.NewSender(api, &telebot.Chat{ID: chatID}, logger)
-		s.Send(ctx, output)
-		time.Sleep(time.Second)
-		r.data = moreTestTweets
-		time.Sleep(10 * time.Minute)
+
+		ed := NewEditor(client, logger)
+		output := make(chan string, 100)
+
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case msg := <-output:
+					t.Log(msg)
+				}
+			}
+		}()
+
+		_, err = ed.EditLongStory(ctx, tweets[:20], output)
+		assert.NoError(t, err)
+
+		_, err = ed.EditLongStory(ctx, tweets[20:], output)
+		assert.NoError(t, err)
 		cancel()
 	})
 }
@@ -230,23 +233,27 @@ func TestRusLongStory(t *testing.T) {
 		logrusLogger := logrus.New()
 		logrusLogger.SetLevel(logrus.TraceLevel)
 		logger := log.NewLogger(logrusLogger)
-		r := &testRepo{data: testTweets}
-		ed := NewEditor(client, r, time.Second, time.Hour*24, logger)
-		ctx = ed.Edit(ctx)
-		output := ed.SubscribeRusStoryMessages()
+		ed := NewEditor(client, logger)
+		output := make(chan string, 100)
 
-		chatID, err := strconv.ParseInt(os.Getenv("CHAT_ID"), 10, 64)
-		require.NoError(t, err)
+		content, err := ed.EditLongStory(ctx, testTweets, output)
+		assert.NoError(t, err)
 
-		api, err := telebot.NewBot(
-			telebot.Settings{Token: os.Getenv("BOT_TOKEN"), Poller: &telebot.LongPoller{Timeout: 10 * time.Second}},
-		)
-		require.NoError(t, err)
-		s := sender.NewSender(api, &telebot.Chat{ID: chatID}, logger)
-		s.Send(ctx, output)
-		time.Sleep(time.Second)
-		r.data = moreTestTweets
-		time.Sleep(10 * time.Minute)
+		translatedContent, err := ed.TranslateLongStory(ctx, content)
+		assert.NoError(t, err)
+
+		t.Log(translatedContent)
+
+		content, err = ed.EditLongStory(ctx, moreTestTweets, output)
+		assert.NoError(t, err)
+
+		if content != "" {
+			translatedContent, err = ed.TranslateLongStory(ctx, content)
+			assert.NoError(t, err)
+
+			t.Log(translatedContent)
+		}
+
 		cancel()
 	})
 }
