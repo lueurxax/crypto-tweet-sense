@@ -18,16 +18,14 @@ const (
 	prompt     = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip information such as airdrops or giveaway, if they are not useful for investing. I will parse your answer by code like json `{\"tweets\":[{\"telegram_message\":\"summarized message by tweet\", \"link\":\"link to tweet\", \"useful_information\":true, \"duplicate_information\": false}]}`, then can you prepare messages in json with prepared telegram message? \nTweets: %s." //nolint:lll
 	nextPrompt = "Additional tweets, create new message only for new information: %s."                                                                                                                                                                                                                                                                                                                                                                                                                                                                     //nolint:lll
 
-	longStoryPrompt = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make expanded summary? Skip information such as airdrops or giveaway, if they are not useful for investing. Format the summaries in json with fields: 'telegram_message' for the summary, 'useful_information' to indicate if the information is investment-relevant (true/false), and 'duplicate_information' to indicate if the information is repetitive (true/false), for example {\"telegram_message\":\"summarized message by tweet\", \"useful_information\":true, \"duplicate_information\": false}. \nTweets: %s." //nolint:lll
 	longStorySystem = `User has some popular crypto tweets.
-Can you extract information useful for cryptocurrency investing from these tweets and make expanded summary?
+Can you extract information useful for cryptocurrency investing from these tweets and make summary?
 Skip information such as airdrops or giveaway, if they are not useful for investing.
-Format the summaries in json with fields: 
+Deduplicate information, summarize only new information. Format the summaries in json with fields: 
 	'telegram_message' for the summary, 'useful_information' to indicate if the information is investment-relevant (true/false),
 	and 'duplicate_information' to indicate if the information is repetitive (true/false),
 for example {\"telegram_message\":\"summarized message by tweet\", \"useful_information\":true, \"duplicate_information\": false}.`
-	longStoryNextPrompt = "Additional tweets, create new message only for new information: %s."
-	russianPrompt       = "Translate to russian this text: "
+	russianPrompt = "Translate to russian this text: "
 
 	queueLen = 100
 )
