@@ -21,10 +21,7 @@ const (
 	longStorySystem = `User has some popular crypto tweets.
 Can you extract information useful for cryptocurrency investing from these tweets and make summary?
 Skip information such as airdrops or giveaway, if they are not useful for investing.
-Deduplicate information, summarize only new information. Format the summaries in json with fields: 
-	'telegram_message' for the summary, 'useful_information' to indicate if the information is investment-relevant (true/false),
-	and 'duplicate_information' to indicate if the information is repetitive (true/false),
-for example {\"telegram_message\":\"summarized message by tweet\", \"useful_information\":true, \"duplicate_information\": false}.`
+Deduplicate information, summarize only new information. Format message for telegram channel.`
 	russianPrompt = "Translate to russian this text: "
 
 	queueLen = 100
@@ -33,12 +30,6 @@ for example {\"telegram_message\":\"summarized message by tweet\", \"useful_info
 type Tweet struct {
 	Content   string `json:"telegram_message"`
 	Link      string `json:"link"`
-	Useful    bool   `json:"useful_information"`
-	Duplicate bool   `json:"duplicate_information"`
-}
-
-type LongStoryMessage struct {
-	Content   string `json:"telegram_message"`
 	Useful    bool   `json:"useful_information"`
 	Duplicate bool   `json:"duplicate_information"`
 }
@@ -83,9 +74,6 @@ func (e *editor) EditLongStory(ctx context.Context, tweets []common.Tweet, out c
 	resp, err := e.client.CreateChatCompletion(
 		ctx,
 		openai.ChatCompletionRequest{
-			ResponseFormat: &openai.ChatCompletionResponseFormat{
-				Type: openai.ChatCompletionResponseFormatTypeJSONObject,
-			},
 			Model:    openai.GPT4TurboPreview,
 			Messages: append(e.longStoryMessages, requestMessages...),
 		},
@@ -98,28 +86,14 @@ func (e *editor) EditLongStory(ctx context.Context, tweets []common.Tweet, out c
 
 	e.log.WithField("response", resp).Debug("long story summary generation result")
 
-	res := LongStoryMessage{}
-
-	if err = jsoniter.UnmarshalFromString(resp.Choices[0].Message.Content, &res); err != nil {
-		// TODO: try to search correct json in string
-		e.log.WithError(err).Error("long story summary unmarshal error")
-		out <- utils.Escape(resp.Choices[0].Message.Content)
-
-		return resp.Choices[0].Message.Content, err
-	}
-
-	if !res.Useful || res.Duplicate {
-		return "", nil
-	}
-
-	out <- utils.Escape(res.Content)
+	out <- utils.Escape(resp.Choices[0].Message.Content)
 
 	e.longStoryMessages = append(append(e.longStoryMessages, requestMessages...), openai.ChatCompletionMessage{
 		Role:    openai.ChatMessageRoleAssistant,
 		Content: resp.Choices[0].Message.Content,
 	})
 
-	return res.Content, nil
+	return resp.Choices[0].Message.Content, nil
 }
 
 func (e *editor) Edit(ctx context.Context, tweets []common.Tweet, out chan string) error {
