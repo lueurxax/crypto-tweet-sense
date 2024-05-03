@@ -14,6 +14,8 @@ import (
 	fdb "github.com/lueurxax/crypto-tweet-sense/internal/repo"
 )
 
+const loginKey = "login"
+
 type Manager interface {
 	AddAccount(ctx context.Context, config Config) error
 	AuthScrapper(ctx context.Context, account common.TwitterAccount, scraper *twitterscraper.Scraper) error
@@ -56,12 +58,12 @@ func (m *manager) AuthScrapper(ctx context.Context, account common.TwitterAccoun
 	cookies, err := m.repo.GetCookie(ctx, account.Login)
 	if err != nil {
 		if !errors.Is(err, fdb.ErrCookieNotFound) {
-			m.log.WithError(err).WithField("login", account.Login).Error("error on get cookie")
+			m.log.WithError(err).WithField(loginKey, account.Login).Error("error on get cookie")
 			return err
 		}
 
 		if err = scrapperLogin(ctx, scraper, account); err != nil {
-			m.log.WithError(err).WithField("login", account.Login).Error("error while login")
+			m.log.WithError(err).WithField(loginKey, account.Login).Error("error while login")
 			return err
 		}
 	}
@@ -70,7 +72,7 @@ func (m *manager) AuthScrapper(ctx context.Context, account common.TwitterAccoun
 
 	if !scraper.IsLoggedIn(ctx) {
 		if err = scrapperLogin(ctx, scraper, account); err != nil {
-			m.log.WithError(err).WithField("login", account.Login).Error("error while login")
+			m.log.WithError(err).WithField(loginKey, account.Login).Error("error while login")
 			return err
 		}
 	}
@@ -78,7 +80,7 @@ func (m *manager) AuthScrapper(ctx context.Context, account common.TwitterAccoun
 	cookies = scraper.GetCookies()
 
 	if err = m.repo.SaveCookie(ctx, account.Login, cookies); err != nil {
-		m.log.WithError(err).WithField("login", account.Login).Error("error while login")
+		m.log.WithError(err).WithField(loginKey, account.Login).Error("error while login")
 		return err
 	}
 

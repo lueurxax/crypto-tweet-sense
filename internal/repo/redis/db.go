@@ -10,6 +10,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+const versionKey = "version"
+
 type DB interface {
 	Migrate(ctx context.Context) error
 	version
@@ -30,11 +32,11 @@ func (d *db) Migrate(ctx context.Context) error {
 		return err
 	}
 
-	d.log.WithField("version", v).Info("current version")
+	d.log.WithField(versionKey, v).Info("current version")
 
 	m := migrations.Migrations(v)
 	for _, el := range m {
-		d.log.WithField("version", el.Version()).Info("migrating to version")
+		d.log.WithField(versionKey, el.Version()).Info("migrating to version")
 
 		tx := d.db.TxPipeline()
 
@@ -50,7 +52,7 @@ func (d *db) Migrate(ctx context.Context) error {
 			return err
 		}
 
-		d.log.WithField("version", el.Version()).Info("migrated to version")
+		d.log.WithField(versionKey, el.Version()).Info("migrated to version")
 	}
 
 	return nil

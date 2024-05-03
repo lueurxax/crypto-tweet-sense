@@ -14,6 +14,8 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/pkg/fdbclient"
 )
 
+const implementMe = "implement me"
+
 type Accounts struct{}
 
 func (i *Accounts) Up(ctx context.Context, ftr fdbclient.Transaction, rtr redis.Pipeliner) error {
@@ -75,7 +77,7 @@ func (i *Accounts) Up(ctx context.Context, ftr fdbclient.Transaction, rtr redis.
 
 func (i *Accounts) Down(context.Context, fdbclient.Transaction, redis.Pipeliner) error {
 	// TODO implement me
-	panic("implement me")
+	panic(implementMe)
 }
 
 func (i *Accounts) Version() uint32 {

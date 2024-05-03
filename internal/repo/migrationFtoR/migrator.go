@@ -11,6 +11,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+const versionKey = "version"
+
 type Migrator interface {
 	Migrate(ctx context.Context) error
 }
@@ -30,11 +32,11 @@ func (m *migrator) Migrate(ctx context.Context) error {
 		return err
 	}
 
-	m.log.WithField("version", v).Info("current version")
+	m.log.WithField(versionKey, v).Info("current version")
 
 	mig := Migrations(v)
 	for _, el := range mig {
-		m.log.WithField("version", el.Version()).Info("migrating to version")
+		m.log.WithField(versionKey, el.Version()).Info("migrating to version")
 
 		tr, err := m.fdb.NewTransaction(ctx)
 		if err != nil {
@@ -55,7 +57,7 @@ func (m *migrator) Migrate(ctx context.Context) error {
 			return err
 		}
 
-		m.log.WithField("version", el.Version()).Info("migrated to version")
+		m.log.WithField(versionKey, el.Version()).Info("migrated to version")
 	}
 
 	return nil
