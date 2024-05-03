@@ -12,9 +12,9 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/pkg/fdbclient"
 )
 
-type FirstAndLast struct{}
+type Cookies struct{}
 
-func (i *FirstAndLast) Up(ctx context.Context, ftr fdbclient.Transaction, rtr redis.Pipeliner) error {
+func (i *Cookies) Up(ctx context.Context, ftr fdbclient.Transaction, rtr redis.Pipeliner) error {
 	keyBuilder := keys.NewBuilder()
 	pr, err := fdb.PrefixRange(keyBuilder.TwitterAccounts())
 	if err != nil {
@@ -45,11 +45,11 @@ func (i *FirstAndLast) Up(ctx context.Context, ftr fdbclient.Transaction, rtr re
 	return nil
 }
 
-func (i *FirstAndLast) Down(context.Context, fdbclient.Transaction) error {
+func (i *Cookies) Down(context.Context, fdbclient.Transaction, redis.Pipeliner) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (i *FirstAndLast) Version() uint32 {
-	return 2
+func (i *Cookies) Version() uint32 {
+	return 3
 }

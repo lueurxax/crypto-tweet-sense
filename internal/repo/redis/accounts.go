@@ -1,10 +1,9 @@
-package fdb
+package redis
 
 import (
 	"context"
 	"net/http"
 
-	"github.com/apple/foundationdb/bindings/go/src/fdb"
 	jsoniter "github.com/json-iterator/go"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
@@ -19,63 +18,48 @@ type twitterAccountsRepo interface {
 }
 
 func (d *db) GetAccounts(ctx context.Context) ([]common.TwitterAccount, error) {
-	tx, err := d.db.NewTransaction(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	pr, err := fdb.PrefixRange(d.keyBuilder.TwitterAccounts())
-	if err != nil {
-		return nil, err
-	}
-
-	kvs, err := tx.GetRange(pr)
-	if err != nil {
-		return nil, err
-	}
-
-	accounts := make([]common.TwitterAccount, 0, len(kvs))
-
-	for _, kv := range kvs {
-		account := common.TwitterAccount{}
-
-		if err = jsoniter.Unmarshal(kv.Value, &account); err != nil {
-
+	var cursor uint64
+	accounts := make([]common.TwitterAccount, 0)
+	for {
+		var keys []string
+		var err error
+		keys, cursor, err = d.db.Scan(ctx, cursor, string(d.keyBuilder.TwitterAccounts())+"*", 0).Result()
+		if err != nil {
 			return nil, err
 		}
 
-		accounts = append(accounts, account)
-	}
+		for _, key := range keys {
+			account := common.TwitterAccount{}
 
-	if err = tx.Commit(); err != nil {
-		return nil, err
+			data, err := d.db.Get(ctx, key).Result()
+			if err != nil {
+				return nil, err
+			}
+
+			if err = jsoniter.UnmarshalFromString(data, &account); err != nil {
+				return nil, err
+			}
+
+			accounts = append(accounts, account)
+		}
+
+		if cursor == 0 {
+			break
+		}
 	}
 
 	return accounts, nil
 }
 
 func (d *db) GetAccount(ctx context.Context, login string) (common.TwitterAccount, error) {
-	tx, err := d.db.NewTransaction(ctx)
+	data, err := d.db.Get(ctx, string(d.keyBuilder.TwitterAccount(login))).Result()
 	if err != nil {
 		return common.TwitterAccount{}, err
-	}
-
-	data, err := tx.Get(d.keyBuilder.TwitterAccount(login))
-	if err != nil {
-		return common.TwitterAccount{}, err
-	}
-
-	if data == nil {
-		return common.TwitterAccount{}, ErrTwitterAccountNotFound
 	}
 
 	account := common.TwitterAccount{}
 
-	if err = jsoniter.Unmarshal(data, &account); err != nil {
-		return common.TwitterAccount{}, err
-	}
-
-	if err = tx.Commit(); err != nil {
+	if err = jsoniter.UnmarshalFromString(data, &account); err != nil {
 		return common.TwitterAccount{}, err
 	}
 
@@ -83,59 +67,32 @@ func (d *db) GetAccount(ctx context.Context, login string) (common.TwitterAccoun
 }
 
 func (d *db) SaveAccount(ctx context.Context, account common.TwitterAccount) error {
-	tx, err := d.db.NewTransaction(ctx)
+	data, err := jsoniter.MarshalToString(&account)
 	if err != nil {
 		return err
 	}
 
-	data, err := jsoniter.Marshal(&account)
-	if err != nil {
-		return err
-	}
-
-	tx.Set(d.keyBuilder.TwitterAccount(account.Login), data)
-
-	return tx.Commit()
+	return d.db.Set(ctx, string(d.keyBuilder.TwitterAccount(account.Login)), data, 0).Err()
 }
 
 func (d *db) SaveCookie(ctx context.Context, login string, cookie []*http.Cookie) error {
-	tx, err := d.db.NewTransaction(ctx)
+	data, err := jsoniter.MarshalToString(&cookie)
 	if err != nil {
 		return err
 	}
 
-	data, err := jsoniter.Marshal(&cookie)
-	if err != nil {
-		return err
-	}
-
-	tx.Set(d.keyBuilder.Cookie(login), data)
-
-	return tx.Commit()
+	return d.db.Set(ctx, string(d.keyBuilder.Cookie(login)), data, 0).Err()
 }
 
 func (d *db) GetCookie(ctx context.Context, login string) ([]*http.Cookie, error) {
-	tx, err := d.db.NewTransaction(ctx)
+	data, err := d.db.Get(ctx, string(d.keyBuilder.Cookie(login))).Result()
 	if err != nil {
 		return nil, err
-	}
-
-	data, err := tx.Get(d.keyBuilder.Cookie(login))
-	if err != nil {
-		return nil, err
-	}
-
-	if data == nil {
-		return nil, ErrCookieNotFound
 	}
 
 	cookie := make([]*http.Cookie, 0)
 
-	if err = jsoniter.Unmarshal(data, &cookie); err != nil {
-		return nil, err
-	}
-
-	if err = tx.Commit(); err != nil {
+	if err = jsoniter.UnmarshalFromString(data, &cookie); err != nil {
 		return nil, err
 	}
 

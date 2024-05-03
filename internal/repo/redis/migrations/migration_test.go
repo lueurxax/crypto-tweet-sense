@@ -9,6 +9,7 @@ func TestMigrations(t *testing.T) {
 	type args struct {
 		version uint32
 	}
+
 	tests := []struct {
 		name string
 		args args
@@ -19,11 +20,10 @@ func TestMigrations(t *testing.T) {
 			args: args{
 				version: 0,
 			},
-			want: []Migration{
-				&Init{},
-			},
+			want: []Migration{},
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := Migrations(tt.args.version); !reflect.DeepEqual(got, tt.want) {

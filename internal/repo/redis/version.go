@@ -1,4 +1,4 @@
-package fdb
+package redis
 
 import (
 	"context"
@@ -11,33 +11,17 @@ type version interface {
 }
 
 func (d *db) WriteVersion(ctx context.Context, version uint32) error {
-	tr, err := d.db.NewTransaction(ctx)
-	if err != nil {
-		return err
-	}
-
 	data := make([]byte, binary.Size(version))
 	binary.BigEndian.PutUint32(data, version)
 
-	tr.Set(d.keyBuilder.Version(), data)
-
-	return tr.Commit()
+	return d.db.Set(ctx, string(d.keyBuilder.Version()), string(data), 0).Err()
 }
 
 func (d *db) GetVersion(ctx context.Context) (uint32, error) {
-	tr, err := d.db.NewTransaction(ctx)
+	data, err := d.db.Get(ctx, string(d.keyBuilder.Version())).Result()
 	if err != nil {
 		return 0, err
 	}
 
-	data, err := tr.Get(d.keyBuilder.Version())
-	if err != nil {
-		return 0, err
-	}
-
-	if data == nil {
-		return 0, nil
-	}
-
-	return binary.BigEndian.Uint32(data), nil
+	return binary.BigEndian.Uint32([]byte(data)), nil
 }

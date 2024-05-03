@@ -20,7 +20,7 @@ func TestMigrations(t *testing.T) {
 				version: 0,
 			},
 			want: []Migration{
-				&Init{},
+				&Cookies{},
 			},
 		},
 	}

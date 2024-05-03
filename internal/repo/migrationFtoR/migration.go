@@ -4,17 +4,19 @@ import (
 	"context"
 
 	"github.com/lueurxax/crypto-tweet-sense/pkg/fdbclient"
+	"github.com/redis/go-redis/v9"
 )
 
 type Migration interface {
-	Up(ctx context.Context, tr fdbclient.Transaction) error
-	Down(ctx context.Context, tr fdbclient.Transaction) error
+	Up(ctx context.Context, ftr fdbclient.Transaction, rtr redis.Pipeliner) error
+	Down(ctx context.Context, ftr fdbclient.Transaction, rtr redis.Pipeliner) error
 	Version() uint32
 }
 
 func Migrations(version uint32) []Migration {
 	migrations := []Migration{
-		&Init{},
+		&Accounts{},
+		&Cookies{},
 	}
 
 	result := make([]Migration, 0, len(migrations))
