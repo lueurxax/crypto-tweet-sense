@@ -40,6 +40,7 @@ type config struct {
 	EditorSendInterval         time.Duration `envconfig:"EDITOR_SEND_INTERVAL" default:"30m"`          // Interval to send edited tweets to telegram
 	EditorCleanContextInterval time.Duration `envconfig:"EDITOR_CLEAN_CONTEXT_INTERVAL" default:"12h"` // Interval to clean chatgpt context
 	DatabasePath               string        `default:"/usr/local/etc/foundationdb/fdb.cluster"`
+	RedisAddress               string        `default:"localhost:6379"`
 }
 
 func main() {

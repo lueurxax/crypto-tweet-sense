@@ -16,6 +16,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lueurxax/twitter-scraper v1.0.5
 	github.com/prometheus/client_golang v1.17.0
+	github.com/redis/go-redis/v9 v9.5.1
 	github.com/sashabaranov/go-openai v1.19.3
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
@@ -32,6 +33,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/go-faster/jx v1.1.0 // indirect
@@ -65,3 +67,5 @@ require (
 	nhooyr.io/websocket v1.8.10 // indirect
 	rsc.io/qr v0.2.0 // indirect
 )
+
+replace github.com/gocql/gocql => github.com/scylladb/gocql v1.13.0
