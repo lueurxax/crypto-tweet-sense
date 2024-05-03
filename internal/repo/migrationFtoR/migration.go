@@ -13,8 +13,24 @@ type Migration interface {
 	Version() uint32
 }
 
+type Empty struct {
+}
+
+func (e *Empty) Up(context.Context, fdbclient.Transaction, redis.Pipeliner) error {
+	return nil
+}
+
+func (e *Empty) Down(context.Context, fdbclient.Transaction, redis.Pipeliner) error {
+	return nil
+}
+
+func (e *Empty) Version() uint32 {
+	return 1
+}
+
 func Migrations(version uint32) []Migration {
 	migrations := []Migration{
+		&Empty{},
 		&Accounts{},
 		&Cookies{},
 	}
