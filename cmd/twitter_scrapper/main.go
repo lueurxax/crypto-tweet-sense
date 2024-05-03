@@ -49,7 +49,7 @@ type config struct {
 	LogToEcs         bool         `envconfig:"LOG_TO_ECS" default:"false"`
 	TopCount         int          `envconfig:"TOP_COUNT" default:"1000"`
 	DatabasePath     string       `default:"/usr/local/etc/foundationdb/fdb.cluster"`
-	RedisAddress     string       `default:"localhost:6379"`
+	RedisAddress     string       `envconfig:"REDIS_ADDRESS" default:"localhost:6379"`
 	MetricsSubsystem string       `envconfig:"METRICS_SUBSYSTEM" default:"crypto_tweet_sense"`
 	DiagHTTPPort     int          `envconfig:"DIAG_HTTP_PORT" default:"8080"`
 }
