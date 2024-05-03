@@ -14,6 +14,7 @@ import (
 	foundeationDB "github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/buaazp/fasthttprouter"
 	"github.com/kelseyhightower/envconfig"
+	migrations "github.com/lueurxax/crypto-tweet-sense/internal/repo/migrationFtoR"
 	repo "github.com/lueurxax/crypto-tweet-sense/internal/repo/redis"
 	watcherMetrics "github.com/lueurxax/crypto-tweet-sense/internal/watcher/metrics"
 	"github.com/prometheus/client_golang/prometheus"
@@ -107,6 +108,10 @@ func main() {
 	rst := repo.NewDB(rdb, logger.WithField(pkgKey, "repo"))
 
 	if err = rst.Migrate(ctx); err != nil {
+		panic(err)
+	}
+
+	if err = migrations.NewMigrator(db, rdb, logger.WithField(pkgKey, "migrator")).Migrate(ctx); err != nil {
 		panic(err)
 	}
 
