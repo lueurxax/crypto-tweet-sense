@@ -3,6 +3,9 @@ package redis
 import (
 	"context"
 	"encoding/binary"
+	"errors"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type version interface {
@@ -20,6 +23,9 @@ func (d *db) WriteVersion(ctx context.Context, version uint32) error {
 func (d *db) GetVersion(ctx context.Context) (uint32, error) {
 	data, err := d.db.Get(ctx, string(d.keyBuilder.Version())).Result()
 	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return 0, nil
+		}
 		return 0, err
 	}
 
