@@ -57,6 +57,10 @@ func (m *migrator) Migrate(ctx context.Context) error {
 			return err
 		}
 
+		if _, err = tx.Exec(ctx); err != nil {
+			return err
+		}
+
 		m.log.WithField(versionKey, el.Version()).Info("migrated to version")
 	}
 
