@@ -33,6 +33,7 @@ func Migrations(version uint32) []Migration {
 		&Empty{},
 		&Accounts{},
 		&Cookies{},
+		&SessionStorage{},
 	}
 
 	result := make([]Migration, 0, len(migrations))
