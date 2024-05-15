@@ -69,7 +69,7 @@ func (p *pool) IsHot() bool {
 }
 
 func (p *pool) CurrentTemp(context.Context) float64 {
-	sum := 0.0
+	sum := 0.0 //nolint:goconst
 
 	p.mu.RLock()
 	for _, d := range p.finderTemp {

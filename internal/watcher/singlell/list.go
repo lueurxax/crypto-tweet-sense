@@ -21,10 +21,13 @@ type singleLL[T any] struct {
 func (l *singleLL[T]) Push(v T) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
 	n := &node[T]{value: v}
+
 	if l.first == nil {
 		l.first = n
 		l.last = n
+
 		return
 	}
 
@@ -35,6 +38,7 @@ func (l *singleLL[T]) Push(v T) {
 func (l *singleLL[T]) Pop() (T, bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
 	if l.first == nil {
 		var result T
 		return result, false
@@ -42,6 +46,7 @@ func (l *singleLL[T]) Pop() (T, bool) {
 
 	n := l.first
 	l.first = n.next
+
 	return n.value, true
 }
 

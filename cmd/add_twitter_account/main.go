@@ -6,25 +6,24 @@ import (
 	"syscall"
 
 	nested "github.com/antonfisher/nested-logrus-formatter"
-	foundeationDB "github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"go.elastic.co/ecslogrus"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/account_manager"
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
-	fdb "github.com/lueurxax/crypto-tweet-sense/internal/repo"
+	repo "github.com/lueurxax/crypto-tweet-sense/internal/repo/redis"
 )
 
 const (
-	foundationDBVersion = 710
-	pkgKey              = "pkg"
+	pkgKey = "pkg"
 )
 
 type config struct {
 	LoggerLevel  logrus.Level `envconfig:"LOG_LEVEL" default:"info"`
 	LogToEcs     bool         `envconfig:"LOG_TO_ECS" default:"false"`
-	DatabasePath string       `default:"/usr/local/etc/foundationdb/fdb.cluster"`
+	RedisAddress string       `default:"localhost:6379"`
 }
 
 func main() {
@@ -51,18 +50,13 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	foundeationDB.MustAPIVersion(foundationDBVersion)
+	logger.WithField("cluster_location", cfg.RedisAddress).Info("starting redis connection")
 
-	logger.WithField("cluster_location", cfg.DatabasePath).Info("starting foundationdb")
+	db := redis.NewClient(&redis.Options{Addr: cfg.RedisAddress})
 
-	db, err := foundeationDB.OpenDatabase(cfg.DatabasePath)
-	if err != nil {
-		panic(err)
-	}
+	st := repo.NewDB(db, logger.WithField(pkgKey, "repo"))
 
-	st := fdb.NewDB(db, logrusLogger.WithField(pkgKey, "fdb"))
-
-	if err = account_manager.NewManager(st, logger.WithField(pkgKey, "account_manager")).AddAccount(ctx, account_manager.GetConfig()); err != nil {
+	if err := account_manager.NewManager(st, logger.WithField(pkgKey, "account_manager")).AddAccount(ctx, account_manager.GetConfig()); err != nil {
 		panic(err)
 	}
 

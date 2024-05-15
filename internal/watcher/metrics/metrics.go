@@ -8,6 +8,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+const countLabel = "count"
+
 type repo interface {
 	Count(ctx context.Context) (uint32, error)
 }
@@ -24,7 +26,7 @@ type metrics struct {
 }
 
 func (m *metrics) Start(ctx context.Context) {
-	ticker := time.NewTicker(time.Second * 10)
+	ticker := time.NewTicker(time.Second * 10) //nolint:gomnd
 	for range ticker.C {
 		select {
 		case <-ctx.Done():
@@ -32,12 +34,12 @@ func (m *metrics) Start(ctx context.Context) {
 		default:
 			count, err := m.repo.Count(ctx)
 			if err != nil {
-				m.log.WithError(err).Error("count")
+				m.log.WithError(err).Error(countLabel)
 
 				continue
 			}
 
-			m.log.WithField("count", count).Trace("current processing tweets")
+			m.log.WithField(countLabel, count).Trace("current processing tweets")
 
 			m.currentProcessingTweets.WithLabelValues().Set(float64(count))
 		}

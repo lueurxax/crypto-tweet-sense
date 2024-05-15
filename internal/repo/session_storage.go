@@ -6,6 +6,7 @@ import (
 	"github.com/gotd/td/session"
 )
 
+// Deprecated: use redis instead
 func (d *db) LoadSession(ctx context.Context) ([]byte, error) {
 	tx, err := d.db.NewTransaction(ctx)
 	if err != nil {
@@ -28,6 +29,7 @@ func (d *db) LoadSession(ctx context.Context) ([]byte, error) {
 	return data, nil
 }
 
+// Deprecated: use redis instead
 func (d *db) StoreSession(ctx context.Context, data []byte) error {
 	tx, err := d.db.NewTransaction(ctx)
 	if err != nil {

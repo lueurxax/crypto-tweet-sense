@@ -10,6 +10,8 @@ import (
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	foundeationDB "github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/kelseyhightower/envconfig"
+	repo "github.com/lueurxax/crypto-tweet-sense/internal/repo/redis"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"go.elastic.co/ecslogrus"
 
@@ -33,6 +35,7 @@ type config struct {
 	AppHash      string       `envconfig:"APP_HASH" required:"true"`
 	Phone        string       `envconfig:"PHONE" required:"true"`
 	DatabasePath string       `default:"/usr/local/etc/foundationdb/fdb.cluster"`
+	RedisAddress string       `default:"localhost:6379"`
 }
 
 func main() {
@@ -78,11 +81,15 @@ func main() {
 
 	st := fdb.NewDB(db, logrusLogger.WithField(pkgKey, "fdb"))
 
+	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddress})
+	rst := repo.NewDB(rdb, logger.WithField(pkgKey, "repo"))
+
 	ratingFetcher := ratingCollector.NewFetcher(
 		cfg.AppID,
 		cfg.AppHash,
 		cfg.Phone,
 		st,
+		rst,
 		logger.WithField(pkgKey, "rating_fetcher"),
 	)
 	if err = ratingFetcher.Auth(ctx); err != nil {

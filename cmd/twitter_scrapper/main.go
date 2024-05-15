@@ -14,9 +14,12 @@ import (
 	foundeationDB "github.com/apple/foundationdb/bindings/go/src/fdb"
 	"github.com/buaazp/fasthttprouter"
 	"github.com/kelseyhightower/envconfig"
+	migrations "github.com/lueurxax/crypto-tweet-sense/internal/repo/migrationFtoR"
+	repo "github.com/lueurxax/crypto-tweet-sense/internal/repo/redis"
 	watcherMetrics "github.com/lueurxax/crypto-tweet-sense/internal/watcher/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
@@ -46,6 +49,7 @@ type config struct {
 	LogToEcs         bool         `envconfig:"LOG_TO_ECS" default:"false"`
 	TopCount         int          `envconfig:"TOP_COUNT" default:"1000"`
 	DatabasePath     string       `default:"/usr/local/etc/foundationdb/fdb.cluster"`
+	RedisAddress     string       `envconfig:"REDIS_ADDRESS" default:"localhost:6379"`
 	MetricsSubsystem string       `envconfig:"METRICS_SUBSYSTEM" default:"crypto_tweet_sense"`
 	DiagHTTPPort     int          `envconfig:"DIAG_HTTP_PORT" default:"8080"`
 }
@@ -99,11 +103,23 @@ func main() {
 		panic(err)
 	}
 
+	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddress})
+
+	rst := repo.NewDB(rdb, logger.WithField(pkgKey, "repo"))
+
+	if err = rst.Migrate(ctx); err != nil {
+		panic(err)
+	}
+
+	if err = migrations.NewMigrator(db, rdb, logger.WithField(pkgKey, "migrator")).Migrate(ctx); err != nil {
+		panic(err)
+	}
+
 	checker := ratingCollector.NewChecker(st, cfg.TopCount)
 
 	xConfig := tweetFinder.GetConfigPool()
 
-	accountManager := account_manager.NewManager(st, logger.WithField(pkgKey, "account_manager"))
+	accountManager := account_manager.NewManager(rst, logger.WithField(pkgKey, "account_manager"))
 
 	next := prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: namespace,

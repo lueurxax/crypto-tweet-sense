@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	queueLen    = 10
-	durationKey = "duration"
+	queueLen     = 10
+	durationKey  = "duration"
+	thresholdKey = "threshold"
 )
 
 type WindowLimiter interface {
@@ -95,7 +96,7 @@ func (l *limiter) TrySetThreshold(ctx context.Context, startTime time.Time) erro
 	rl, err := l.repo.GetRequestLimit(ctx, l.id, l.duration)
 	if err == nil {
 		l.log.WithField(durationKey, l.duration).
-			WithField("threshold", rl.Threshold).
+			WithField(thresholdKey, rl.Threshold).
 			WithField("current", rl.RequestsCount).
 			Debug("set threshold")
 	}
@@ -126,7 +127,7 @@ func (l *limiter) RecommendedDelay(ctx context.Context) (uint64, error) {
 		return 0, nil
 	}
 
-	l.log.WithField("threshold", rl.Threshold).
+	l.log.WithField(thresholdKey, rl.Threshold).
 		WithField("counter", rl.RequestsCount).
 		WithField(durationKey, l.duration).
 		Trace("checking if too fast")

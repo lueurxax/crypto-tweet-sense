@@ -48,7 +48,9 @@ type repo interface {
 	SaveRatings(ctx context.Context, ratings []common.UsernameRating) error
 	SaveSentTweet(ctx context.Context, link string) error
 	GetRating(ctx context.Context, username string) (common.Rating, error)
+}
 
+type sessionRepo interface {
 	LoadSession(ctx context.Context) ([]byte, error)
 	StoreSession(ctx context.Context, data []byte) error
 }
@@ -296,7 +298,7 @@ func (f *fetcher) run(ctx context.Context, user *tg.User) {
 	}
 }
 
-func NewFetcher(appID int, appHash, phone string, repo repo, logger log.Logger) Fetcher {
+func NewFetcher(appID int, appHash, phone string, repo repo, sessionRepo sessionRepo, logger log.Logger) Fetcher {
 	d := tg.NewUpdateDispatcher()
 	gaps := updates.New(updates.Config{
 		Handler: d,
@@ -319,7 +321,7 @@ func NewFetcher(appID int, appHash, phone string, repo repo, logger log.Logger) 
 		Middlewares: []telegram.Middleware{
 			hook.UpdateHook(gaps.Handle),
 		},
-		SessionStorage: repo,
+		SessionStorage: sessionRepo,
 		Logger:         zapLogger,
 	})
 

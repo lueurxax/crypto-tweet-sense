@@ -10,6 +10,7 @@ import (
 	"github.com/lueurxax/crypto-tweet-sense/internal/common"
 )
 
+// Deprecated: use redis instead
 type twitterAccountsRepo interface {
 	GetAccount(ctx context.Context, login string) (common.TwitterAccount, error)
 	SaveAccount(ctx context.Context, account common.TwitterAccount) error

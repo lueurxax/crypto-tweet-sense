@@ -969,6 +969,7 @@ grafana:
     #   - grafana.domain.com
     hosts:
         - grafana.teaelephant.com
+        - grafana.lueurxax.org
 
     ## Path for grafana ingress
     path: /

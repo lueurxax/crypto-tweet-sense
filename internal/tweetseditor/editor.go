@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	prompt     = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip information such as airdrops or giveaway, if they are not useful for investing. I will parse your answer by code like json `{\"tweets\":[{\"telegram_message\":\"summarized message by tweet\", \"link\":\"link to tweet\", \"useful_information\":true, \"duplicate_information\": false}]}`, then can you prepare messages in json with prepared telegram message? \nTweets: %s." //nolint:lll
-	nextPrompt = "Additional tweets, create new message only for new information: %s."                                                                                                                                                                                                                                                                                                                                                                                                                                                                     //nolint:lll
+	prompt     = "I have several popular crypto tweets today. Can you extract information useful for cryptocurrency investing from these tweets and make summary? Skip information such as airdrops or giveaway, if they are not useful for investing. I will parse your answer by code like json `{\"tweets\":[{\"telegram_message\":\"summarized message by tweet\", \"link\":\"link to tweet\", \"useful_information\":true, \"duplicate_information\": false}]}`, then can you prepare messages in json with prepared telegram MarkdownV2 message? \nTweets: %s." //nolint:lll
+	nextPrompt = "Additional tweets, create new message only for new information: %s."                                                                                                                                                                                                                                                                                                                                                                                                                                                                                //nolint:lll
 
 	longStorySystem = `User has some popular crypto tweets.
 Can you extract information useful for cryptocurrency investing from these tweets and make summary?
@@ -86,7 +86,7 @@ func (e *editor) EditLongStory(ctx context.Context, tweets []common.Tweet, out c
 
 	e.log.WithField("response", resp).Debug("long story summary generation result")
 
-	out <- utils.Escape(resp.Choices[0].Message.Content)
+	out <- resp.Choices[0].Message.Content
 
 	e.longStoryMessages = append(append(e.longStoryMessages, requestMessages...), openai.ChatCompletionMessage{
 		Role:    openai.ChatMessageRoleAssistant,
@@ -201,7 +201,7 @@ func (e *editor) TranslateLongStory(ctx context.Context, content string) (string
 
 	e.log.WithField("response", resp).Debug("rus long story summary generation result")
 
-	return utils.Escape(resp.Choices[0].Message.Content), nil
+	return resp.Choices[0].Message.Content, nil
 }
 
 func (e *editor) Clean() {
