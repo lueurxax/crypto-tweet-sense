@@ -6,12 +6,14 @@ import (
 	"gopkg.in/telebot.v3"
 
 	"github.com/lueurxax/crypto-tweet-sense/internal/log"
+	"github.com/lueurxax/crypto-tweet-sense/pkg/utils"
 )
 
 //go:generate mockgen -source=sender.go -destination=mocks/mock_sender.go -package=mocks
 
 const (
-	maxLen = 4096
+	maxLen  = 4096
+	whatKey = "what"
 )
 
 type Sender interface {
@@ -42,7 +44,12 @@ func (s *sender) send(cancel context.CancelFunc, ch <-chan string) {
 		for len(msg) > 0 {
 			batchLen := min(maxLen, len(msg))
 			if _, err := s.client.Send(s.recipient, msg[:batchLen], telebot.ModeMarkdownV2); err != nil {
-				s.log.WithField("what", msg).WithError(err).Error("send error")
+				s.log.WithField(whatKey, msg).WithError(err).Warn("send error")
+
+				if _, err = s.client.Send(s.recipient, utils.Escape(msg[:batchLen]), telebot.ModeMarkdownV2); err != nil {
+					s.log.WithField(whatKey, msg).WithError(err).Error("escaped send error")
+				}
+
 				cancel()
 			}
 
